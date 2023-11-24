@@ -1,6 +1,6 @@
 # TruDiagnostic human imprintome array (tdhia)
 
-![banner image](media/banner.jpg)
+![banner image](inst/banner.jpg)
 <br><br>   
    
 **Description**: this software is designed to analyze custom 450k infinium methylation microarrays that characterize the **human imprintome**. The imprintome is the set of imprinted control regions within the genome where where a collection of proximal CpG sites exhibit fixed monoallelic status in methylation state in a parent-of-origin–dependent fashion. These regions are thought to strongly influence expression of adjacently located genes and may play a role in disease susceptability throughout the human lifespan.
