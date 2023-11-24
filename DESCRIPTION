@@ -1,13 +1,16 @@
 Package: tdhia
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Analyze TruDx Version 1 Custom Human imprintome Array.
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Author: Dereje Jima
+Maintainer: Dereje Jima <ddjima2014@gmail.com>
+Description: It loads the iScan data, normalizes it, and fits multiple 
+             regressions to find the difference between cases and control 
+             per the user phenotypic data definition.
+Depends: R (>= 4.1.0)
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.2.3
 Roxygen: list(markdown = TRUE)
+Imports: tidyverse,ggplot2,sesame,readxl,readr

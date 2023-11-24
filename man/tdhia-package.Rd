@@ -4,8 +4,8 @@
 \name{tdhia-package}
 \alias{tdhia}
 \alias{tdhia-package}
-\title{tdhia: What the Package Does (Title Case)}
+\title{tdhia: Analyze TruDx Version 1 Custom Human imprintome Array.}
 \description{
-More about what it does (maybe more than one line) Use four spaces when indenting paragraphs within the Description.
+It loads the iScan data, normalizes it, and fits multiple regressions to find the difference between cases and control per the user phenotypic data definition.
 }
 \keyword{internal}
