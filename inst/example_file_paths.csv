@@ -1,0 +1,4 @@
+var_name,value
+idat_dir_paths,C:\Users\myname\projects\my_imprintome_project\IDAT_files
+study_meta_path,C:\Users\myname\projects\my_imprintome_project\my_study_metadata.xlsx
+output_dir_path,C:\Users\myname\projects\my_imprintome_project\output
