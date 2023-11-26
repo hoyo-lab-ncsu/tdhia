@@ -15,6 +15,9 @@ RoxygenNote: 7.2.3
 Roxygen: list(markdown = TRUE)
 biocViews:
 Imports: 
-	stringr,
-	sesame,
-	BiocFileCache
+	stringr (>=	1.5.1),
+	sesame (>= 1.20.0),
+	BiocFileCache (>= 2.10.1),
+	BiocManager (>= 3.18),
+	BiocParallel
+	

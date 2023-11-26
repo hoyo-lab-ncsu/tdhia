@@ -13,11 +13,6 @@
 #' A dataframe with metadata mapping probe_ids to CpG sites. See ?manifest_v1A2 dataset.
 #' @param multicore boolean flag for whether multicore processing should be used
 #'  when importing IDAT files.
-#' @importFrom sesame openSesame
-#' @importFrom sesameData sesameDataCache
-#' @importFrom stringr str_replace regex
-#' @importFrom BiocParallel SnowParam MulticoreParam
-#' @importFrom parallel detectCores
 #'
 #' @returns a matrix samples to load
 #' @export
@@ -91,18 +86,24 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE) {
     multicore_arg = NULL
   }
 
-  # browser();
 
-  # # Load each of the IDAT file pairs, process with standard SeSame pipeline
-  # print("Processing IDAT Files...")
-  # if (!is.null(multicore_arg)) {
-  #   print(sprintf("  Using %i/%i cores.", default_ncores, parallel::detectCores()))
-  # }
-  # probe_beta_matrix <- openSesame(paste0(idat_dir_paths, '/', all_idat_basenames),
-  #                                 platform="TruDx_imprintome", manifest = mft, mask=F,
-  #                                 BPPARAM = multicore_arg)
-  #
-  # return(probe_beta_matrix)
+  # Load each of the IDAT file pairs, process with standard SeSame pipeline
+  print("Processing IDAT Files...")
+  if (!is.null(multicore_arg)) {
+    print(sprintf("  Using %i/%i cores.", default_ncores, parallel::detectCores()))
+  }
+  probe_beta_matrix <- sesame::openSesame(paste0(idat_dir_paths, '/', unq_idat_basenames),
+                                  platform="TruDx_imprintome", manifest = mft, mask=F,
+                                  BPPARAM = multicore_arg)
+
+  # Convert matrix to dataframe
+  probe_beta_df <- as.data.frame(probe_beta_matrix)
+
+  # Records original column names and row names
+  attr(probe_beta_df, 'orig_colnames') <- colnames(probe_beta_matrix)
+  attr(probe_beta_df, 'orig_rownames') <-  rownames(probe_beta_matrix)
+
+  return(probe_beta_df)
 
 }
 
