@@ -14,8 +14,10 @@
 #' @param multicore boolean flag for whether multicore processing should be used
 #'  when importing IDAT files.
 #' @importFrom sesame openSesame
+#' @importFrom sesameData sesameDataCache
 #' @importFrom stringr str_replace regex
-#'
+#' @importFrom BiocParallel SnowParam MulticoreParam
+#' @importFrom parallel detectCores
 #'
 #' @returns a matrix samples to load
 #' @export
@@ -25,8 +27,7 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE) {
 
 
   # Load manifest file
-  mft = tdhia::manifest_v1A2
-  print(mft)
+  if (is.null(mft)) {mft = tdhia::manifest_v1A2}
 
   # Get list of IDAT files in target path
   all_idat_names <- dir(path = idat_dir_paths, pattern = "*.idat", ignore.case = TRUE)
@@ -68,24 +69,36 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE) {
   # # if (!length(missing_idats)==0) {
   # #   warning("There are missing IDAT files for some patients in study metadata, see 'missing_idats' variable")
   # # }
-  #
-  #
-  #
-  # # Processing IDAT files into beta matrices
-  # ################################################################################
-  # # Convert florescence data from array into beta values
-  #
-  # # Set Multicore parameter depending on operating system
-  # if (.Platform$OS.type == "windows" && multicore) {
-  #   multicore_arg <- BiocParallel::SnowParam(max(c(parallel::detectCores()-1,1)))
-  # } else if (multicore) {
-  #   multicore_arg <- BiocParallel::MulticoreParam(max(c(parallel::detectCores()-1,1)))
-  # } else {
-  #   multicore_arg = NULL
-  # }
-  #
+
+
+  # Processing IDAT files into beta matrices
+  ################################################################################
+  # Convert florescence data from array into beta values
+
+  # Catching SeSame Data Files
+  print("Checking that Sesame idatSignature file is locally cached...")
+  sesameData::sesameDataCache()
+
+  print("Finished")
+
+  # Set Multicore parameter depending on operating system
+  default_ncores <- max(c(parallel::detectCores()-1,1))
+  if (.Platform$OS.type == "windows" && multicore) {
+    multicore_arg <- BiocParallel::SnowParam(default_ncores)
+  } else if (multicore) {
+    multicore_arg <- BiocParallel::MulticoreParam(default_ncores)
+  } else {
+    multicore_arg = NULL
+  }
+
+  # browser();
+
   # # Load each of the IDAT file pairs, process with standard SeSame pipeline
-  # probe_beta_matrix <- openSesame(paste0(idat_dir_paths, '/', target_IDAT_basenames),
+  # print("Processing IDAT Files...")
+  # if (!is.null(multicore_arg)) {
+  #   print(sprintf("  Using %i/%i cores.", default_ncores, parallel::detectCores()))
+  # }
+  # probe_beta_matrix <- openSesame(paste0(idat_dir_paths, '/', all_idat_basenames),
   #                                 platform="TruDx_imprintome", manifest = mft, mask=F,
   #                                 BPPARAM = multicore_arg)
   #

@@ -16,4 +16,5 @@ Roxygen: list(markdown = TRUE)
 biocViews:
 Imports: 
 	stringr,
-	sesame
+	sesame,
+	BiocFileCache
