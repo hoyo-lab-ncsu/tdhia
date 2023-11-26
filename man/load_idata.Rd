@@ -4,10 +4,17 @@
 \alias{load_idata}
 \title{load_idata}
 \usage{
-load_idata(idata)
+load_idata(idat_dir_paths, mft = NULL, multicore = TRUE)
 }
 \arguments{
-\item{idata}{load the idata from red and green channel}
+\item{idat_dir_paths}{the full filesystem path to directory containing the idat
+files to be processed, formatted as a string or a vector of strings.}
+
+\item{mft}{manifest file for particular imprintome array used in data collection.
+A dataframe with metadata mapping probe_ids to CpG sites. See ?manifest_v1A2 dataset.}
+
+\item{multicore}{boolean flag for whether multicore processing should be used
+when importing IDAT files.}
 }
 \value{
 a matrix samples to load
@@ -20,7 +27,4 @@ This is a generic function: methods can be defined for it directly
 or via the \code{\link{Summary}} group generic. For this to work properly,
 the arguments \code{...} should be unnamed, and dispatch is on the
 first argument.
-}
-\examples{
-load-data(input_data)
 }
