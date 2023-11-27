@@ -13,12 +13,19 @@
 #' A dataframe with metadata mapping probe_ids to CpG sites. See ?manifest_v1A2 dataset.
 #' @param multicore boolean flag for whether multicore processing should be used
 #'  when importing IDAT files.
+#' @param column_mappings a dataframe containing two columns used to convert the
+#' basename of the IDAT files (used to label columns of output dataframe), into
+#' a different set of identifiers/mappings.
+#'  - idat_basename: column of base filenames of IDAT (no repeated values).
+#'  - id: column of strings of new mapping (no repeated values).
 #'
-#' @returns a matrix samples to load
+#' @returns a dataframe containing beta values where rows are probe_ids and columns
+#' are the basenames of the idat files or some other mapping specifed by column_mappings.
+#'
 #' @export
 #'
 #'
-load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE) {
+load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE, column_mapping = NULL) {
 
 
   # Load manifest file
@@ -43,27 +50,6 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE) {
 
   # Get unique list of basenames (removes repeats)
   unq_idat_basenames <- unique(all_idat_basenames)
-  #
-  # # Load study meta_data
-  # # study metadata file needs to have these columns
-  # #   source: name of study that data originated from
-  # #   patient_study_id: an integer, study-specific simple ID # for each patient
-  # #   Patient_ID: the original medical record number/code for patient
-  # #
-  # # Note: the same patient participating in different studies will have different
-  # #   Patient_IDs!
-  # #
-  # # Even though Patient_ID and patient_study_id have similar roles, its better to
-  # #   Use a simple integer index for downstream processing.
-  # # study_meta <- read_excel(study_meta_path)
-  # # study_meta$patient_global_id <- paste(study_meta$source, study_meta$patient_study_id, sep = "_")
-  #
-  # # # List any patient IDs not found in IDAT files
-  # # target_IDAT_basenames <- intersect(study_meta$Patient_ID, unq_idat_basenames)
-  # # missing_idats <- setdiff(study_meta$Patient_ID, unq_idat_basenames)
-  # # if (!length(missing_idats)==0) {
-  # #   warning("There are missing IDAT files for some patients in study metadata, see 'missing_idats' variable")
-  # # }
 
 
   # Processing IDAT files into beta matrices
@@ -96,14 +82,62 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE) {
                                   platform="TruDx_imprintome", manifest = mft, mask=F,
                                   BPPARAM = multicore_arg)
 
-  # Convert matrix to dataframe
+  # Convert matrix to dataframe for easier manipulation
   probe_beta_df <- as.data.frame(probe_beta_matrix)
 
   # Records original column names and row names
   attr(probe_beta_df, 'orig_colnames') <- colnames(probe_beta_matrix)
   attr(probe_beta_df, 'orig_rownames') <-  rownames(probe_beta_matrix)
 
+
+  # If column mapping is specified
+  if (!is.null(column_mapping)) {
+
+    df_remap$idat_basename <- unq_idat_basenames
+
+    column_mapping$idat_basename
+    column_mapping$id
+
+
+    remapped_colnames <-
+      dplyr::left_join(df_remap, column_mapping, by = idat_basename,
+                     na_matches = "never", unmatched = "error", relationship = "one-to-one")
+
+
+    colnames(probe_beta_d) <- remapped_colnames
+  }
+
+
   return(probe_beta_df)
 
 }
 
+
+
+
+
+
+
+
+
+
+
+# Load study meta_data
+# study metadata file needs to have these columns
+#   source: name of study that data originated from
+#   patient_study_id: an integer, study-specific simple ID # for each patient
+#   Patient_ID: the original medical record number/code for patient
+#
+# Note: the same patient participating in different studies will have different
+#   Patient_IDs!
+#
+# Even though Patient_ID and patient_study_id have similar roles, its better to
+#   Use a simple integer index for downstream processing.
+# study_meta <- read_excel(study_meta_path)
+# study_meta$patient_global_id <- paste(study_meta$source, study_meta$patient_study_id, sep = "_")
+
+# # List any patient IDs not found in IDAT files
+# target_IDAT_basenames <- intersect(study_meta$Patient_ID, unq_idat_basenames)
+# missing_idats <- setdiff(study_meta$Patient_ID, unq_idat_basenames)
+# if (!length(missing_idats)==0) {
+#   warning("There are missing IDAT files for some patients in study metadata, see 'missing_idats' variable")

@@ -7,7 +7,7 @@ Maintainer: Dereje Jima <ddjima2014@gmail.com>
 Description: It loads the iScan data, normalizes it, and fits multiple 
              regressions to find the difference between cases and control 
              per the user phenotypic data definition.
-Depends: R (>= 4.1.0)
+Depends: R (>= 4.3)
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
@@ -17,7 +17,6 @@ biocViews:
 Imports: 
 	stringr (>=	1.5.1),
 	sesame (>= 1.20.0),
-	BiocFileCache (>= 2.10.1),
-	BiocManager (>= 3.18),
+	sesameData (>= 1.20.0),
 	BiocParallel
 	

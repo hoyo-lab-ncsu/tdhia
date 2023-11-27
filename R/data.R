@@ -36,6 +36,29 @@
 "manifest_v1A2"
 
 
+
+#' Mapping between CpG site IDs and Imprint Control Region IDs
+#'
+#' A table with 9757 rows and 10 columns
+#'
+#' @format A data frame with 22819 rows and 23 columns
+#' \describe{
+#'   \item{X}{   }
+#'   \item{CpG_chr}{   }
+#'   \item{CpG_start}{  }
+#'   \item{CpG_stop}{  }
+#'   \item{ICR_chr}{  }
+#'   \item{ICR_start}{  }
+#'   \item{ICR_stop}{  }
+#'   \item{CpG_Probe}{  }
+#'   \item{ICR_id}{  }
+#'   \item{CpG_id}{  }
+#' }
+#' @source https://doi.org/10.1080/15592294.2022.2091815
+"mapping_cpg_icr_ids"
+
+
+
 #' Sample data
 #'
 #' data to be filled in
