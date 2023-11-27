@@ -3,7 +3,7 @@
 
 #' True Diagnostic Imprintome Manifest File
 #'
-#' A datafranme that maps illumina probe ids used in the imprintome array to CpG
+#' A dataframe that maps illumina probe ids used in the imprintome array to CpG
 #' sites in the human genome (build GRCh37).
 #'
 #' @format A data frame with 22819 rows and 23 columns
@@ -38,7 +38,7 @@
 #'   signal. The red and green are abbreviated to R and G, respectively.}
 #'   \item{Probe_Type}{Either cg, ch, mu, rp, or rs to denote CpG, CpH,
 #'   multi-unique, repetitive element, or SNP probes. Control probes denoted in
-#'    [Controls] section in the GenomeStudio Manifest and prefixed with “ctl” in
+#'    Controls section in the GenomeStudio Manifest and prefixed with “ctl” in
 #'    the SeSAMe Manifest.}
 #'   \item{Strand_FR}{The forward (F) or reverse (R) designation of the design
 #'   strand. Strand_FR is dependent on the genome build used to prepare the array
@@ -75,7 +75,7 @@
 
 #' Mapping between CpG site IDs and Imprint Control Region IDs
 #'
-#' A table with 9757 rows and 10 columns
+#' A table that maps CpG sites to specific imprint control regions.
 #'
 #' @format A data frame with 22819 rows and 23 columns
 #' \describe{

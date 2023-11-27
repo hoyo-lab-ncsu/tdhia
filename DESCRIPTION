@@ -18,5 +18,7 @@ Imports:
 	stringr (>=	1.5.1),
 	sesame (>= 1.20.0),
 	sesameData (>= 1.20.0),
+	dplyr,
+	preprocessCore,
 	BiocParallel
 	

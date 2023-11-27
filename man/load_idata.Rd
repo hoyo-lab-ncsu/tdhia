@@ -4,7 +4,14 @@
 \alias{load_idata}
 \title{load_idata}
 \usage{
-load_idata(idat_dir_paths, mft = NULL, multicore = TRUE, column_mapping = NULL)
+load_idata(
+  idat_dir_paths,
+  mft = NULL,
+  multicore = TRUE,
+  column_mapping = NULL,
+  discard_unmapped = TRUE,
+  quantile_norm = TRUE
+)
 }
 \arguments{
 \item{idat_dir_paths}{the full filesystem path to directory containing the idat
@@ -16,24 +23,25 @@ A dataframe with metadata mapping probe_ids to CpG sites. See ?manifest_v1A2 dat
 \item{multicore}{boolean flag for whether multicore processing should be used
 when importing IDAT files.}
 
-\item{column_mappings}{a dataframe containing two columns used to convert the
+\item{column_mapping}{a dataframe containing two columns used to convert the
 basename of the IDAT files (used to label columns of output dataframe), into
 a different set of identifiers/mappings.
 \itemize{
 \item idat_basename: column of base filenames of IDAT (no repeated values).
 \item id: column of strings of new mapping (no repeated values).
 }}
+
+\item{discard_unmapped}{a boolean flag when set to true discards any idat base
+filenames that are not included in the column_mapping argument (note:
+column_mapping must be specified).}
+
+\item{quantile_norm}{a boolean flag, when set to TRUE, applies quantile
+normalization between the columns in the returned dataframe.}
 }
 \value{
 a dataframe containing beta values where rows are probe_ids and columns
 are the basenames of the idat files or some other mapping specifed by column_mappings.
 }
 \description{
-\code{load_idata} returns the sum of all the values present in its arguments.
-}
-\details{
-This is a generic function: methods can be defined for it directly
-or via the \code{\link{Summary}} group generic. For this to work properly,
-the arguments \code{...} should be unnamed, and dispatch is on the
-first argument.
+Returns the sum of all the values present in its arguments.
 }

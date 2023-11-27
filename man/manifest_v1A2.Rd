@@ -37,7 +37,7 @@ Next_Base signal.}
 signal. The red and green are abbreviated to R and G, respectively.}
 \item{Probe_Type}{Either cg, ch, mu, rp, or rs to denote CpG, CpH,
 multi-unique, repetitive element, or SNP probes. Control probes denoted in
-\link{Controls} section in the GenomeStudio Manifest and prefixed with “ctl” in
+Controls section in the GenomeStudio Manifest and prefixed with “ctl” in
 the SeSAMe Manifest.}
 \item{Strand_FR}{The forward (F) or reverse (R) designation of the design
 strand. Strand_FR is dependent on the genome build used to prepare the array
@@ -75,7 +75,7 @@ True Diagnostic
 manifest_v1A2
 }
 \description{
-A datafranme that maps illumina probe ids used in the imprintome array to CpG
+A dataframe that maps illumina probe ids used in the imprintome array to CpG
 sites in the human genome (build GRCh37).
 }
 \keyword{datasets}
