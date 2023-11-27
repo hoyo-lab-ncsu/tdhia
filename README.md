@@ -5,11 +5,12 @@
    
 **Description**: this software is designed to analyze custom 450k infinium methylation microarrays that characterize the **human imprintome**. The imprintome is the set of imprinted control regions within the genome where where a collection of proximal CpG sites exhibit fixed monoallelic status in methylation state in a parent-of-origin–dependent fashion. These regions are thought to strongly influence expression of adjacently located genes and may play a role in disease susceptability throughout the human lifespan.
 
-**Pipeline Summary**: takes Imprintime array raw data files (.IDAT extension) and metadata associated with the study, produces a table that shows the mean % methylation for each ICR region. 
+**Pipeline Summary**: takes Imprintome array raw data files (.IDAT extension) and metadata associated with the study, produces a table that shows the mean % methylation for each ICR region. 
 <br><br> 
-_Note: IDAT files are assumed to be named by patient_ID, and they should exist in pairs, one file for red channel flourescence, and one file for green channel flourescenet. So for the theoretical patient_ID of **"28137192_R7398"**, the IDAT files would be named (suffix might be lower or upper case, code ignored cased for suffix):_
+_Note: IDAT files are assumed to be named by patient_ID, and they should exist in pairs, one file for red channel flourescence, and one file for green channel flourescenet. So for the theoretical patient_ID of **"28137192_R7398"**, the IDAT files would be named:_
 1. **28137192_R7398**_red.IDAT
-2. **28137192_R7398**_grn.IDAT
+2. **28137192_R7398**_grn.IDAT  
+_> suffix might be lower or upper case in filenames, code ignores cased for suffix._
 <br><br>
     
 ## User Instructions
