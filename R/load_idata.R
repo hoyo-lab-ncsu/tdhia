@@ -88,14 +88,6 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE,
   probe_beta_df <- as.data.frame(probe_beta_matrix)
   cat("Done.\n")
 
-
-  save(list = ls(all.names = TRUE), file='myEnvironment.RData')
-  browser();
-  # load('myEnvironment.RData')
-
-
-
-
   # If a column mapping is specified, rename column names in probe_beta_df
   #   Discard unmapped columns if user specifies it
   if (!is.null(column_mapping)) {

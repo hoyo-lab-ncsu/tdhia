@@ -26,6 +26,6 @@ https://doi.org/10.1080/15592294.2022.2091815
 mapping_cpg_icr_ids
 }
 \description{
-A table with 9757 rows and 10 columns
+A table that maps CpG sites to specific imprint control regions.
 }
 \keyword{datasets}
