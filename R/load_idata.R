@@ -115,8 +115,12 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE,
       as.data.frame(preprocessCore::normalize.quantiles(as.matrix(probe_beta_df)),
                     row.names = rownames(probe_beta_df))
     colnames(norm_probe_df) <- colnames(probe_beta_df)
-    prob_beta_df <- norm_probe_df
+    probe_beta_df <- norm_probe_df
   }
+
+  # Add probe_id as a first column and remove row names
+  probe_beta_df<-cbind(data.frame(Probe_ID = rownames(probe_beta_df)),probe_beta_df)
+  rownames(probe_beta_df) <- NULL
 
   return(probe_beta_df)
 
