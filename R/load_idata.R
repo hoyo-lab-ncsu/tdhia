@@ -23,7 +23,6 @@
 #' @returns a dataframe containing beta values where rows are probe_ids and columns
 #' are the basenames of the idat files or some other mapping specifed by column_mappings.
 #'
-#' @export
 #'
 load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE,
                        column_mapping = NULL, discard_unmapped = TRUE,
