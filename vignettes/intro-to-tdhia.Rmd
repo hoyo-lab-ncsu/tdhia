@@ -1,0 +1,23 @@
+---
+title: "intro-to-tdhia"
+output: rmarkdown::pdf_vignette
+vignette: >
+  %\VignetteIndexEntry{intro-to-tdhia}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r banner, out.width = '70%', echo = FALSE}
+knitr::include_graphics("inst/banner.jpg")
+```
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(tdhia)
+```
