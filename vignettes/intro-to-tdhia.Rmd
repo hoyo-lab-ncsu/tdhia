@@ -8,7 +8,7 @@ vignette: >
 ---
 
 ```{r banner, out.width = '70%', echo = FALSE}
-knitr::include_graphics("inst/banner.jpg")
+knitr::include_graphics("../inst/banner.jpg")
 ```
 
 ```{r, include = FALSE}
