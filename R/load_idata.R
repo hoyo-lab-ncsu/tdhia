@@ -20,7 +20,7 @@
 #'  filenames that are not included in the column_mapping argument (note:
 #'  column_mapping must be specified).
 #' @param quantile_norm a boolean flag, when set to TRUE, applies quantile
-#' normalization between the columns in the returned dataframe.
+#' normalization between the columns in the probe_beta dataframe (default FALSE).
 #'
 #' @returns a dataframe containing beta values where rows are probe_ids and columns
 #' are the basenames of the idat files or some other mapping specifed by column_mappings.
@@ -28,7 +28,7 @@
 #'
 load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE,
                        column_mapping = NULL, discard_unmapped = TRUE,
-                       quantile_norm = TRUE) {
+                       quantile_norm = FALSE) {
 
 
   # Load manifest file
