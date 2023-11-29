@@ -1,7 +1,9 @@
 
 #' load_idata
 #'
-#' Returns the sum of all the values present in its arguments.
+#' Loads a series flourescence measurements from a custom infinium methylation array
+#' and converts into methylation beta values
+#' beta = M/(M+U)   (for cases with significant detection p-value)
 #'
 #' @param idat_dir_paths the full filesystem path to directory containing the idat
 #' files to be processed, formatted as a string or a vector of strings.
