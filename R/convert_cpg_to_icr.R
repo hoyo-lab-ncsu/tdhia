@@ -32,7 +32,7 @@ convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TR
   #   This is used as a grouping variable for the next step.
   cpg_beta_df2 <-
       dplyr::left_join(cpg_beta_df,
-                       dplyr::select(icr_mapping, c("ICR_id", "CpG_id")),
+                       dplyr::select(icr_mapping, c(.data$ICR_id, .data$CpG_id)),
                        dplyr::join_by("CpG_ID" == "CpG_id")) %>%
     dplyr::rename("ICR_ID" = "ICR_id")
 
@@ -40,7 +40,7 @@ convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TR
   # Calculate mean beta value between cpg sites that map to same ICR site
   icr_beta_df <-
     cpg_beta_df2 %>%
-    dplyr::select(-c("CpG_ID", "n_probes")) %>%
+    dplyr::select(-c(.data$CpG_ID, .data$n_probes)) %>%
     dplyr::group_by(.data$ICR_ID) %>%
     dplyr::summarize(dplyr::across(dplyr::where(is.numeric),mean),
               n_CpGs=dplyr::n())
@@ -50,9 +50,9 @@ convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TR
   #   Extract icr id number and add as temp column, sort, remove temp column
   if (sort_by_icr) {
   icr_beta_df <- icr_beta_df %>%
-    dplyr::mutate(icr_num_id = as.numeric(gsub(".*_([0-9]+)$", "\\1", .data$ICR_ID))) %>%
-    dplyr::arrange(icr_num_id) %>%
-    dplyr::select(-icr_num_id)
+    dplyr::mutate("icr_num_id" = as.numeric(gsub(".*_([0-9]+)$", "\\1", .data$ICR_ID))) %>%
+    dplyr::arrange(.data$icr_num_id) %>%
+    dplyr::select(-.data$icr_num_id)
   }
 
   # Filter out entries that do not map to ICR region (icr_id == NA)

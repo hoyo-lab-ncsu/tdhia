@@ -10,7 +10,7 @@ load_idata(
   multicore = TRUE,
   column_mapping = NULL,
   discard_unmapped = TRUE,
-  quantile_norm = TRUE
+  quantile_norm = FALSE
 )
 }
 \arguments{
@@ -36,12 +36,14 @@ filenames that are not included in the column_mapping argument (note:
 column_mapping must be specified).}
 
 \item{quantile_norm}{a boolean flag, when set to TRUE, applies quantile
-normalization between the columns in the returned dataframe.}
+normalization between the columns in the probe_beta dataframe (default FALSE).}
 }
 \value{
 a dataframe containing beta values where rows are probe_ids and columns
 are the basenames of the idat files or some other mapping specifed by column_mappings.
 }
 \description{
-Returns the sum of all the values present in its arguments.
+Loads a series flourescence measurements from a custom infinium methylation array
+and converts into methylation beta values
+beta = M/(M+U)   (for cases with significant detection p-value)
 }
