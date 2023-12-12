@@ -2,8 +2,9 @@
 #' load_idata
 #'
 #' Loads a series flourescence measurements from a custom infinium methylation array
-#' and converts into methylation beta values
-#' beta = M/(M+U)   (for cases with significant detection p-value)
+#' and converts into methylation beta values.
+#'
+#' beta = M/(M+U)   (for probes with significant detection p-values)
 #'
 #' @param idat_dir_paths the full filesystem path to directory containing the idat
 #' files to be processed, formatted as a string or a vector of strings.
@@ -26,13 +27,16 @@
 #' are the basenames of the idat files or some other mapping specifed by column_mappings.
 #'
 #'
-load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE,
+load_idata <- function(idat_dir_paths, platform = "TruDx_imprintome", mft = NULL, multicore = TRUE,
                        column_mapping = NULL, discard_unmapped = TRUE,
-                       quantile_norm = FALSE) {
+                       quantile_norm = FALSE, mask=FALSE) {
+  # Load manifest file if platform is ture diagnostic imprintome array
+  if (is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
+
+  # save(list = ls(all.names = TRUE), file = "load_idata_debug.RData")
+  # load(file = "load_idata_debug.RData")
 
 
-  # Load manifest file
-  if (is.null(mft)) {mft = tdhia::manifest_v1A2}
 
   # Get list of IDAT files in target path
   all_idat_names <- dir(path = idat_dir_paths, pattern = "*.idat", ignore.case = TRUE)
@@ -81,12 +85,25 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE,
   if (!is.null(multicore_arg)) {
     cat(sprintf(" (Using %i/%i cores.)...", default_ncores, parallel::detectCores()))
   }
-  probe_beta_matrix <- sesame::openSesame(paste0(idat_dir_paths, '/', idat_basenames),
-                                  platform="TruDx_imprintome", manifest = mft, mask=F,
-                                  BPPARAM = multicore_arg)
+  probe_beta_matrix <-
+    sesame::openSesame(paste0(idat_dir_paths, '/', idat_basenames),
+                       platform=platform, manifest = mft, mask=mask,
+                       BPPARAM = multicore_arg, fun = sesame::getBetas)
+
+
+  probe_pval_matrix <-
+    sesame::openSesame(paste0(idat_dir_paths, '/', idat_basenames),
+                       platform=platform, manifest = mft,
+                       BPPARAM = multicore_arg, fun = sesame::pOOBAH, return.pval=TRUE)
+
+
+  # save(list = ls(all.names = TRUE), file = "load_idata_debug.RData")
+  # load(file = "load_idata_debug.RData")
+
 
   # Convert matrix to dataframe for easier manipulation
   probe_beta_df <- as.data.frame(probe_beta_matrix)
+  probe_pval_df <- as.data.frame(probe_pval_matrix)
   cat("Done.\n")
 
   # If a column mapping is specified, rename column names in probe_beta_df
@@ -99,17 +116,21 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE,
     if (discard_unmapped) {
       probe_beta_df <- probe_beta_df[,is.element(colnames(probe_beta_df),
                                   column_mapping$idat_basename)]
+      probe_pval_df <- probe_pval_df[,is.element(colnames(probe_pval_df),
+                                                 column_mapping$idat_basename)]
     }
-
-    # Match new id to each idat_basename using a left join
+    # Rename by matching new id to each idat basename using a left_join()
     remapped_colnames <-
       dplyr::left_join(df_remap <- data.frame(idat_basename = colnames(probe_beta_df)),
                        dplyr::select(column_mapping, c("idat_basename", "id")),
                        by = "idat_basename",
-                     na_matches = "never", unmatched = "error", relationship = "one-to-one")
-    # Rename columns of probe_beta_df
+                     na_matches = "never", unmatched = "error",
+                     relationship = "one-to-one")
+    # Rename columns of probe_beta_df and probe_pval_df
     colnames(probe_beta_df) <- remapped_colnames$id
+    colnames(probe_pval_df) <- remapped_colnames$id
   }
+
 
   # Apply quantile normalization between all columns if specified by user.
   if (quantile_norm) {
@@ -123,8 +144,14 @@ load_idata <- function(idat_dir_paths, mft = NULL, multicore = TRUE,
   # Add probe_id as a first column and remove row names
   probe_beta_df<-cbind(data.frame(Probe_ID = rownames(probe_beta_df)),probe_beta_df)
   rownames(probe_beta_df) <- NULL
+  probe_pval_df<-cbind(data.frame(Probe_ID = rownames(probe_pval_df)),probe_pval_df)
+  rownames(probe_pval_df) <- NULL
 
-  return(probe_beta_df)
+
+  ssm_results <- list(probe_beta_df = probe_beta_df,
+                      probe_pval_df = probe_pval_df,
+                   idat_basenames = idat_basenames)
+  return(ssm_results)
 
 }
 
