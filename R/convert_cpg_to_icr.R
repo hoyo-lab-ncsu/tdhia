@@ -22,7 +22,7 @@
 #' specified when the data was loaded in \code{load_idat}.
 #'
 #'
-convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TRUE,
+convert_cpg_to_icr <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
                                quantile_norm = FALSE) {
 
   # Load dataframe that maps CpG sites to ICR site
@@ -31,8 +31,8 @@ convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TR
   # Look up the ICR id for each of the cpg sites, add it as a column
   #   This is used as a grouping variable for the next step.
   cpg_beta_df2 <-
-      dplyr::left_join(cpg_beta_df,
-                       dplyr::select(icr_mapping, c(.data$ICR_id, .data$CpG_id)),
+      dplyr::left_join(cpg_beta$cpg_beta_df,
+                       dplyr::select(icr_mapping, c("ICR_id", "CpG_id")),
                        dplyr::join_by("CpG_ID" == "CpG_id")) %>%
     dplyr::rename("ICR_ID" = "ICR_id")
 
@@ -40,9 +40,10 @@ convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TR
   # Calculate mean beta value between cpg sites that map to same ICR site
   icr_beta_df <-
     cpg_beta_df2 %>%
-    dplyr::select(-c(.data$CpG_ID, .data$n_probes)) %>%
+    dplyr::select(-c("CpG_ID", "n_probes")) %>%
     dplyr::group_by(.data$ICR_ID) %>%
-    dplyr::summarize(dplyr::across(dplyr::where(is.numeric),mean),
+    dplyr::summarize(dplyr::across(dplyr::where(is.numeric),
+                                   function(x) mean(x, na.rm = TRUE)),
               n_CpGs=dplyr::n())
 
 
@@ -59,7 +60,11 @@ convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TR
   icr_beta_df <- icr_beta_df[!is.na(icr_beta_df$ICR_ID),]
 
 
-  return(icr_beta_df)
+  icr_beta <- list(icr_beta_df = icr_beta_df,
+                   platform = cpg_beta$platform,
+                   manifest = cpg_beta$manifest)
+
+  return(icr_beta)
 }
 
 

@@ -6,8 +6,10 @@
 #' values for CpG sites. Calculates mean beta value for cases where multiple
 #' probes map to a single CpG site.
 #'
-#' @param probe_beta_df a dataframe of beta values with rows representing cpg sites
-#'  and columns representing different patients/ samples.
+#' @param probe_beta a list object that must contain
+#'        - probe_beta_df: beta value dataframe, probe_id x patient_id
+#'        - probe_pval_df: p-value value dataframe, probe_id x patient_id
+#'        - Probe_ID: vector of string containing ID for each probe
 #' @param quantile_norm a boolean flag, when true normalizes the beta values
 #' between columns of the icr beta dataframe. Default is FALSE because this
 #' normalization is done earlier in the pipeline, at the probe level.
@@ -25,30 +27,35 @@
 #' specified when the data was loaded in \code{load_idat}.
 #'
 #'
-convert_probe_to_cpg <- function(probe_beta_df, mft = NULL, quantile_norm = FALSE,
+convert_probe_to_cpg <- function(probe_beta,
+                                 quantile_norm = FALSE,
                                  discard_unmapped_cpgs = TRUE) {
 
   # # Convert rownames to prode_beta_df to the first column
   # probe_beta_df2<-cbind(data.frame(Probe_ID = rownames(probe_beta_df)),probe_beta_df)
   # rownames(probe_beta_df2) <- NULL
 
-  if (is.null(mft)) {mft = tdhia::manifest_v1A2}
+  mft = probe_beta$manifest
+
 
   # Match CpG site ID for each probe ID in probe_beta_df2
   probe_beta_df2 <-
-    dplyr::select(
-      dplyr::left_join(probe_beta_df,
-                       dplyr::select(mft, c("Probe_ID", "Name")),
-                       "Probe_ID",-"Probe_ID"), -"Probe_ID"
-      ) %>%
+    probe_beta$probe_beta_df %>%
+    tibble::rownames_to_column(var = "Probe_ID") %>%
+    dplyr::left_join(y = dplyr::select(mft, c("Probe_ID", "Name")),
+                     "Probe_ID",-"Probe_ID") %>%
+    dplyr::select(-c("Probe_ID")) %>%
     dplyr::rename("CpG_ID" = "Name")
+
 
   # CpG Beta Matrix: average beta values between probe_id(s) that belong same CpG site
   cpg_beta_df <-
     probe_beta_df2 %>%
     dplyr::group_by(.data$CpG_ID) %>%
-    dplyr::summarize(dplyr::across(dplyr::where(is.numeric),mean),
+    dplyr::summarize(dplyr::across(dplyr::where(is.numeric),
+                                   function(x) mean(x, na.rm = TRUE)),
               n_probes = dplyr::n())
+
 
   # Discard CpG_ID(s) that do not map uniquely to a single genome location
   #   Defined in manifest file where MAPINFO == (0 or NA)
@@ -56,8 +63,14 @@ convert_probe_to_cpg <- function(probe_beta_df, mft = NULL, quantile_norm = FALS
   f_unmmaped = function (x) is.na(x) | x==0;
   unmapped_cpg_ids <- sapply(cpg_beta_df$CpG_ID,
                              function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Name)[1]]))
+
+
   cpg_beta_df <- cpg_beta_df[!unmapped_cpg_ids,]
   }
 
-  return(cpg_beta_df)
+
+  cpg_beta <- list(cpg_beta_df = cpg_beta_df,
+                     platform = probe_beta$platform,
+                     manifest = probe_beta$manifest)
+  return(cpg_beta)
 }
