@@ -28,7 +28,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   # save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")
   # load(file = "filter_probes_debug.RData")
 
-  # Load manifest
+  # Extract manifest dataframe
   mft = probe_beta$manifest
 
 
@@ -42,6 +42,9 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                                  function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Probe_ID)[1]]))
     filt_probe_beta_df <- probe_beta$probe_beta_df[!unmapped_probe_ids,]
     filt_probe_pval_df <- probe_beta$probe_pval_df[!unmapped_probe_ids,]
+
+    cat(sprintf("Filtering: %.0f probes removed b/c they don't map to genome.\n",
+                nrow(probe_beta$probe_beta_df)- nrow(filt_probe_beta_df)))
   } else {
     # Copy the probe_beta and p-value matrices and beginning filtering steps
     filt_probe_beta_df <- probe_beta$probe_beta_df
@@ -52,19 +55,29 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   # Set individual probe_beta values to NA if the p-value is above max threshold
   #-----------------------------------------------------------------------------
   if (!is.null(max_sig_pval)) {
-    filt_probe_beta_df[filt_probe_pval_df < max_sig_pval] <- NA
+    filt_probe_beta_df[filt_probe_pval_df > max_sig_pval] <- NA
+    cat(sprintf("Filtering: %.0f%% of beta measurements failed p-value threshold of %.0f%%, setting to NA.\n",
+        100*sum(is.na(filt_probe_beta_df))/prod(dim(filt_probe_beta_df)), 100*max_sig_pval))
   }
+  # hist(rowSums(!is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df),
+  #      main = paste("Histogram of probe pass rate"),
+  #      xlab = "Fraction passed probes")
 
 
   # Set entire row of probe measures to NA if not enough pass p-value check above
   #-----------------------------------------------------------------------------
   if(!is.null(max_probe_fail_rate)) {
     # Binary index of rows, TRUE means row failed QC
-    row_fail_ind <- rowSums(is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df) <
+    row_fail_flag <- rowSums(is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df) >
       max_probe_fail_rate
     # Set rows to NA
-    filt_probe_beta_df[row_fail_ind,] <- NA
+    filt_probe_beta_df[row_fail_flag,] <- NA
+    cat(sprintf("Filtering: %.0f%% of probes had a fail rate above %.0f%%, whole row set to NA.\n",
+        100*sum(row_fail_flag)/length(row_fail_flag), 100*max_probe_fail_rate))
   }
+  # hist(rowSums(!is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df),
+  #      main = paste("Histogram of probe pass rate"),
+  #      xlab = "Fraction passed probes")
 
 
   # Discard probes/rows where all samples have a NA for the beta value
@@ -73,9 +86,17 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     # Binary index of rows, TRUE means row failed QC
     row_all_na_ind <- rowSums(is.na(filt_probe_beta_df)) == ncol(filt_probe_beta_df)
     # Set rows to NA
-    filt_probe_beta_df <- filt_probe_beta_df[!row_fail_ind,]
-    filt_probe_pval_df <- filt_probe_pval_df[!row_fail_ind,]
+    filt_probe_beta_df2 <- filt_probe_beta_df[!row_all_na_ind,]
+    filt_probe_pval_df2 <- filt_probe_pval_df[!row_all_na_ind,]
+  } else {
+    filt_probe_beta_df2 <- filt_probe_beta_df
+    filt_probe_pval_df2 <- filt_probe_pval_df
   }
+  cat(sprintf("Filtering: %.0f probes removed because all measurements were NA.\n",
+      nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2)))
+  # hist(rowSums(!is.na(filt_probe_beta_df2))/ncol(filt_probe_beta_df2),
+  #      main = paste("Histogram of probe pass rate"),
+  #      xlab = "Fraction passed probes")
 
 
  probe_beta <- list(probe_beta_df = filt_probe_beta_df,
