@@ -1,12 +1,12 @@
 
 
-#' convert_cpg_to_icr
+#' convert_cpgs_to_icrs
 #'
 #' Converts a dataframe of beta values of specific CpG sites into beta
 #' values for Imprint Control Region (ICR) sites. Calculates mean beta value for
 #' cases where multiple CpG sites map to a single ICR site.
 #'
-#' @param cpg_beta_df a dataframe of beta values with rows representing cpg sites
+#' @param cpg_beta a dataframe of beta values with rows representing cpg sites
 #'  and columns representing different patients/ samples.
 #' @param icr_mapping tba
 #' @param sort_by_icr tba
@@ -22,7 +22,7 @@
 #' specified when the data was loaded in \code{load_idat}.
 #'
 #'
-convert_cpg_to_icr <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
+convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
                                quantile_norm = FALSE) {
 
   # Load dataframe that maps CpG sites to ICR site

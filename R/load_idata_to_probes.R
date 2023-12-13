@@ -1,5 +1,5 @@
 
-#' load_idata
+#' load_idata_to_probes
 #'
 #' Loads a series flourescence measurements from a custom infinium methylation array
 #' and converts into methylation beta values.
@@ -8,30 +8,38 @@
 #'
 #' @param idat_dir_paths the full filesystem path to directory containing the idat
 #' files to be processed, formatted as a string or a vector of strings.
+#' @param platform string for the platform that the array belongs to, as specifed
+#' within the SeSame package with openSesame().
 #' @param mft manifest file for particular imprintome array used in data collection.
-#' A dataframe with metadata mapping probe_ids to CpG sites. See ?manifest_v1A2 dataset.
-#' @param multicore boolean flag for whether multicore processing should be used
-#'  when importing IDAT files.
+#' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
+#' See ?manifest_v1A2 for more info.
+#' @param multicore boolean flag, when true the max number of cores minus 1 is
+#' used for the current system.
 #' @param idat_name_remapping a dataframe containing two columns used to convert the
 #' basename of the IDAT files (used to label columns of output dataframe), into
 #' a different set of identifiers/mappings.
 #'  - idat_basename: column of base filenames of IDAT (no repeated values).
 #'  - id: column of strings of new mapping (no repeated values).
-#' @param idat_discard_unmapped a boolean flag when set to true discards any idat base
+#' @param idat_discard_unmapped a boolean flag, when set to TRUE discards any idat base
 #'  filenames that are not included in the idat_name_remapping argument (note:
 #'  idat_name_remapping must be specified).
 #' @param quantile_norm a boolean flag, when set to TRUE, applies quantile
-#' normalization between the columns in the probe_beta dataframe (default FALSE).
+#' normalization between the columns in the probe_beta dataframe (default = FALSE).
+#' @param mask a boolean flag specified in opensesame() in the Sesame package,
+#' when TRUE excludes some probes due to issues of inter-dependence of measurements
+#' (default = FALSE).
 #'
-#' @returns a list of the following objects:
+#' @returns a named list object with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
 #'  - platform: string that describes platform for methylation array
 #'  - manifest: dataframe of the manifest file used for SeSame processing
 #'
-load_idata <- function(idat_dir_paths, platform = "TruDx_imprintome", mft = NULL, multicore = TRUE,
-                       idat_name_remapping = NULL, idat_discard_unmapped = TRUE,
-                       quantile_norm = FALSE, mask=FALSE) {
+load_idata_to_probes <-
+  function(idat_dir_paths, platform = "TruDx_imprintome",
+           mft = NULL, multicore = TRUE,
+           idat_name_remapping = NULL, idat_discard_unmapped = TRUE,
+           quantile_norm = FALSE, mask = FALSE) {
   # Load manifest file if platform is ture diagnostic imprintome array
   if (is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
 
@@ -89,7 +97,7 @@ load_idata <- function(idat_dir_paths, platform = "TruDx_imprintome", mft = NULL
   }
   probe_beta_matrix <-
     sesame::openSesame(paste0(idat_dir_paths, '/', idat_basenames),
-                       platform=platform, manifest = mft, mask=mask,
+                       platform=platform, manifest = mft, mask = mask,
                        BPPARAM = multicore_arg, fun = sesame::getBetas)
 
 

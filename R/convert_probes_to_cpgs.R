@@ -1,6 +1,6 @@
 
 
-#' convert_probe_to_cpg
+#' convert_probes_to_cpgs
 #'
 #' Converts a dataframe of beta values of specific methylation probes into beta
 #' values for CpG sites. Calculates mean beta value for cases where multiple
@@ -13,8 +13,6 @@
 #' @param quantile_norm a boolean flag, when true normalizes the beta values
 #' between columns of the icr beta dataframe. Default is FALSE because this
 #' normalization is done earlier in the pipeline, at the probe level.
-#' @param mft manifest file for particular imprintome array used in data collection.
-#' A dataframe with metadata mapping probe_ids to CpG sites. See ?manifest_v1A2 dataset.
 #' @param discard_unmapped_cpgs  a boolean flag, when set to TRUE, discards any
 #' CpG sites that are not mapped to a unique genomic location from MAPINFO column
 #' in the manifest file.
@@ -27,7 +25,7 @@
 #' specified when the data was loaded in \code{load_idat}.
 #'
 #'
-convert_probe_to_cpg <- function(probe_beta,
+convert_probes_to_cpgs <- function(probe_beta,
                                  quantile_norm = FALSE,
                                  discard_unmapped_cpgs = TRUE) {
 

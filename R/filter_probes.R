@@ -12,14 +12,11 @@
 #' p-value dataframes.
 #' @param max_sig_pval a maximum threshold for the signal detection value, beta
 #' values higher than this max are set to NA.
-#' @param max_probe_fail_rate proportion value [0-1], if a probe fails the p-value
+#' @param max_probe_fail_rate proportion value (0-1), if a probe fails the p-value
 #' threshold above this proportion of the samples, all measurements from this probe
 #' are set to NA.
 #' @param discard_failed_probes boolean flag, when TRUE any probes that have NA
 #' values across all samples are discarded.
-#' @param mft manifest file for particular imprintome array used in data collection.
-#' A dataframe with metadata mapping probe_ids to CpG sites. See ?manifest_v1A2
-#' for more information on this metadata.
 #'
 #' @returns a dataframe containing beta values where rows are probe_ids and columns
 #' are the sample_ids (basenames of the IDAT files or some other mapping
