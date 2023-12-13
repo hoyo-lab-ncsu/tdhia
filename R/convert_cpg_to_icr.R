@@ -52,13 +52,15 @@ convert_cpg_to_icr <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
   if (sort_by_icr) {
   icr_beta_df <- icr_beta_df %>%
     dplyr::mutate("icr_num_id" = as.numeric(gsub(".*_([0-9]+)$", "\\1", .data$ICR_ID))) %>%
-    dplyr::arrange(.data$icr_num_id) %>%
-    dplyr::select(-.data$icr_num_id)
+    dplyr::arrange("icr_num_id") %>%
+    dplyr::select(-c("icr_num_id"))
   }
 
   # Filter out entries that do not map to ICR region (icr_id == NA)
   icr_beta_df <- icr_beta_df[!is.na(icr_beta_df$ICR_ID),]
 
+
+  # hist(1-rowSums(is.na(icr_beta_df))/ncol(icr_beta_df))
 
   icr_beta <- list(icr_beta_df = icr_beta_df,
                    platform = cpg_beta$platform,
