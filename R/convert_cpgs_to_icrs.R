@@ -10,9 +10,11 @@
 #'  and columns representing different patients/ samples.
 #' @param icr_mapping tba
 #' @param sort_by_icr tba
+#' @param max_icr_fail_rate if a fraction of samples for an ICR have NA values
+#' above this proportion (0-1), the ICR is discarded from the results.
 #' @param quantile_norm a boolean flag, when true normalizes the beta values
 #' between columns of the output icr beta matrix. Default is FALSE because this
-#' normalization is done earlier in the pipeline, at the probe level.
+#' normalization is done earlier in the pipeline.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
@@ -23,7 +25,7 @@
 #'
 #'
 convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
-                               quantile_norm = FALSE) {
+                                 max_icr_fail_rate = 0.20, quantile_norm = FALSE) {
 
   # Load dataframe that maps CpG sites to ICR site
   if (is.null(icr_mapping)) {icr_mapping = tdhia::mapping_cpg_icr_ids}
@@ -57,10 +59,17 @@ convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRU
   }
 
   # Filter out entries that do not map to ICR region (icr_id == NA)
-  icr_beta_df <- icr_beta_df[!is.na(icr_beta_df$ICR_ID),]
+  icr_beta_df2 <- icr_beta_df[!is.na(icr_beta_df$ICR_ID),]
 
+  # Filter ICRs that have too high of a fraction of failed measurements
+  icr_discard <- rowSums(is.na(icr_beta_df2))/ncol(icr_beta_df2) > max_icr_fail_rate
+  icr_beta_df3 <- icr_beta_df2[!icr_discard,]
+  cat(sprintf("ICR Filter: %.f ICRs discarded b/c fail rate > %.f%%.\n",
+              nrow(icr_beta_df2)-nrow(icr_beta_df3), 100*max_icr_fail_rate))
 
-  # hist(1-rowSums(is.na(icr_beta_df))/ncol(icr_beta_df))
+  # hist(rowSums(!is.na(icr_beta_df3))/ncol(icr_beta_df3),
+  #      main = paste("Histogram of ICRs, pass rate"),
+  #      xlab = "Fraction passed probes")
 
   icr_beta <- list(icr_beta_df = icr_beta_df,
                    platform = cpg_beta$platform,
