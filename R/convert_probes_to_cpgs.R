@@ -25,14 +25,9 @@
 #' specified when the data was loaded in \code{load_idat}.
 #'
 #'
-convert_probes_to_cpgs <- function(probe_beta,
-                                 quantile_norm = FALSE,
+convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
                                  discard_unmapped_cpgs = TRUE) {
-
-  # # Convert rownames to prode_beta_df to the first column
-  # probe_beta_df2<-cbind(data.frame(Probe_ID = rownames(probe_beta_df)),probe_beta_df)
-  # rownames(probe_beta_df2) <- NULL
-
+  # Get manifest data
   mft = probe_beta$manifest
 
 
@@ -62,13 +57,12 @@ convert_probes_to_cpgs <- function(probe_beta,
   unmapped_cpg_ids <- sapply(cpg_beta_df$CpG_ID,
                              function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Name)[1]]))
 
-
   cpg_beta_df <- cpg_beta_df[!unmapped_cpg_ids,]
   }
-
 
   cpg_beta <- list(cpg_beta_df = cpg_beta_df,
                      platform = probe_beta$platform,
                      manifest = probe_beta$manifest)
+
   return(cpg_beta)
 }

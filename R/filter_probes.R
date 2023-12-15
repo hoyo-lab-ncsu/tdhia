@@ -43,8 +43,12 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_beta_df <- probe_beta$probe_beta_df[!unmapped_probe_ids,]
     filt_probe_pval_df <- probe_beta$probe_pval_df[!unmapped_probe_ids,]
 
-    cat(sprintf("Filtering: %.0f probes removed b/c they don't map to genome.\n",
-                nrow(probe_beta$probe_beta_df)- nrow(filt_probe_beta_df)))
+    cat(sprintf("Probe filtering: discarding %.0f%% probes ( %i/ %i) b/c they don't
+                map to genome. %.0f probes now remain.\n",
+                100*nrow(filt_probe_beta_df)/nrow(probe_beta$probe_beta_df),
+                nrow(probe_beta$probe_beta_df)- nrow(filt_probe_beta_df),
+                nrow(probe_beta$probe_beta_df),
+                nrow(filt_probe_beta_df)))
   } else {
     # Copy the probe_beta and p-value matrices and beginning filtering steps
     filt_probe_beta_df <- probe_beta$probe_beta_df
@@ -56,8 +60,11 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #-----------------------------------------------------------------------------
   if (!is.null(max_sig_pval)) {
     filt_probe_beta_df[filt_probe_pval_df > max_sig_pval] <- NA
-    cat(sprintf("Filtering: %.0f%% of beta measurements failed p-value threshold of %.0f%%, setting to NA.\n",
-        100*sum(is.na(filt_probe_beta_df))/prod(dim(filt_probe_beta_df)), 100*max_sig_pval))
+    cat(sprintf("Probe filtering: %.0f%% of beta measurements ( %i/ %i) failed the
+                signal p-value max threshold of %.2f, setting them to NA.\n",
+        100*sum(is.na(filt_probe_beta_df))/prod(dim(filt_probe_beta_df)),
+        sum(is.na(filt_probe_beta_df)),prod(dim(filt_probe_beta_df)),
+        max_sig_pval))
   }
   # hist(rowSums(!is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df),
   #      main = paste("Histogram of probe pass rate"),
@@ -72,8 +79,10 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
       max_probe_fail_rate
     # Set rows to NA
     filt_probe_beta_df[row_fail_flag,] <- NA
-    cat(sprintf("Filtering: %.0f%% of probes had a fail rate above %.0f%%, whole row set to NA.\n",
-        100*sum(row_fail_flag)/length(row_fail_flag), 100*max_probe_fail_rate))
+    cat(sprintf("Probe filtering: %.0f%% of probes ( %i/ %i) had a signal p-value
+                fail rate above %.0f%%, setting all beta values to NA for those probes.\n",
+        100*sum(row_fail_flag)/length(row_fail_flag), sum(row_fail_flag),
+        length(row_fail_flag), 100*max_probe_fail_rate))
   }
   # hist(rowSums(!is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df),
   #      main = paste("Histogram of probe pass rate"),
@@ -92,8 +101,12 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_beta_df2 <- filt_probe_beta_df
     filt_probe_pval_df2 <- filt_probe_pval_df
   }
-  cat(sprintf("Filtering: %.0f probes removed because all measurements were NA.\n",
-      nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2)))
+  cat(sprintf("Probe filtering: discarded %.0f%% probes ( %i/ %i) because all measurements were NA.
+              %i probes now remain. \n",
+      100*(nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2))/nrow(filt_probe_beta_df),
+      nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2),
+      nrow(filt_probe_beta_df), nrow(filt_probe_beta_df2)))
+
   # hist(rowSums(!is.na(filt_probe_beta_df2))/ncol(filt_probe_beta_df2),
   #      main = paste("Histogram of probe pass rate"),
   #      xlab = "Fraction passed probes")

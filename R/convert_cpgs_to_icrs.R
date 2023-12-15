@@ -46,7 +46,7 @@ convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRU
     dplyr::group_by(.data$ICR_ID) %>%
     dplyr::summarize(dplyr::across(dplyr::where(is.numeric),
                                    function(x) mean(x, na.rm = TRUE)),
-              n_CpGs=dplyr::n())
+              n_CpGs = dplyr::n())
 
 
   # Sort ICR_ID by their number
@@ -64,8 +64,13 @@ convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRU
   # Filter ICRs that have too high of a fraction of failed measurements
   icr_discard <- rowSums(is.na(icr_beta_df2))/ncol(icr_beta_df2) > max_icr_fail_rate
   icr_beta_df3 <- icr_beta_df2[!icr_discard,]
-  cat(sprintf("ICR Filter: %.f ICRs discarded b/c fail rate > %.f%%.\n",
-              nrow(icr_beta_df2)-nrow(icr_beta_df3), 100*max_icr_fail_rate))
+  # Print out how many ICRs were discarded.
+  cat(sprintf("ICR Filter: %.0f%% of ICRs discarded ( %i/ %i) b/c their signal fail rate was > %.f%%. %.0f ICRs Remain.\n",
+              100*(nrow(icr_beta_df2)-nrow(icr_beta_df3))/length(unique(icr_mapping$ICR_id)),
+              nrow(icr_beta_df2)-nrow(icr_beta_df3),
+              length(unique(icr_mapping$ICR_id)),
+              100*max_icr_fail_rate,
+              nrow(icr_beta_df3)))
 
   # hist(rowSums(!is.na(icr_beta_df3))/ncol(icr_beta_df3),
   #      main = paste("Histogram of ICRs, pass rate"),
