@@ -65,7 +65,8 @@ convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRU
   icr_discard <- rowSums(is.na(icr_beta_df2))/ncol(icr_beta_df2) > max_icr_fail_rate
   icr_beta_df3 <- icr_beta_df2[!icr_discard,]
   # Print out how many ICRs were discarded.
-  cat(sprintf("ICR Filter: %.0f%% of ICRs discarded ( %i/ %i) b/c their signal fail rate was > %.f%%. %.0f ICRs Remain.\n",
+  cat(sprintf("ICR Filter: discarded %.0f%% of ICRs ( %i/ %i) b/c their signal fail rate was > %.f%%.
+              %.0f ICRs still remain.\n",
               100*(nrow(icr_beta_df2)-nrow(icr_beta_df3))/length(unique(icr_mapping$ICR_id)),
               nrow(icr_beta_df2)-nrow(icr_beta_df3),
               length(unique(icr_mapping$ICR_id)),
