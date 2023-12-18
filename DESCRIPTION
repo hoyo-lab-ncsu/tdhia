@@ -22,7 +22,8 @@ Imports:
 	preprocessCore,
 	magrittr,
 	rlang,
-	BiocParallel
+	BiocParallel,
+	tibble
 Suggests: 
     knitr,
     rmarkdown

@@ -1,18 +1,20 @@
 
 
-#' convert_cpg_to_icr
+#' convert_cpgs_to_icrs
 #'
 #' Converts a dataframe of beta values of specific CpG sites into beta
 #' values for Imprint Control Region (ICR) sites. Calculates mean beta value for
 #' cases where multiple CpG sites map to a single ICR site.
 #'
-#' @param cpg_beta_df a dataframe of beta values with rows representing cpg sites
+#' @param cpg_beta a dataframe of beta values with rows representing cpg sites
 #'  and columns representing different patients/ samples.
 #' @param icr_mapping tba
 #' @param sort_by_icr tba
+#' @param max_icr_fail_rate if a fraction of samples for an ICR have NA values
+#' above this proportion (0-1), the ICR is discarded from the results.
 #' @param quantile_norm a boolean flag, when true normalizes the beta values
 #' between columns of the output icr beta matrix. Default is FALSE because this
-#' normalization is done earlier in the pipeline, at the probe level.
+#' normalization is done earlier in the pipeline.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
@@ -22,8 +24,8 @@
 #' specified when the data was loaded in \code{load_idat}.
 #'
 #'
-convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TRUE,
-                               quantile_norm = FALSE) {
+convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
+                                 max_icr_fail_rate = 0.20, quantile_norm = FALSE) {
 
   # Load dataframe that maps CpG sites to ICR site
   if (is.null(icr_mapping)) {icr_mapping = tdhia::mapping_cpg_icr_ids}
@@ -31,7 +33,7 @@ convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TR
   # Look up the ICR id for each of the cpg sites, add it as a column
   #   This is used as a grouping variable for the next step.
   cpg_beta_df2 <-
-      dplyr::left_join(cpg_beta_df,
+      dplyr::left_join(cpg_beta$cpg_beta_df,
                        dplyr::select(icr_mapping, c("ICR_id", "CpG_id")),
                        dplyr::join_by("CpG_ID" == "CpG_id")) %>%
     dplyr::rename("ICR_ID" = "ICR_id")
@@ -42,24 +44,44 @@ convert_cpg_to_icr <- function(cpg_beta_df, icr_mapping = NULL, sort_by_icr = TR
     cpg_beta_df2 %>%
     dplyr::select(-c("CpG_ID", "n_probes")) %>%
     dplyr::group_by(.data$ICR_ID) %>%
-    dplyr::summarize(dplyr::across(dplyr::where(is.numeric),mean),
-              n_CpGs=dplyr::n())
+    dplyr::summarize(dplyr::across(dplyr::where(is.numeric),
+                                   function(x) mean(x, na.rm = TRUE)),
+              n_CpGs = dplyr::n())
 
 
   # Sort ICR_ID by their number
   #   Extract icr id number and add as temp column, sort, remove temp column
   if (sort_by_icr) {
   icr_beta_df <- icr_beta_df %>%
-    dplyr::mutate(icr_num_id = as.numeric(gsub(".*_([0-9]+)$", "\\1", .data$ICR_ID))) %>%
-    dplyr::arrange(icr_num_id) %>%
-    dplyr::select(-icr_num_id)
+    dplyr::mutate("icr_num_id" = as.numeric(gsub(".*_([0-9]+)$", "\\1", .data$ICR_ID))) %>%
+    dplyr::arrange("icr_num_id") %>%
+    dplyr::select(-c("icr_num_id"))
   }
 
   # Filter out entries that do not map to ICR region (icr_id == NA)
-  icr_beta_df <- icr_beta_df[!is.na(icr_beta_df$ICR_ID),]
+  icr_beta_df2 <- icr_beta_df[!is.na(icr_beta_df$ICR_ID),]
 
+  # Filter ICRs that have too high of a fraction of failed measurements
+  icr_discard <- rowSums(is.na(icr_beta_df2))/ncol(icr_beta_df2) > max_icr_fail_rate
+  icr_beta_df3 <- icr_beta_df2[!icr_discard,]
+  # Print out how many ICRs were discarded.
+  cat(sprintf("ICR Filter: discarded %.0f%% of ICRs ( %i/ %i) b/c their signal fail rate was > %.f%%.
+              %.0f ICRs still remain.\n",
+              100*(nrow(icr_beta_df2)-nrow(icr_beta_df3))/length(unique(icr_mapping$ICR_id)),
+              nrow(icr_beta_df2)-nrow(icr_beta_df3),
+              length(unique(icr_mapping$ICR_id)),
+              100*max_icr_fail_rate,
+              nrow(icr_beta_df3)))
 
-  return(icr_beta_df)
+  # hist(rowSums(!is.na(icr_beta_df3))/ncol(icr_beta_df3),
+  #      main = paste("Histogram of ICRs, pass rate"),
+  #      xlab = "Fraction passed probes")
+
+  icr_beta <- list(icr_beta_df = icr_beta_df,
+                   platform = cpg_beta$platform,
+                   manifest = cpg_beta$manifest)
+
+  return(icr_beta)
 }
 
 
