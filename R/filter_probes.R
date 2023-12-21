@@ -44,7 +44,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_beta_df <- probe_beta$probe_beta_df[!unmapped_probe_ids,]
     filt_probe_pval_df <- probe_beta$probe_pval_df[!unmapped_probe_ids,]
 
-    cat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) b/c they don't
+    cat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) in dataset  b/c they don't
                 map uniquely to the genome. %.0f probes now remain.\n",
                 100*nrow(filt_probe_beta_df)/nrow(probe_beta$probe_beta_df),
                 nrow(probe_beta$probe_beta_df)- nrow(filt_probe_beta_df),
