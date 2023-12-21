@@ -24,57 +24,84 @@
 #' specified when the data was loaded in \code{load_idat}.
 #'
 #'
-convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE, max_icr_fail_rate = 0.2, quantile_norm = FALSE) {
+convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
+                                 max_icr_fail_rate = 0.20, quantile_norm = FALSE) {
 
-    # Load dataframe that maps CpG sites to ICR site
-    if (is.null(icr_mapping)) {
-        icr_mapping = tdhia::mapping_cpg_icr_ids
-    }
+  # Load dataframe that maps CpG sites to ICR site
+  if (is.null(icr_mapping)) {icr_mapping = tdhia::mapping_cpg_icr_ids}
 
-    # Look up the ICR id for each of the cpg sites, add it as a column This is used as a grouping variable for the next step.
-    cpg_beta_df2 <- dplyr::left_join(cpg_beta$cpg_beta_df, dplyr::select(icr_mapping, c("ICR_id", "CpG_id")), dplyr::join_by("CpG_ID" == "CpG_id")) %>%
-        dplyr::rename(ICR_ID = "ICR_id")
-
-
-    # Calculate mean beta value between cpg sites that map to same ICR site
-    icr_beta_df <- cpg_beta_df2 %>%
-        dplyr::select(-c("CpG_ID", "n_probes")) %>%
-        dplyr::group_by(.data$ICR_ID) %>%
-        dplyr::summarize(dplyr::across(dplyr::where(is.numeric), function(x) mean(x, na.rm = TRUE)), n_CpGs = dplyr::n())
+  # Look up the ICR id for each of the cpg sites, add it as a column
+  #   This is used as a grouping variable for the next step.
+  cpg_beta_df2 <-
+      dplyr::left_join(cpg_beta$cpg_beta_df,
+                       dplyr::select(icr_mapping, c("ICR_id", "CpG_id")),
+                       dplyr::join_by("CpG_ID" == "CpG_id")) %>%
+    dplyr::rename("ICR_ID" = "ICR_id")
 
 
-    # Sort ICR_ID by their number Extract icr id number and add as temp column, sort, remove temp column
-    if (sort_by_icr) {
-        icr_beta_df <- icr_beta_df %>%
-            dplyr::mutate(icr_num_id = as.numeric(gsub(".*_([0-9]+)$", "\\1", .data$ICR_ID))) %>%
-            dplyr::arrange("icr_num_id") %>%
-            dplyr::select(-c("icr_num_id"))
-    }
+  # Calculate mean beta value between cpg sites that map to same ICR site
+  icr_beta_df <-
+    cpg_beta_df2 %>%
+    dplyr::select(-c("CpG_ID", "n_probes")) %>%
+    dplyr::group_by(.data$ICR_ID) %>%
+    dplyr::summarize(dplyr::across(dplyr::where(is.numeric),
+                                   function(x) mean(x, na.rm = TRUE)),
+              n_CpGs = dplyr::n())
 
-    # Filter out entries that do not map to ICR region (icr_id == NA)
-    icr_beta_df2 <- icr_beta_df[!is.na(icr_beta_df$ICR_ID), ]
 
-    # Filter ICRs that have too high of a fraction of failed measurements
-    icr_discard <- rowSums(is.na(icr_beta_df2))/ncol(icr_beta_df2) > max_icr_fail_rate
-    icr_beta_df3 <- icr_beta_df2[!icr_discard, ]
-    # Print out how many ICRs were discarded.
-    cat(sprintf("ICR Filter: discarded %.0f%% of ICRs ( %i/ %i) b/c their signal fail rate was > %.f%%.
+  # Sort ICR_ID by their number
+  #   Extract icr id number and add as temp column, sort, remove temp column
+  if (sort_by_icr) {
+  icr_beta_df <- icr_beta_df %>%
+    dplyr::mutate("icr_num_id" = as.numeric(gsub(".*_([0-9]+)$", "\\1", .data$ICR_ID))) %>%
+    dplyr::arrange("icr_num_id") %>%
+    dplyr::select(-c("icr_num_id"))
+  }
+
+  # Filter out entries that do not map to ICR region (icr_id == NA)
+  icr_beta_df2 <- icr_beta_df[!is.na(icr_beta_df$ICR_ID),]
+
+  # Filter ICRs that have too high of a fraction of failed measurements
+  icr_discard <- rowSums(is.na(icr_beta_df2))/ncol(icr_beta_df2) > max_icr_fail_rate
+  icr_beta_df3 <- icr_beta_df2[!icr_discard,]
+  # Print out how many ICRs were discarded.
+  cat(sprintf("ICR Filter: discarded %.0f%% of ICRs ( %i/ %i) b/c their signal fail rate was > %.f%%.
               %.0f ICRs still remain.\n",
-        100 * (nrow(icr_beta_df2) - nrow(icr_beta_df3))/length(unique(icr_mapping$ICR_id)), nrow(icr_beta_df2) - nrow(icr_beta_df3), length(unique(icr_mapping$ICR_id)),
-        100 * max_icr_fail_rate, nrow(icr_beta_df3)))
+              100*(nrow(icr_beta_df2)-nrow(icr_beta_df3))/length(unique(icr_mapping$ICR_id)),
+              nrow(icr_beta_df2)-nrow(icr_beta_df3),
+              length(unique(icr_mapping$ICR_id)),
+              100*max_icr_fail_rate,
+              nrow(icr_beta_df3)))
 
-    # hist(rowSums(!is.na(icr_beta_df3))/ncol(icr_beta_df3), main = paste('Histogram of ICRs, pass rate'), xlab = 'Fraction passed probes')
+  # hist(rowSums(!is.na(icr_beta_df3))/ncol(icr_beta_df3),
+  #      main = paste("Histogram of ICRs, pass rate"),
+  #      xlab = "Fraction passed probes")
 
-    icr_beta <- list(icr_beta_df = icr_beta_df, platform = cpg_beta$platform, manifest = cpg_beta$manifest)
+  icr_beta <- list(icr_beta_df = icr_beta_df,
+                   platform = cpg_beta$platform,
+                   manifest = cpg_beta$manifest)
 
-    return(icr_beta)
+  return(icr_beta)
 }
 
 
 
-# # ICR Summary Table ################################################################################ # Columns: # icr_id: id number of ICR
-# as annotated in the original epginetics paper # mean_beta: mean of beta values across all patients # std_beta: standard deviation of beta
-# values across all patients summary_icr_beta_df <- data.frame(icr_id = icr_beta_df$icr_id, mean_beta = rowMeans(select(icr_beta_df,
-# -icr_id, -n_CpGs)), std_beta = rowSds(as.matrix(select(icr_beta_df, -icr_id, -n_CpGs), na.rm=FALSE))) colnames(summary_icr_beta_df)<-
-# c(sprintf('ICR Name (n=%i)',ncol(select(icr_beta_df, -icr_id, -n_CpGs))), 'Mean (% Methylation)','Standard Deviation') write.csv(x =
-# summary_icr_beta_df, file = paste0(output_dir_path, '/summary_icr_beta_df.csv'), row.names = FALSE)
+#
+# # ICR Summary Table
+# ################################################################################
+# # Columns:
+# #  icr_id: id number of ICR as annotated in the original epginetics paper
+# #  mean_beta: mean of beta values across all patients
+# #  std_beta: standard deviation of beta values across all patients
+#
+# summary_icr_beta_df <-
+#   data.frame(icr_id = icr_beta_df$icr_id,
+#              mean_beta = rowMeans(select(icr_beta_df, -icr_id, -n_CpGs)),
+#              std_beta = rowSds(as.matrix(select(icr_beta_df, -icr_id, -n_CpGs),
+#                                          na.rm=FALSE)))
+# colnames(summary_icr_beta_df)<-
+#   c(sprintf("ICR Name (n=%i)",ncol(select(icr_beta_df, -icr_id, -n_CpGs))),
+#     "Mean (% Methylation)","Standard Deviation")
+#
+# write.csv(x = summary_icr_beta_df, file = paste0(output_dir_path, "/summary_icr_beta_df.csv"),
+#           row.names = FALSE)
