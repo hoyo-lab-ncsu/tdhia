@@ -8,7 +8,7 @@
 #'   $probe_beta_df: a dataframe of beta values, probe_id x sample_id
 #'   $probe_pval_df: a dataframe of signal detection p-values, probe_id x sample_id
 #' @param discard_unmapped_probes boolean flag, when TRUE probes that do not map
-#' to a unique position in the genome are discarded from the probe beta and
+#' to a unique genomic position are discarded from the probe beta and
 #' p-value dataframes.
 #' @param max_sig_pval a maximum threshold for the signal detection value, beta
 #' values higher than this max are set to NA.
