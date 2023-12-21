@@ -30,7 +30,8 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 
   # Extract manifest dataframe
   mft = probe_beta$manifest
-
+  cat(sprintf("Probe manifest: manifest file has a total of %.0f probes.\n",
+              nrow(mft)))
 
   # Discard probe_ids(s) that do not map uniquely to a single genome location
   #----------------------------------------------------------------------------
@@ -60,11 +61,11 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #-----------------------------------------------------------------------------
   if (!is.null(max_sig_pval)) {
     filt_probe_beta_df[filt_probe_pval_df > max_sig_pval] <- NA
-    cat(sprintf("Probe filter: %.0f%% of beta measurements ( %i/ %i) failed the
-                signal p-value max threshold of %.2f, setting them to NA.\n",
-        100*sum(is.na(filt_probe_beta_df))/prod(dim(filt_probe_beta_df)),
-        sum(is.na(filt_probe_beta_df)),prod(dim(filt_probe_beta_df)),
-        max_sig_pval))
+    cat(sprintf("Probe filter: %.0f%% of probe beta measurements ( %i/ %i) failed
+                 the signal max p-value threshold of %.2f, setting them to NA.\n",
+                100*sum(is.na(filt_probe_beta_df))/prod(dim(filt_probe_beta_df)),
+                sum(is.na(filt_probe_beta_df)),prod(dim(filt_probe_beta_df)),
+                max_sig_pval))
   }
   # hist(rowSums(!is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df),
   #      main = paste("Histogram of probe pass rate"),
@@ -75,15 +76,19 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #-----------------------------------------------------------------------------
   if(!is.null(max_probe_fail_rate)) {
     # Binary index of rows, TRUE means row failed QC
-    row_fail_flag <- rowSums(is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df) >
-      max_probe_fail_rate
+    probe_fail_rate_df <- data.frame(cpg_id <- rownames(filt_probe_beta_df),
+                                probe_fail_rate = rowSums(is.na(filt_probe_beta_df)) /
+                                  ncol(filt_probe_beta_df))
+
+    row_fail_flag <-  probe_fail_rate_df$probe_fail_rate > max_probe_fail_rate
     # Set rows to NA
     filt_probe_beta_df[row_fail_flag,] <- NA
     cat(sprintf("Probe filter: %.0f%% of probes ( %i/ %i) had a signal p-value
-                fail rate above %.0f%%, setting all beta values to NA for those probes.\n",
+                fail rate above threshold of %.0f%%, setting all beta values to NA
+                for those probes.\n",
         100*sum(row_fail_flag)/length(row_fail_flag), sum(row_fail_flag),
         length(row_fail_flag), 100*max_probe_fail_rate))
-  }
+  } else {probe_fail_rate_df = NULL}
   # hist(rowSums(!is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df),
   #      main = paste("Histogram of probe pass rate"),
   #      xlab = "Fraction passed probes")
@@ -101,21 +106,23 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_beta_df2 <- filt_probe_beta_df
     filt_probe_pval_df2 <- filt_probe_pval_df
   }
-  cat(sprintf("Probe filter: discarded %.0f%% probes ( %i/ %i) because all measurements were NA.
+  cat(sprintf("Probe filter: discarded %.0f%% probes ( %i/ %i) because all measurements are now NA.
               %i probes now remain. \n",
       100*(nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2))/nrow(filt_probe_beta_df),
       nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2),
-      nrow(filt_probe_beta_df), nrow(filt_probe_beta_df2)))
+      nrow(filt_probe_beta_df),
+      nrow(filt_probe_beta_df2)))
 
   # hist(rowSums(!is.na(filt_probe_beta_df2))/ncol(filt_probe_beta_df2),
   #      main = paste("Histogram of probe pass rate"),
   #      xlab = "Fraction passed probes")
 
 
- probe_beta <- list(probe_beta_df = filt_probe_beta_df,
-                      probe_pval_df = filt_probe_pval_df,
+ probe_beta <- list(probe_beta_df = filt_probe_beta_df2,
+                      probe_pval_df = filt_probe_beta_df2,
                       platform = probe_beta$platform,
-                      manifest = probe_beta$manifest
+                      manifest = probe_beta$manifest,
+                      probe_fail_rate_df = probe_fail_rate_df
   )
 
   return(probe_beta)
