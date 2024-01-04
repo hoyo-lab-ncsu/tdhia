@@ -9,7 +9,8 @@ filter_probes(
   discard_unmapped_probes = TRUE,
   max_sig_pval = 0.2,
   max_probe_fail_rate = 0.5,
-  discard_failed_probes = TRUE
+  discard_failed_probes = TRUE,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -18,8 +19,10 @@ $probe_beta_df: a dataframe of beta values, probe_id x sample_id
 $probe_pval_df: a dataframe of signal detection p-values, probe_id x sample_id}
 
 \item{discard_unmapped_probes}{boolean flag, when TRUE probes that do not map
-to a unique position in the genome are discarded from the probe beta and
-p-value dataframes.}
+to a unique genomic position or CpG site are discarded from the probe beta and
+p-value dataframes. Probes that match to a CpG site are identified by their prefix
+in the probe name (\if{html}{\out{<prefix>}}\if{html}{\out{<index>}}_\if{html}{\out{<version tag>}}). Prefixes are (ctl:control,
+cg:CpG, ch:CHG, mu:multi-unique, rp:repetitive element, or rs:SNP)}
 
 \item{max_sig_pval}{a maximum threshold for the signal detection value, beta
 values higher than this max are set to NA.}
@@ -29,7 +32,10 @@ threshold above this proportion of the samples, all measurements from this probe
 are set to NA.}
 
 \item{discard_failed_probes}{boolean flag, when TRUE any probes that have NA
-values across all samples are discarded.}
+values across all samples are discarded (default = TRUE)}
+
+\item{verbose}{boolean flag, when TRUE prints the results of each filtering
+step (default = TRUE).}
 }
 \value{
 a dataframe containing beta values where rows are probe_ids and columns
