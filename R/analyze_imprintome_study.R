@@ -10,8 +10,6 @@
 #' presence of an association is tested for each of the predictor variables to
 #' the response variable.
 #'
-#' whose
-#' methylation state is associated with a response variable
 #' @param beta a dataframe that is a beta matrix with CpG site IDs x patients
 #' (row x col).
 #' @param pheno a data frame of study metadata with patients x phenotype

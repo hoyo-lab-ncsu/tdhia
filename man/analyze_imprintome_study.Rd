@@ -20,5 +20,10 @@ X_1,...,X_N.}
 sorted results from statistical analysis
 }
 \description{
-performs a statistical analysis to identify CpG sites whose methylation
+performs a statistical analysis with CpG sites whose methylation
+state are correlated with a response variable while also considering several
+covariates. CpG methylation status/ beta values are used as predictors, from
+the study metadata a response variable is chosen along with any co-factors. The
+presence of an association is tested for each of the predictor variables to
+the response variable.
 }
