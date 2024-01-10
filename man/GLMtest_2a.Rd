@@ -7,15 +7,15 @@
 GLMtest_2a(methcol, meth_matrix, Y, X1, X2)
 }
 \arguments{
-\item{methcol}{numeric vector of which columns to use for predictors}
+\item{methcol}{vector of which column names to use for meth_matrix}
 
 \item{meth_matrix}{matrix of predictor variables (beta values)}
 
 \item{Y}{vector, response variable}
 
-\item{X1}{predictor ?}
+\item{X1}{vector, covariate variable 1}
 
-\item{X2}{predictor ?}
+\item{X2}{vector, covariate variable 2}
 }
 \value{
 fit of general linear model, including

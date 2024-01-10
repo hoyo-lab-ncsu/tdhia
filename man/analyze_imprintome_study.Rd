@@ -4,15 +4,20 @@
 \alias{analyze_imprintome_study}
 \title{analyze_imprintome_study}
 \usage{
-analyze_imprintome_study(tbeta, pheno)
+analyze_imprintome_study(beta, pheno, quantile_norm = TRUE)
 }
 \arguments{
-\item{tbeta}{beta matrix}
+\item{beta}{a dataframe that is a beta matrix with CpG site IDs x patients
+(row x col).}
 
-\item{pheno}{study metadata}
+\item{pheno}{a data frame of study metadata with patients x phenotype
+variables (row x col). Contains the response variable Y and N covariates
+X_1,...,X_N.}
+
+\item{quantile_norm}{boolean flag, when true the beta matrix is quantile normalized}
 }
 \value{
-sorted results from satistical analysis
+sorted results from statistical analysis
 }
 \description{
 performs a statistical analysis to identify CpG sites whose methylation

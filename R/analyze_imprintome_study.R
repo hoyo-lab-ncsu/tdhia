@@ -1,22 +1,28 @@
 
 
 
-
-
 #' analyze_imprintome_study
-#' @description performs a statistical analysis to identify CpG sites whose methylation
-#' @param tbeta beta matrix
-#' @param pheno study metadata
 #'
+#' @description performs a statistical analysis to identify CpG sites whose methylation
+#' @param beta a dataframe that is a beta matrix with CpG site IDs x patients
+#' (row x col).
+#' @param pheno a data frame of study metadata with patients x phenotype
+#' variables (row x col). Contains the response variable Y and N covariates
+#' X_1,...,X_N.
+#' @param quantile_norm boolean flag, when true the beta matrix is quantile normalized
 #' @importFrom data.table :=
 #'
-#' @return sorted results from satistical analysis
+#' @return sorted results from statistical analysis
 #'
-analyze_imprintome_study <- function (tbeta, pheno) {
+analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 
 
   # Quantile Normalization
-
+  if (quantile_norm) {
+    tbeta <- t(preprocessCore::normalize.quantiles(beta))
+  } else {
+    tbeta <- t(beta)
+  }
 
 
   # Beta matrix, rows:patients (samples), columns:cpg or ICR sites (features)
@@ -24,11 +30,14 @@ analyze_imprintome_study <- function (tbeta, pheno) {
   dim(tbetas)
   dim(tbetas)
   # This line has to be true. This is the only thing you must care about when creating the two matrices.
-  compare::compare(rownames(tbetas),rownames(pheno)) #TRUE
+  stopifnot(compare::compare(rownames(tbetas),rownames(pheno)))
 
 
-  # This is where you call
+  # Perform general linear modeling of imprintome and study metadata
   start.time <- base::Sys.time()
+
+  # Use all but 2 cores for parallel processing
+  mc.cores <- max(c(parallel::detectCores()-2,1), na.rm = TRUE)
 
   ind.hcc <-
     parallel::mclapply(
@@ -38,7 +47,7 @@ analyze_imprintome_study <- function (tbeta, pheno) {
       Y = pheno$case_control,
       X1 = pheno$sex,
       X2 = pheno$bw,
-      mc.cores = 56
+      mc.cores = mc.cores
     )
 
   # End time
@@ -57,7 +66,7 @@ analyze_imprintome_study <- function (tbeta, pheno) {
   data.table::setcolorder(all.results, c("probeID","BETA","SE", "P_VAL"))
 
   # Organize and export resutls.
-  all.results.sorted <- export_results(all.results, tbeta)
+  all.results.sorted <- analyze_imprintome_export(all.results, tbeta)
 
   return(all.results.sorted)
 
@@ -69,11 +78,11 @@ analyze_imprintome_study <- function (tbeta, pheno) {
 #'
 #' @description perform general linear modeling response variable Y to
 #'
-#' @param methcol numeric vector of which columns to use for predictors
+#' @param methcol vector of which column names to use for meth_matrix
 #' @param meth_matrix matrix of predictor variables (beta values)
 #' @param Y vector, response variable
-#' @param X1 predictor ?
-#' @param X2 predictor ?
+#' @param X1 vector, covariate variable 1
+#' @param X2 vector, covariate variable 2
 #'
 #'
 #' @return fit of general linear model, including
@@ -95,9 +104,9 @@ GLMtest_2a = function(methcol, meth_matrix, Y, X1, X2 ) {
 
 
 
-#' export_results
+#' analyze_imprintome_export
 #'
-#' @description Organizes output from statistical analysis
+#' @description Organizes output from statistical analysis for export
 #'
 #' @param tbetas transposed beta_matrix
 #' @param all.results output of general linear modeling analysis
@@ -107,7 +116,7 @@ GLMtest_2a = function(methcol, meth_matrix, Y, X1, X2 ) {
 #' @return export
 #'
 #'
-export_results <- function(all.results, tbetas) {
+analyze_imprintome_export <- function(all.results, tbetas) {
 
   #Add a column for the number of samples for each probe; this is just processing
   # the result and checking lambda to check if the assumption works ( generally,
@@ -117,16 +126,17 @@ export_results <- function(all.results, tbetas) {
   # frequencies in a categorical variable. It is commonly used in GLM (Generalized
   # Linear Model) analysis to assess the fit of the model to the data.
 
-  # Transform methylation data again so that rows are probes and columns are samples
+  # Transform methylation data again so to probes x samples (row x col)
   tbetas_2<-t(tbetas)
 
   # Match order of all.results with order of probes in tbetas_1
   all.results<-all.results[match(rownames(tbetas_2),all.results$probeID),]
   all.results$N <- rowSums(!is.na(tbetas_2))
-  # Convert results data table to Data.frame
+  # Convert results data table to data.frame
   all.results <- base::as.data.frame(all.results) # High memory option
   # all.results <- Laurae::setDF(all.results)      # Low memory option, extra package req
 
+  # Sort rows by p value
   all.results.sorted<-all.results %>%
     dplyr::arrange(.data$P_VAL)
 
@@ -134,7 +144,7 @@ export_results <- function(all.results, tbetas) {
   dplyr::count(all.results.sorted$P_VAL < 0.05)
   FileName<-paste("HCC_TruDx_v1_case_contorl_09152023.txt")
 
-  #Lambda
+  # Lambda
   lambda <-
     stats::median(stats::qchisq( as.numeric( as.character( all.results.sorted$P_VAL)),
                         df = 1, lower.tail = F),
