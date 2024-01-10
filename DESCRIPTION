@@ -23,7 +23,9 @@ Imports:
 	magrittr,
 	rlang,
 	BiocParallel,
-	tibble
+	tibble,
+	data.table,
+	compare
 Suggests: 
     knitr,
     rmarkdown
