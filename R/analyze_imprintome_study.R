@@ -3,7 +3,15 @@
 
 #' analyze_imprintome_study
 #'
-#' @description performs a statistical analysis to identify CpG sites whose methylation
+#' @description performs a statistical analysis with CpG sites whose methylation
+#' state are correlated with a response variable while also considering several
+#' covariates. CpG methylation status/ beta values are used as predictors, from
+#' the study metadata a response variable is chosen along with any co-factors. The
+#' presence of an association is tested for each of the predictor variables to
+#' the response variable.
+#'
+#' whose
+#' methylation state is associated with a response variable
 #' @param beta a dataframe that is a beta matrix with CpG site IDs x patients
 #' (row x col).
 #' @param pheno a data frame of study metadata with patients x phenotype
