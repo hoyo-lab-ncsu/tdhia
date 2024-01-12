@@ -80,15 +80,14 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 
 
 
-#' GLMtest_2a
+#' GLMcall
 #'
 #' @description perform general linear modeling response variable Y to
 #'
 #' @param methcol vector of which column names to use for meth_matrix
 #' @param meth_matrix matrix of predictor variables (beta values)
 #' @param Y vector, response variable
-#' @param X1 vector, covariate variable 1
-#' @param X2 vector, covariate variable 2
+#' @param ... any additional covariates variables
 #'
 #'
 #' @return fit of general linear model, including
@@ -96,9 +95,12 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 #' - Std. Error: standard error of the estimates
 #' - Cumulative two-tailed probability
 #'
-GLMtest_2a = function(methcol, meth_matrix, Y, X1, X2 ) {
+GLMcall = function(methcol, meth_matrix, Y, ... ) {
+  args = list(...)
+  # Create a formula string dynamically using paste
+  formula_string <- paste("Y ~ meth_matrix[, methcol]", paste(args, collapse = " + "), sep = " + ")
 
-  mod = stats::glm(Y ~ meth_matrix[, methcol] + X1 + X2, family = "binomial")
+  mod = stats::glm(formula_string, family = "binomial")
 
   cf = summary(mod)$coefficients
 
@@ -148,7 +150,7 @@ analyze_imprintome_export <- function(all.results, tbetas) {
 
   utils::head(all.results.sorted)
   dplyr::count(all.results.sorted$P_VAL < 0.05)
-  FileName<-paste("HCC_TruDx_v1_case_contorl_09152023.txt")
+  FileName<-paste("imprintome_study_results.txt")
 
   # Lambda
   lambda <-
