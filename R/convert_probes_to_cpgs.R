@@ -30,6 +30,9 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   # Get manifest data
   mft = probe_beta$manifest
 
+  save(list = ls(all.names = TRUE), file = "convert_probes_to_cpgs.RData")
+  # load(file = "convert_probes_to_cpgs.RData")
+
 
   # Match CpG site ID for each probe ID in probe_beta_df2
   probe_beta_df2 <-
@@ -58,7 +61,14 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   unmapped_cpg_ids <- sapply(cpg_beta_df$CpG_ID,
                              function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Name)[1]]))
 
+  # Remove unmapped cpgs
   cpg_beta_df <- cpg_beta_df[!unmapped_cpg_ids,]
+
+  # Convert to dataframe to add rownames and drop first column (Cpg IDs)
+  cpg_beta_df <- as.data.frame(cpg_beta_df)
+  rownames(cpg_beta_df) <- cpg_beta_df$CpG_ID
+  cpg_beta_df <- select(cpg_beta_df,-CpG_ID)
+
   cat(sprintf("CpG filter: discarded %.0f%% of CpG sites (%i/ %i) because they
       do not map uniquely to the genome. %i CpG sites remain.\n",
       100*sum(unmapped_cpg_ids)/length(unmapped_cpg_ids), sum(unmapped_cpg_ids),
