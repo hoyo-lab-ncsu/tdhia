@@ -16,8 +16,8 @@
 #' @param discard_unmapped_cpgs  a boolean flag, when set to TRUE, discards any
 #' CpG sites that are not mapped to a unique genomic location from MAPINFO column
 #' in the manifest file.
-#' @param return_n_probes a boolean flag, when set to TRUE, adds a column to the
-#'  output cpg beta matrix (cpg_beta_df), labeled a n_probe, that represents the
+#' @param return_n_probes a boolean flag, when set to TRUE, adds a column,n_probes,
+#'  to the output cpg beta matrix (cpg_beta_df), that represents the
 #'  number of probes whose beta value was averaged together for that cpg site.
 #'
 #' @importFrom magrittr %>%
@@ -79,7 +79,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   }
 
   if (!return_n_probes) {
-    cpg_beta_df <- cpg_beta_df %>%select(return_n_probes)
+    cpg_beta_df <- cpg_beta_df %>%select(-n_probes)
   }
 
   cpg_beta <- list(cpg_beta_df = cpg_beta_df,

@@ -42,37 +42,33 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
   stopifnot(all(rownames(tbetas)==rownames(pheno)))
 
 
-  # Use all but 2 cores for parallel processing
-  mc.cores <- max(c(parallel::detectCores()-2,1), na.rm = TRUE)
 
 
-  # formula_string <- paste("pheno$cd_dry ~ tbetas[,1]", paste(args, collapse = " + "), sep = " + ")
-
-
+  # Threshold beta value to hemi-methylation
   hemi_tbetas <- (tbetas > 0.35) & (tbetas < 0.65)
 
-  mod = stats::glm("hemi_tbetas[,1] ~ pheno$cd_dry + pheno$ba_sex + pheno$race_final", family = "binomial")
 
+  for_each_fun <-
+    function (x) GLM_par(R = hemi_tbetas, Rind = x,   P = dplyr::select(pheno, cd_dry), Pind = 1,
+                         C = dplyr::select(pheno, c(race_final, mat_bmi_lmp, smoking,
+                                             smoke_preg)), family = "binomial")
 
-  GLMcall(methcol = 1, meth_matrix = tbetas, Y = pheno$cd_dry)
+  #Intiatialize parallel computing
+  cl <- parallel::makePSOCKcluster(parallel::detectCores() - 1)
+  doParallel::registerDoParallel(cl)
 
+  start <- Sys.time()
 
-  # # Perform general linear modeling of imprintome and study metadata
-  # start.time <- base::Sys.time()
-  # ind.hcc <-
-  #   parallel_lapply(
-  #     X = stats::setNames(seq_len(ncol(tbetas)), dimnames(tbetas)[[2]]),
-  #     FUN = GLMcall,
-  #     meth_matrix = tbetas,
-  #     Y = pheno$case_control,
-  #     X1 = pheno$sex,
-  #     X2 = pheno$bw,
-  #     mc.cores = mc.cores
-  #   )
-  #
-  # # End time
-  # end.time <- base::Sys.time()
-  # time.taken <- end.time - start.time
+  cat("Fitting model...\n")
+  df_fits <- foreach::foreach(i=1:dim(hemi_tbetas)[2], .combine = rbind) %dopar% {
+    for_each_fun(i)
+  }
+  colnames(df_fits) <-  c("Response", "Predictor", "BETA", "SE", "Z", "P_VAL",  "Formula")
+
+  finish <- Sys.time()
+  cat(sprintf("Processing time: "))
+  finish - start
+
 
   # Setting metadata
   data.table::setattr(ind.hcc, 'class', 'data.frame')
@@ -118,32 +114,40 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 #' - Cumulative two-tailed probability
 GLM_par = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
 
-  stopifnot(is.data.frame(R), "GLM_par:error: R must be a dataframe")
-  stopifnot(is.data.frame(P), "GLM_par:error: P must be a dataframe")
-  stopifnot(length(Rind)==1 && length(Pind)==1,
-            sprintf("GLM_par:error: both lengths of Rind(==%.0f) and P(ind==%.0f) must be 1.",
-                                                        length(Rind), length(Pind)))
+  save(list = ls(all.names = TRUE), file = "GLM_par.RData")
+  # load(file = "GLM_par.RData")
+
+  stopifnot("GLM_par:error: R must be a dataframe" = is.data.frame(R) || is.matrix(R))
+  stopifnot("GLM_par:error: P must be a dataframe" = is.data.frame(P) || is.matrix(P))
+  if (length(Rind)!=1 || length(Pind)!=1) {
+    stop(sprintf("GLM_par:error: both length() of Rind(==%.0f) and P(==%.0f) must be 1.",
+                      length(Rind), length(Pind)))
+  }
 
   # Formula string for confounders that preserve the column names (for record keeping)
-  confounder_string <- paste0("C$",colnames(C), c(rep(" +", ncol(C)-1), ""), collapse=" ")
+  confounder_string <- paste0("C[, '",colnames(C),"']", c(rep(" +", ncol(C)-1), ""), collapse=" ")
 
   # Formula string for Response that preserve the column names (for record keeping)
-  response_string <- paste0("R$", colnames(R)[Rind])
+  response_string <- paste0("R[, '", colnames(R)[Rind],"']")
 
   # Formula string for Predictor that preserve the column names (for record keeping)
-  predictor_string <- paste0("P$", colnames(P)[Pind])
+  predictor_string <- paste0("P[, '", colnames(P)[Pind], "']")
 
   # Create a formula string dynamically using paste
   formula_string <- paste0(response_string, " ~ ", predictor_string, " + ", confounder_string)
 
   # Calculate glm
-  mod = stats::glm(formula_string, family = family)
+  mod = stats::glm(formula(formula_string), family = family)
 
-  # Grab ppredictor
+  # Grab predictor from second row of summary output
   cf = summary(mod)$coefficients
+  # Produce tidy dataframe of output
+  out <- cbind(data.frame(Response = colnames(R)[Rind]),
+               Predictor = colnames(P)[Pind],
+               t(as.data.frame(cf[2,])),
+               data.frame(Formula = formula_string))
+  rownames(out) <- NULL
 
-  # Only grab outputs for predictor (second row)
-  out <- setNames(c(cf[2,], formula_string),c(names(cf[2,]), "formula"))
 
   return(out)
 }
@@ -165,7 +169,6 @@ GLM_par = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
 #'
 #'
 analyze_imprintome_export <- function(all.results, tbetas) {
-
   #Add a column for the number of samples for each probe; this is just processing
   # the result and checking lambda to check if the assumption works ( generally,
   # anything close to 1 is good).

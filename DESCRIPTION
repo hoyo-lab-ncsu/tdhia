@@ -25,7 +25,9 @@ Imports:
 	BiocParallel,
 	tibble,
 	data.table,
-	compare
+	parallel,
+	doParallel,
+	foreach
 Suggests: 
     knitr,
     rmarkdown
