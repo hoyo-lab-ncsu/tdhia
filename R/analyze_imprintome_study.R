@@ -16,7 +16,9 @@
 #' variables (row x col). Contains the response variable Y and N covariates
 #' X_1,...,X_N.
 #' @param quantile_norm boolean flag, when true the beta matrix is quantile normalized
-#' @importFrom data.table :=
+#'
+#' @importFrom magrittr %>%
+#' @importFrom rlang .data
 #'
 #' @return sorted results from statistical analysis
 #'
@@ -24,7 +26,6 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 
   save(list = ls(all.names = TRUE), file = "analyze_imprintome_study.RData")
   # load(file = "analyze_imprintome_study.RData")
-
 
   # Quantile Normalization
   if (quantile_norm) {
@@ -37,59 +38,55 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 
   # Reorder rows in tbetas so that ID matches order in rows of pheno (rownames for both)
   tbetas <- tbetas[order(match(rownames(tbetas),rownames(pheno))),]
-
   # Check that rownames between tbetas and pheno
   stopifnot(all(rownames(tbetas)==rownames(pheno)))
-
-
-
 
   # Threshold beta value to hemi-methylation
   hemi_tbetas <- (tbetas > 0.35) & (tbetas < 0.65)
 
-
+  # Helper function for parallel processing of fitting models
   for_each_fun <-
-    function (x) GLM_par(R = hemi_tbetas, Rind = x,   P = dplyr::select(pheno, cd_dry), Pind = 1,
+    function (x) GLM_parallel(R = hemi_tbetas, Rind = x,   P = dplyr::select(pheno, cd_dry), Pind = 1,
                          C = dplyr::select(pheno, c(race_final, mat_bmi_lmp, smoking,
                                              smoke_preg)), family = "binomial")
 
-  #Intiatialize parallel computing
+  #Initialize parallel computing
   cl <- parallel::makePSOCKcluster(parallel::detectCores() - 1)
   doParallel::registerDoParallel(cl)
 
+  # Fit mdoels to data in parallel
   start <- Sys.time()
-
   cat("Fitting model...\n")
   df_fits <- foreach::foreach(i=1:dim(hemi_tbetas)[2], .combine = rbind) %dopar% {
     for_each_fun(i)
   }
-  colnames(df_fits) <-  c("Response", "Predictor", "BETA", "SE", "Z", "P_VAL",  "Formula")
-
+  colnames(df_fits) <-  c("Response", "Predictor", "EST", "SE", "Z", "P_VAL",  "Formula")
   finish <- Sys.time()
-  cat(sprintf("Processing time: "))
-  finish - start
+  cat(sprintf("Processing time: %f %s\n", finish - start, units(finish - start)))
+
+  # Sort by p value
+  df_fits_sorted <- df_fits %>% dplyr::arrange(.data$P_VAL)
+
+  # Adjust pvalues for FDR correction
+  df_fits_sorted$ADJ_P_VAL <- stats::p.adjust(df_fits_sorted$P_VAL, method = "fdr")
+
+  cat(sprintf("%.0f cpg sites have p_val < 0.05\n", sum(df_fits_sorted$P_VAL < 0.05)))
+  cat(sprintf("%.0f cpg sites have adj_p_val < 0.05\n", sum(df_fits_sorted$ADJ_P_VAL < 0.05)))
+
+  # TODO: fill in what this does
+  lambda <-
+    stats::median(stats::qchisq( as.numeric( as.character(df_fits_sorted$P_VAL)),
+                                 df = 1, lower.tail = F),
+                  na.rm = T) / stats::qchisq( 0.5, 1)
+  cat(sprintf("Lambda: %f\n", lambda))
 
 
-  # Setting metadata
-  data.table::setattr(ind.hcc, 'class', 'data.frame')
-  data.table::setattr(ind.hcc, "row.names", c(NA_integer_,4))
-  data.table::setattr(ind.hcc, "names", make.names(names(ind.hcc), unique=TRUE))
-  probelistnames <- names(ind.hcc)
-  all.results <- t(data.table::as.data.table(ind.hcc))
-  all.results <- data.table::as.data.table(all.results)
-  all.results[, .data$probeID := probelistnames]
-  stats::setNames(all.results, c("BETA","SE", "P_VAL", "probeID"))
-  data.table::setcolorder(all.results, c("probeID","BETA","SE", "P_VAL"))
-
-  # Organize and export resutls.
-  all.results.sorted <- analyze_imprintome_export(all.results, tbeta)
-
-  return(all.results.sorted)
-
+  return(df_fits_sorted)
 }
 
 
-#' GLM_par
+
+#' GLM_parallel
 #'
 #' @description perform general linear modeling with the equation of the form:
 #'
@@ -112,15 +109,15 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 #' - Estimate: point estimates of coefficients for each of the predictors
 #' - Std. Error: standard error of the estimates
 #' - Cumulative two-tailed probability
-GLM_par = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
+GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
 
-  save(list = ls(all.names = TRUE), file = "GLM_par.RData")
-  # load(file = "GLM_par.RData")
+  save(list = ls(all.names = TRUE), file = "GLM_parallel.RData")
+  # load(file = "GLM_parallel.RData")
 
-  stopifnot("GLM_par:error: R must be a dataframe" = is.data.frame(R) || is.matrix(R))
-  stopifnot("GLM_par:error: P must be a dataframe" = is.data.frame(P) || is.matrix(P))
+  stopifnot("GLM_parallel:error: R must be a dataframe" = is.data.frame(R) || is.matrix(R))
+  stopifnot("GLM_parallel:error: P must be a dataframe" = is.data.frame(P) || is.matrix(P))
   if (length(Rind)!=1 || length(Pind)!=1) {
-    stop(sprintf("GLM_par:error: both length() of Rind(==%.0f) and P(==%.0f) must be 1.",
+    stop(sprintf("GLM_parallel:error: both length() of Rind(==%.0f) and P(==%.0f) must be 1.",
                       length(Rind), length(Pind)))
   }
 
@@ -151,67 +148,6 @@ GLM_par = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
 
   return(out)
 }
-
-
-
-
-
-#' analyze_imprintome_export
-#'
-#' @description Organizes output from statistical analysis for export
-#'
-#' @param tbetas transposed beta_matrix
-#' @param all.results output of general linear modeling analysis
-#'
-#' @importFrom rlang .data
-#'
-#' @return export
-#'
-#'
-analyze_imprintome_export <- function(all.results, tbetas) {
-  #Add a column for the number of samples for each probe; this is just processing
-  # the result and checking lambda to check if the assumption works ( generally,
-  # anything close to 1 is good).
-  # A Goodness-of-fit chi-square test is a statistical test used to determine
-  # whether there is a significant difference between the observed and expected
-  # frequencies in a categorical variable. It is commonly used in GLM (Generalized
-  # Linear Model) analysis to assess the fit of the model to the data.
-
-  # Transform methylation data again so to probes x samples (row x col)
-  tbetas_2<-t(tbetas)
-
-  # Match order of all.results with order of probes in tbetas_1
-  all.results<-all.results[match(rownames(tbetas_2),all.results$probeID),]
-  all.results$N <- rowSums(!is.na(tbetas_2))
-  # Convert results data table to data.frame
-  all.results <- base::as.data.frame(all.results) # High memory option
-  # all.results <- Laurae::setDF(all.results)      # Low memory option, extra package req
-
-  # Sort rows by p value
-  all.results.sorted<-all.results %>%
-    dplyr::arrange(.data$P_VAL)
-
-  utils::head(all.results.sorted)
-  dplyr::count(all.results.sorted$P_VAL < 0.05)
-  FileName<-paste("imprintome_study_results.txt")
-
-  # Lambda
-  lambda <-
-    stats::median(stats::qchisq( as.numeric( as.character( all.results.sorted$P_VAL)),
-                        df = 1, lower.tail = F),
-                        na.rm = T) / stats::qchisq( 0.5, 1)
-  lambda # 1.56
-
-
-  # export table of results as a .TXT.GZ FILE
-  utils::write.table(all.results.sorted,file=FileName,na="NA", row.names = FALSE)
-
-  return(all.results.sorted)
-}
-
-
-
-
 
 
 
