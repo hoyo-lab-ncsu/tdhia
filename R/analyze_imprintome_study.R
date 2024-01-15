@@ -22,43 +22,57 @@
 #'
 analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 
+  save(list = ls(all.names = TRUE), file = "analyze_imprintome_study.RData")
+  # load(file = "analyze_imprintome_study.RData")
+
 
   # Quantile Normalization
   if (quantile_norm) {
-    tbeta <- t(preprocessCore::normalize.quantiles(beta))
+    tbetas <- t(preprocessCore::normalize.quantiles(as.matrix(beta)))
   } else {
-    tbeta <- t(beta)
+    tbetas <- t(as.matrix(beta))
   }
+  rownames(tbetas) <- colnames(beta)
+  colnames(tbetas) <- rownames(beta)
 
+  # Reorder rows in tbetas so that ID matches order in rows of pheno (rownames for both)
+  tbetas <- tbetas[order(match(rownames(tbetas),rownames(pheno))),]
 
-  # Beta matrix, rows:patients (samples), columns:cpg or ICR sites (features)
-  tbetas<-tbeta
-  dim(tbetas)
-  dim(tbetas)
-  # This line has to be true. This is the only thing you must care about when creating the two matrices.
-  stopifnot(compare::compare(rownames(tbetas),rownames(pheno)))
+  # Check that rownames between tbetas and pheno
+  stopifnot(all(rownames(tbetas)==rownames(pheno)))
 
-
-  # Perform general linear modeling of imprintome and study metadata
-  start.time <- base::Sys.time()
 
   # Use all but 2 cores for parallel processing
   mc.cores <- max(c(parallel::detectCores()-2,1), na.rm = TRUE)
 
-  ind.hcc <-
-    parallel::mclapply(
-      stats::setNames(seq_len(ncol(tbetas)), dimnames(tbetas)[[2]]),
-      GLMtest_2a,
-      meth_matrix = tbetas,
-      Y = pheno$case_control,
-      X1 = pheno$sex,
-      X2 = pheno$bw,
-      mc.cores = mc.cores
-    )
 
-  # End time
-  end.time <- base::Sys.time()
-  time.taken <- end.time - start.time
+  # formula_string <- paste("pheno$cd_dry ~ tbetas[,1]", paste(args, collapse = " + "), sep = " + ")
+
+
+  hemi_tbetas <- (tbetas > 0.35) & (tbetas < 0.65)
+
+  mod = stats::glm("hemi_tbetas[,1] ~ pheno$cd_dry + pheno$ba_sex + pheno$race_final", family = "binomial")
+
+
+  GLMcall(methcol = 1, meth_matrix = tbetas, Y = pheno$cd_dry)
+
+
+  # # Perform general linear modeling of imprintome and study metadata
+  # start.time <- base::Sys.time()
+  # ind.hcc <-
+  #   parallel_lapply(
+  #     X = stats::setNames(seq_len(ncol(tbetas)), dimnames(tbetas)[[2]]),
+  #     FUN = GLMcall,
+  #     meth_matrix = tbetas,
+  #     Y = pheno$case_control,
+  #     X1 = pheno$sex,
+  #     X2 = pheno$bw,
+  #     mc.cores = mc.cores
+  #   )
+  #
+  # # End time
+  # end.time <- base::Sys.time()
+  # time.taken <- end.time - start.time
 
   # Setting metadata
   data.table::setattr(ind.hcc, 'class', 'data.frame')
@@ -79,35 +93,61 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 }
 
 
-
-#' GLMcall
+#' GLM_par
 #'
-#' @description perform general linear modeling response variable Y to
+#' @description perform general linear modeling with the equation of the form:
 #'
-#' @param methcol vector of which column names to use for meth_matrix
-#' @param meth_matrix matrix of predictor variables (beta values)
-#' @param Y vector, response variable
-#' @param ... any additional covariates variables
+#' Response ~ Predictor + Confounders
+#' R[,Rind] ~ P[,Pind] + C[, 1] + C[, 2] + C[, 3] + C[, ...]
 #'
+#' One predictor and one response variable is assumed. Either R or P can be
+#' parallelized (but only one of them)
+#'
+#' @param R dataframe where each column is a response variable.
+#' @param Rind column index for R if it's a matrix (for parallel processing).
+#' Then keep Rind = 1.
+#' @param P dataframe where each column is a predictor variable.
+#' @param Pind column index for P if it's a matrix (for parallel processing).
+#' Then keep Pind = 1.
+#' @param C matrix of confounder variables to be including in model
+#' @param family string denoting GLM family
 #'
 #' @return fit of general linear model, including
 #' - Estimate: point estimates of coefficients for each of the predictors
 #' - Std. Error: standard error of the estimates
 #' - Cumulative two-tailed probability
-#'
-GLMcall = function(methcol, meth_matrix, Y, ... ) {
-  args = list(...)
+GLM_par = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
+
+  stopifnot(is.data.frame(R), "GLM_par:error: R must be a dataframe")
+  stopifnot(is.data.frame(P), "GLM_par:error: P must be a dataframe")
+  stopifnot(length(Rind)==1 && length(Pind)==1,
+            sprintf("GLM_par:error: both lengths of Rind(==%.0f) and P(ind==%.0f) must be 1.",
+                                                        length(Rind), length(Pind)))
+
+  # Formula string for confounders that preserve the column names (for record keeping)
+  confounder_string <- paste0("C$",colnames(C), c(rep(" +", ncol(C)-1), ""), collapse=" ")
+
+  # Formula string for Response that preserve the column names (for record keeping)
+  response_string <- paste0("R$", colnames(R)[Rind])
+
+  # Formula string for Predictor that preserve the column names (for record keeping)
+  predictor_string <- paste0("P$", colnames(P)[Pind])
+
   # Create a formula string dynamically using paste
-  formula_string <- paste("Y ~ meth_matrix[, methcol]", paste(args, collapse = " + "), sep = " + ")
+  formula_string <- paste0(response_string, " ~ ", predictor_string, " + ", confounder_string)
 
-  mod = stats::glm(formula_string, family = "binomial")
+  # Calculate glm
+  mod = stats::glm(formula_string, family = family)
 
+  # Grab ppredictor
   cf = summary(mod)$coefficients
 
-  cf[2, c("Estimate", "Std. Error", "Pr(>|z|)")]
+  # Only grab outputs for predictor (second row)
+  out <- setNames(c(cf[2,], formula_string),c(names(cf[2,]), "formula"))
 
-  return(cf)
+  return(out)
 }
+
 
 
 

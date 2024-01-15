@@ -14,6 +14,8 @@
 #' cg:CpG, ch:CHG, mu:multi-unique, rp:repetitive element, or rs:SNP)
 #' @param max_sig_pval a maximum threshold for the signal detection value, beta
 #' values higher than this max are set to NA.
+#' @param failed_beta_na boolean flag, when TRUE beta measurements with pval >
+#' max_sig_pval will be set to NA. When false, the beta value is left as is.
 #' @param max_probe_fail_rate proportion value (0-1), if a probe fails the p-value
 #' threshold above this proportion of the samples, all measurements from this probe
 #' are set to NA.
@@ -27,9 +29,10 @@
 #' specified by idat_remappings).
 #'
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
-                          max_sig_pval = 0.2, max_probe_fail_rate = 0.5,
+                          max_sig_pval = 0.2, failed_beta_na = TRUE,
+                          max_probe_fail_rate = 0.5,
                           discard_failed_probes = TRUE, verbose = TRUE) {
-  # save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")
+  save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")
   # load(file = "filter_probes_debug.RData")
 
   # Only print cat() output if the user requests it
@@ -77,8 +80,9 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 
   # Set individual probe_beta values to NA if the p-value is above max threshold
   #-----------------------------------------------------------------------------
-  if (!is.null(max_sig_pval)) {
-    filt_probe_beta_df[filt_probe_pval_df > max_sig_pval] <- NA
+  sig_pval_pass <- filt_probe_pval_df < max_sig_pval
+  if (!is.null(max_sig_pval) && failed_beta_na) {
+    filt_probe_beta_df[!sig_pval_pass] <- NA
     verbosecat(sprintf("Probe filter: %.0f%% of probe beta measurements ( %i/ %i) failed
                  the signal max p-value threshold of %.2f, setting them to NA.\n",
                 100*sum(is.na(filt_probe_beta_df))/prod(dim(filt_probe_beta_df)),
@@ -95,7 +99,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   if(!is.null(max_probe_fail_rate)) {
     # Binary index of rows, TRUE means row failed QC
     probe_fail_rate_df <- data.frame(cpg_id = rownames(filt_probe_beta_df),
-                                probe_fail_rate = rowSums(is.na(filt_probe_beta_df)) /
+                                probe_fail_rate = rowSums(!sig_pval_pass) /
                                   ncol(filt_probe_beta_df))
 
     row_fail_flag <-  probe_fail_rate_df$probe_fail_rate > max_probe_fail_rate

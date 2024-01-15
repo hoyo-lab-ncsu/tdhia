@@ -16,6 +16,9 @@
 #' @param discard_unmapped_cpgs  a boolean flag, when set to TRUE, discards any
 #' CpG sites that are not mapped to a unique genomic location from MAPINFO column
 #' in the manifest file.
+#' @param return_n_probes a boolean flag, when set to TRUE, adds a column to the
+#'  output cpg beta matrix (cpg_beta_df), labeled a n_probe, that represents the
+#'  number of probes whose beta value was averaged together for that cpg site.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
@@ -24,9 +27,8 @@
 #' are either (1) the basenames of the idat files or (2) some other mapping
 #' specified when the data was loaded in \code{load_idat}.
 #'
-#'
 convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
-                                 discard_unmapped_cpgs = TRUE) {
+                                 discard_unmapped_cpgs = TRUE, return_n_probes = FALSE) {
   # Get manifest data
   mft = probe_beta$manifest
 
@@ -74,6 +76,10 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
       100*sum(unmapped_cpg_ids)/length(unmapped_cpg_ids), sum(unmapped_cpg_ids),
       length(unmapped_cpg_ids), length(unmapped_cpg_ids) - sum(unmapped_cpg_ids)))
 
+  }
+
+  if (!return_n_probes) {
+    cpg_beta_df <- cpg_beta_df %>%select(return_n_probes)
   }
 
   cpg_beta <- list(cpg_beta_df = cpg_beta_df,

@@ -7,7 +7,8 @@
 convert_probes_to_cpgs(
   probe_beta,
   quantile_norm = FALSE,
-  discard_unmapped_cpgs = TRUE
+  discard_unmapped_cpgs = TRUE,
+  return_n_probes = FALSE
 )
 }
 \arguments{
@@ -23,6 +24,10 @@ normalization is done earlier in the pipeline, at the probe level.}
 \item{discard_unmapped_cpgs}{a boolean flag, when set to TRUE, discards any
 CpG sites that are not mapped to a unique genomic location from MAPINFO column
 in the manifest file.}
+
+\item{return_n_probes}{a boolean flag, when set to TRUE, adds a column to the
+output cpg beta matrix (cpg_beta_df), labeled a n_probe, that represents the
+number of probes whose beta value was averaged together for that cpg site.}
 }
 \value{
 a dataframe containing beta values where rows are cpg sites and columns
