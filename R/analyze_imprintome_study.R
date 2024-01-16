@@ -16,6 +16,13 @@
 #' variables (row x col). Contains the response variable Y and N covariates
 #' X_1,...,X_N.
 #' @param quantile_norm boolean flag, when true the beta matrix is quantile normalized
+#' param model_params a named list that defines parameter for the model to be
+#' fitted to the data, with the following fields:
+#'  - R
+#'  - Rind [def = 1]
+#'  - P
+#'  - Pind [def = 1]
+#'  - family
 #'
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
@@ -47,8 +54,13 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
   # Helper function for parallel processing of fitting models
   for_each_fun <-
     function (x) GLM_parallel(R = hemi_tbetas, Rind = x,   P = dplyr::select(pheno, cd_dry), Pind = 1,
-                         C = dplyr::select(pheno, c(race_final, mat_bmi_lmp, smoking,
-                                             smoke_preg)), family = "binomial")
+                         C = dplyr::select(pheno, c(mat_bmi_lmp, smoking,
+                                             smoke_preg, race_isHispanic,
+                                             race_isBlack, race_isWhite)),
+                         family = "binomial")
+
+  # cat("Attempting single run of model for debugging...\n")
+  # for_each_fun(1)
 
   #Initialize parallel computing
   cl <- parallel::makePSOCKcluster(parallel::detectCores() - 1)
@@ -57,18 +69,25 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
   # Fit mdoels to data in parallel
   start <- Sys.time()
   cat("Fitting model...\n")
-  df_fits <- foreach::foreach(i=1:dim(hemi_tbetas)[2], .combine = rbind) %dopar% {
+  df_fits <- foreach::foreach(i=1:dim(hemi_tbetas)[2], .combine = rbind,
+                              .export = "GLM_parallel") %dopar% {
     for_each_fun(i)
-  }
-  colnames(df_fits) <-  c("Response", "Predictor", "EST", "SE", "Z", "P_VAL",  "Formula")
+                              }
+  # Rename Columns
+  colnames(df_fits) <-  c("Response", "Predictor", "EST", "SE", "Z", "P_VAL", "Formula", "Family")
+  # Adjust p-values for FDR correction
+  df_fits$ADJ_P_VAL <- stats::p.adjust(df_fits$P_VAL, method = "fdr")
+  # Reorder columns for readability
+  df_fits <- df_fits[,c(1:6,9, 7, 8)]
+
+  # End processing time
   finish <- Sys.time()
   cat(sprintf("Processing time: %f %s\n", finish - start, units(finish - start)))
 
   # Sort by p value
   df_fits_sorted <- df_fits %>% dplyr::arrange(.data$P_VAL)
 
-  # Adjust pvalues for FDR correction
-  df_fits_sorted$ADJ_P_VAL <- stats::p.adjust(df_fits_sorted$P_VAL, method = "fdr")
+
 
   cat(sprintf("%.0f cpg sites have p_val < 0.05\n", sum(df_fits_sorted$P_VAL < 0.05)))
   cat(sprintf("%.0f cpg sites have adj_p_val < 0.05\n", sum(df_fits_sorted$ADJ_P_VAL < 0.05)))
@@ -96,13 +115,13 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
 #' One predictor and one response variable is assumed. Either R or P can be
 #' parallelized (but only one of them)
 #'
-#' @param R dataframe where each column is a response variable.
-#' @param Rind column index for R if it's a matrix (for parallel processing).
-#' Then keep Rind = 1.
-#' @param P dataframe where each column is a predictor variable.
-#' @param Pind column index for P if it's a matrix (for parallel processing).
-#' Then keep Pind = 1.
-#' @param C matrix of confounder variables to be including in model
+#' @param R dataframe where each column is a Response variable.
+#' @param Rind column index for R if it has multiple columns (for parallel processing).
+#' Default for Rind is 1 for single column dataframe.
+#' @param P dataframe where each column is a Predictor variable.
+#' @param Pind column index for P if it has multiple columns (for parallel processing).
+#' Default for Pind is 1 for single column dataframe.
+#' @param C dataframe of confounder variables to be including in model
 #' @param family string denoting GLM family
 #'
 #' @return fit of general linear model, including
@@ -142,7 +161,7 @@ GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
   out <- cbind(data.frame(Response = colnames(R)[Rind]),
                Predictor = colnames(P)[Pind],
                t(as.data.frame(cf[2,])),
-               data.frame(Formula = formula_string))
+               data.frame(Formula = formula_string, Family = family))
   rownames(out) <- NULL
 
 

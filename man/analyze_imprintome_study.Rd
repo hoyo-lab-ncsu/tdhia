@@ -14,7 +14,16 @@ analyze_imprintome_study(beta, pheno, quantile_norm = TRUE)
 variables (row x col). Contains the response variable Y and N covariates
 X_1,...,X_N.}
 
-\item{quantile_norm}{boolean flag, when true the beta matrix is quantile normalized}
+\item{quantile_norm}{boolean flag, when true the beta matrix is quantile normalized
+param model_params a named list that defines parameter for the model to be
+fitted to the data, with the following fields:
+\itemize{
+\item R
+\item Rind \link{def = 1}
+\item P
+\item Pind \link{def = 1}
+\item family
+}}
 }
 \value{
 sorted results from statistical analysis
