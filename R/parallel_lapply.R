@@ -7,10 +7,11 @@
 #' (including classed objects) will be coerced by as.list.
 #' @param FUN the function to be applied to each element of X.
 #' @param mc.cores he number of cores to use.
+#' @param ... arguments to carry over to parLapply and mclapply
 #'
 #' @return a list of the same length as X and named by X
 #'
-parallel_lapply <- function(X, FUN, mc.cores,...) {
+parallel_lapply <- function(X, FUN, mc.cores, ...) {
 
 
   if (.Platform$OS.type == "windows" && mc.cores > 1) {
@@ -24,7 +25,7 @@ parallel_lapply <- function(X, FUN, mc.cores,...) {
     # each cluster
     results1 <- purrr::map_dfr(ls(envir=.GlobalEnv), ~data.frame(name=.,
                                                                  is_func = is.function(get(.))))
-    results2 <- filter(results1,is_func)
+    results2 <- dplyr::filter(results1, "is_func")
     parallel::clusterEvalQ(cl, library("dplyr"))
     parallel::clusterExport(cl = cl, varlist = results2$name)
 

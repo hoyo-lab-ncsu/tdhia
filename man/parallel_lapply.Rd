@@ -13,6 +13,8 @@ parallel_lapply(X, FUN, mc.cores, ...)
 \item{FUN}{the function to be applied to each element of X.}
 
 \item{mc.cores}{he number of cores to use.}
+
+\item{...}{arguments to carry over to parLapply and mclapply}
 }
 \value{
 a list of the same length as X and named by X

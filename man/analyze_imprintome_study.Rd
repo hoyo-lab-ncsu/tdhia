@@ -4,25 +4,30 @@
 \alias{analyze_imprintome_study}
 \title{analyze_imprintome_study}
 \usage{
-analyze_imprintome_study(beta, pheno, quantile_norm = TRUE)
+analyze_imprintome_study(model_params)
 }
 \arguments{
-\item{beta}{a dataframe that is a beta matrix with CpG site IDs x patients
-(row x col).}
-
-\item{pheno}{a data frame of study metadata with patients x phenotype
-variables (row x col). Contains the response variable Y and N covariates
-X_1,...,X_N.}
-
-\item{quantile_norm}{boolean flag, when true the beta matrix is quantile normalized
-param model_params a named list that defines parameter for the model to be
+\item{model_params}{a named list that defines parameter for the model to be
 fitted to the data, with the following fields:
 \itemize{
-\item R
-\item Rind \link{def = 1}
-\item P
-\item Pind \link{def = 1}
-\item family
+\item R: response variable(s), data frame that is patients (rows) x variables
+(columns) could either be beta values for cpg or ICR sites, or
+study metadata.
+\item Rind: single value or array that represents column index for which variables
+in R to use in the model, for the case of multiple columns, will be parallelized
+in separate models. Only Rind or Pind can have more than one value, but not
+both (defaults to 1).
+\item P: predictor variable(s) data frame that is patients (rows) x variables
+(columns), could either be beta values for cpg or ICR sites, or
+study metadata.
+\item Pind: single value or array that represents column index for which variables
+in P to use in the model, for the case of multiple columns, will be parallelized
+in separate models. Only Rind or Pind can have more than one value, but not
+both (defaults to 1).
+\item C: confounder variables data frame that is patients (rows) x variables
+(columns).
+\item family: string for family model argument for glm(). (ex. 'binomial', 'gaussian')
+@param quantile_norm boolean flag, when true the beta matrix is quantile normalized
 }}
 }
 \value{

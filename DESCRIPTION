@@ -24,7 +24,7 @@ Imports:
 	rlang,
 	BiocParallel,
 	tibble,
-	data.table,
+	purrr,
 	parallel,
 	doParallel,
 	foreach
