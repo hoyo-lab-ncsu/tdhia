@@ -46,8 +46,6 @@ load_idata_to_probes <-
   # save(list = ls(all.names = TRUE), file = "load_idata_debug.RData")
   # load(file = "load_idata_debug.RData")
 
-
-
   # Get list of IDAT files in target path
   all_idat_names <- dir(path = idat_dir_paths, pattern = "*.idat", ignore.case = TRUE)
   # Extract the basenames of IDAT files

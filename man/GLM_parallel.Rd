@@ -4,7 +4,7 @@
 \alias{GLM_parallel}
 \title{GLM_parallel}
 \usage{
-GLM_parallel(R, Rind = 1, P, Pind = 1, C, family = "binomial")
+GLM_parallel(R, Rind = 1, P, Pind = 1, C, family = "binomial", n_p_adj = 1)
 }
 \arguments{
 \item{R}{dataframe where each column is a Response variable.}
@@ -20,6 +20,8 @@ Default for Pind is 1 for single column dataframe.}
 \item{C}{dataframe of confounder variables to be including in model}
 
 \item{family}{string denoting GLM family}
+
+\item{n_p_adj}{n adjustment for multiple comparisons}
 }
 \value{
 fit of general linear model, including

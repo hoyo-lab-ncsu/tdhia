@@ -17,13 +17,14 @@
 #' Default for Pind is 1 for single column dataframe.
 #' @param C dataframe of confounder variables to be including in model
 #' @param family string denoting GLM family
+#' @param n_p_adj n adjustment for multiple comparisons
 #'
 #' @return fit of general linear model, including
 #' - Estimate: point estimates of coefficients for each of the predictors
 #' - Std. Error: standard error of the estimates
 #' - Cumulative two-tailed probability
-GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
-  # save(list = ls(all.names = TRUE), file = "GLM_parallel.RData")
+GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial", n_p_adj = 1) {
+  save(list = ls(all.names = TRUE), file = "GLM_parallel.RData")
   # load(file = "GLM_parallel.RData")
 
   stopifnot("GLM_parallel:error: R must be a dataframe" = is.data.frame(R) || is.matrix(R))
@@ -50,13 +51,16 @@ GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
 
   # Grab predictor from second row of summary output
   cf = summary(mod)$coefficients
+
   # Produce tidy dataframe of output
   out <- cbind(data.frame(Response = colnames(R)[Rind]),
                Predictor = colnames(P)[Pind],
                t(as.data.frame(cf[2,])),
-               data.frame(Formula = formula_string, Family = family))
-  rownames(out) <- NULL
+               data.frame(ADJ_P_VAL = stats::p.adjust(cf[2,4], method = "fdr", n = n_p_adj),
+                 Formula = formula_string, Family = family))
+  names(out)[6] <- "P_VAL"
 
+  rownames(out) <- NULL
 
   return(out)
 }

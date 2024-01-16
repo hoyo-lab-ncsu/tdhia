@@ -28,7 +28,9 @@
 #'  - C: confounder variables data frame that is patients (rows) x variables
 #'  (columns).
 #'  - family: string for family model argument for glm(). (ex. 'binomial', 'gaussian')
-#'  @param quantile_norm boolean flag, when true the beta matrix is quantile normalized
+#'  - n_p_adj: n for p value adjustment
+#'  @param max_p_val max p-value threshold, prints number of entries below this
+#'  threshold, but does not alter computation.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom foreach %dopar%
@@ -36,7 +38,7 @@
 #'
 #' @return sorted results from statistical analysis
 #'
-analyze_imprintome_study <- function (model_params) {
+analyze_imprintome_study <- function (model_params, max_p_val = 0.1) {
 
   save(list = ls(all.names = TRUE), file = "analyze_imprintome_study.RData")
   # load(file = "analyze_imprintome_study.RData")
@@ -49,6 +51,7 @@ analyze_imprintome_study <- function (model_params) {
   # Confounder Variable(s)
   C <- model_params[["C"]]
   family <- model_params$family
+  n_p_adj <- model_params$n_p_adj
 
   # Reorder rows in P and C to match R, keep both as dataframes even if 1 column
   P <- P %>%
@@ -74,21 +77,19 @@ analyze_imprintome_study <- function (model_params) {
   # over columns in R or P
   if (length(Rind) > 1) {
     # For each response variable
-    foreach_fun <- function (x) GLM_parallel(R = R, Rind = x,
-                                             P = P, Pind = Pind,
-                                             C = C, family = family)
+    foreach_fun <- function (x) GLM_parallel(R = R, Rind = x, P = P, Pind = Pind,
+                                             C = C, family = family, n_p_adj = n_p_adj)
   } else if (length(Pind) > 1) {
     # For each predictor variable
-    foreach_fun <-  function (x) GLM_parallel(R = R, Rind = Rind,
-                                              P = P, Pind = x,
-                                              C = C, family = family)
+    foreach_fun <-  function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = x,
+                                              C = C, family = family, n_p_adj = n_p_adj)
   } else {
-    foreach_fun <- function (x) GLM_parallel(R = R, Rind = Rind,
-                                             P = P, Pind = Pind,
-                                             C = C, family = family)
+    foreach_fun <- function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = Pind,
+                                             C = C, family = family, n_p_adj = n_p_adj)
   }
-  cat("Attempting single run of model for debugging...\n")
-  foreach_fun(1)
+  cat("\n\nFitting Models...\n")
+  test <- foreach_fun(1)
+  print(test[1,8:9])
 
   #Initialize parallel computing
   cl <- parallel::makePSOCKcluster(parallel::detectCores() - 1)
@@ -101,35 +102,30 @@ analyze_imprintome_study <- function (model_params) {
 
   # Fit mdoels to data in parallel
   start <- Sys.time()
-  cat("Fitting model...\n")
+  cat("> Fitting model...\n")
   df_fits <- foreach::foreach(x = par_ind, .combine = rbind,
                               .export = "GLM_parallel") %dopar% {
                                 foreach_fun(x)
                               }
-  # Rename Columns
-  colnames(df_fits) <-  c("Response", "Predictor", "EST", "SE", "Z", "P_VAL", "Formula", "Family")
-  # Adjust p-values for FDR correction
-  df_fits$ADJ_P_VAL <- stats::p.adjust(df_fits$P_VAL, method = "fdr")
-  # Reorder columns for readability
-  df_fits <- df_fits[,c(1:6,9, 7, 8)]
-
   # End processing time
   finish <- Sys.time()
-  cat(sprintf("Processing time: %f %s\n", finish - start, units(finish - start)))
+  # cat(sprintf(">Processing time: %f %s\n", finish - start, units(finish - start)))
 
   # Sort by p value
   df_fits_sorted <- df_fits %>% dplyr::arrange(.data$P_VAL)
 
   # Report results from GLM
-  cat(sprintf("%.0f cpg sites have p_val < 0.05\n", sum(df_fits_sorted$P_VAL < 0.05)))
-  cat(sprintf("%.0f cpg sites have adj_p_val < 0.05\n", sum(df_fits_sorted$ADJ_P_VAL < 0.05)))
+  cat(sprintf("> %.0f cpg sites have p_val < %.2f\n",
+              sum(df_fits_sorted$P_VAL < max_p_val), max_p_val))
+  cat(sprintf("> %.0f cpg sites have adj_p_val < %.2f\n",
+              sum(df_fits_sorted$ADJ_P_VAL < max_p_val), max_p_val))
 
   # TODO: fill in what this does
   lambda <-
     stats::median(stats::qchisq( as.numeric( as.character(df_fits_sorted$P_VAL)),
                                  df = 1, lower.tail = F),
                   na.rm = T) / stats::qchisq( 0.5, 1)
-  cat(sprintf("Lambda: %f\n", lambda))
+  cat(sprintf("> Lambda: %f\n", lambda))
 
 
   return(df_fits_sorted)

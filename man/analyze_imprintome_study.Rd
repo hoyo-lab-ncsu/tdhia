@@ -4,7 +4,7 @@
 \alias{analyze_imprintome_study}
 \title{analyze_imprintome_study}
 \usage{
-analyze_imprintome_study(model_params)
+analyze_imprintome_study(model_params, max_p_val = 0.1)
 }
 \arguments{
 \item{model_params}{a named list that defines parameter for the model to be
@@ -27,7 +27,9 @@ both (defaults to 1).
 \item C: confounder variables data frame that is patients (rows) x variables
 (columns).
 \item family: string for family model argument for glm(). (ex. 'binomial', 'gaussian')
-@param quantile_norm boolean flag, when true the beta matrix is quantile normalized
+\item n_p_adj: n for p value adjustment
+@param max_p_val max p-value threshold, prints number of entries below this
+threshold, but does not alter computation.
 }}
 }
 \value{
