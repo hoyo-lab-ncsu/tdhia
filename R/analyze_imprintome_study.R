@@ -10,68 +10,102 @@
 #' presence of an association is tested for each of the predictor variables to
 #' the response variable.
 #'
-#' @param beta a dataframe that is a beta matrix with CpG site IDs x patients
-#' (row x col).
-#' @param pheno a data frame of study metadata with patients x phenotype
-#' variables (row x col). Contains the response variable Y and N covariates
-#' X_1,...,X_N.
-#' @param quantile_norm boolean flag, when true the beta matrix is quantile normalized
-#' param model_params a named list that defines parameter for the model to be
+#' @param model_params a named list that defines parameter for the model to be
 #' fitted to the data, with the following fields:
-#'  - R
-#'  - Rind [def = 1]
-#'  - P
-#'  - Pind [def = 1]
-#'  - family
+#'  - R: response variable(s), data frame that is patients (rows) x variables
+#'  (columns) could either be beta values for cpg or ICR sites, or
+#'  study metadata.
+#'  - Rind: single value or array that represents column index for which variables
+#'  in R to use in the model, for the case of multiple columns, will be parallelized
+#'  in separate models. Only Rind or Pind can have more than one value, but not
+#'  both (defaults to 1).
+#'  - P: predictor variable(s) data frame that is patients (rows) x variables
+#'  (columns), could either be beta values for cpg or ICR sites, or
+#'  study metadata.
+#'  - Pind: single value or array that represents column index for which variables
+#'  in P to use in the model, for the case of multiple columns, will be parallelized
+#'  in separate models. Only Rind or Pind can have more than one value, but not
+#'  both (defaults to 1).
+#'  - C: confounder variables data frame that is patients (rows) x variables
+#'  (columns).
+#'  - family: string for family model argument for glm(). (ex. 'binomial', 'gaussian')
+#'  @param quantile_norm boolean flag, when true the beta matrix is quantile normalized
 #'
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #'
 #' @return sorted results from statistical analysis
 #'
-analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
+analyze_imprintome_study <- function (model_params, quantile_norm = TRUE) {
 
   save(list = ls(all.names = TRUE), file = "analyze_imprintome_study.RData")
   # load(file = "analyze_imprintome_study.RData")
 
-  # Quantile Normalization
-  if (quantile_norm) {
-    tbetas <- t(preprocessCore::normalize.quantiles(as.matrix(beta)))
+  # Export model parameters
+  # Response variable(s)
+  R <- model_params[["R"]]
+  # Predictor variable(s)
+  P <- model_params[["P"]]
+  # Confounder Variable(s)
+  C <- model_params[["C"]]
+  family <- model_params$family
+
+  # Reorder rows in P and C to match R, keep both as dataframes even if 1 column
+  P <- P %>%
+    tibble::rownames_to_column(var = "row_names") %>%
+    dplyr::arrange(factor(row_names, levels = rownames(R))) %>%
+    tibble::column_to_rownames(var = "row_names")
+  C <- C %>%
+    tibble::rownames_to_column(var = "row_names") %>%
+    dplyr::arrange(factor(row_names, levels = rownames(R))) %>%
+    tibble::column_to_rownames(var = "row_names")
+
+  if( !all(rownames(R)==rownames(P)))
+    {stop("glm: rownames of R and P dataframes do not match.")}
+  if( !all(rownames(R)==rownames(C)))
+    {stop("glm: rownames of R and C dataframes do not match.")}
+
+
+  #  Get indexes for response and predictor variables
+  Rind <- 1:ncol(R)
+  Pind <- 1:ncol(P)
+
+
+  # Helper function for parallel processing of fitting models, either parallelize
+  # over columns in R or P
+  if (length(Rind) > 1) {
+    # For each response variable
+    foreach_fun <- function (x) GLM_parallel(R = R, Rind = x,
+                                             P = P, Pind = Pind,
+                                             C = C, family = family)
+  } else if (length(Pind) > 1) {
+    # For each predictor variable
+    foreach_fun <-  function (x) GLM_parallel(R = R, Rind = Rind,
+                                              P = P, Pind = x,
+                                              C = C, family = family)
   } else {
-    tbetas <- t(as.matrix(beta))
+    foreach_fun <- function (x) GLM_parallel(R = R, Rind = Rind,
+                                             P = P, Pind = Pind,
+                                             C = C, family = family)
   }
-  rownames(tbetas) <- colnames(beta)
-  colnames(tbetas) <- rownames(beta)
-
-  # Reorder rows in tbetas so that ID matches order in rows of pheno (rownames for both)
-  tbetas <- tbetas[order(match(rownames(tbetas),rownames(pheno))),]
-  # Check that rownames between tbetas and pheno
-  stopifnot(all(rownames(tbetas)==rownames(pheno)))
-
-  # Threshold beta value to hemi-methylation
-  hemi_tbetas <- (tbetas > 0.35) & (tbetas < 0.65)
-
-  # Helper function for parallel processing of fitting models
-  for_each_fun <-
-    function (x) GLM_parallel(R = hemi_tbetas, Rind = x,   P = dplyr::select(pheno, cd_dry), Pind = 1,
-                         C = dplyr::select(pheno, c(mat_bmi_lmp, smoking,
-                                             smoke_preg, race_isHispanic,
-                                             race_isBlack, race_isWhite)),
-                         family = "binomial")
-
-  # cat("Attempting single run of model for debugging...\n")
-  # for_each_fun(1)
+  cat("Attempting single run of model for debugging...\n")
+  foreach_fun(1)
 
   #Initialize parallel computing
   cl <- parallel::makePSOCKcluster(parallel::detectCores() - 1)
   doParallel::registerDoParallel(cl)
 
+  # Identify parallel index processing
+  if (length(Rind)>1) {par_ind <- Rind
+  }  else if (length(Pind)>1) {par_ind <- Pind
+  }  else {par_ind <- 1}
+
   # Fit mdoels to data in parallel
   start <- Sys.time()
   cat("Fitting model...\n")
-  df_fits <- foreach::foreach(i=1:dim(hemi_tbetas)[2], .combine = rbind,
+  df_fits <- foreach::foreach(i=par_ind, .combine = rbind,
                               .export = "GLM_parallel") %dopar% {
-    for_each_fun(i)
+                                foreach_fun(i)
                               }
   # Rename Columns
   colnames(df_fits) <-  c("Response", "Predictor", "EST", "SE", "Z", "P_VAL", "Formula", "Family")
@@ -87,8 +121,7 @@ analyze_imprintome_study <- function (beta, pheno, quantile_norm = TRUE) {
   # Sort by p value
   df_fits_sorted <- df_fits %>% dplyr::arrange(.data$P_VAL)
 
-
-
+  # Report results from GLM
   cat(sprintf("%.0f cpg sites have p_val < 0.05\n", sum(df_fits_sorted$P_VAL < 0.05)))
   cat(sprintf("%.0f cpg sites have adj_p_val < 0.05\n", sum(df_fits_sorted$ADJ_P_VAL < 0.05)))
 
@@ -136,7 +169,7 @@ GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial") {
   stopifnot("GLM_parallel:error: R must be a dataframe" = is.data.frame(R) || is.matrix(R))
   stopifnot("GLM_parallel:error: P must be a dataframe" = is.data.frame(P) || is.matrix(P))
   if (length(Rind)!=1 || length(Pind)!=1) {
-    stop(sprintf("GLM_parallel:error: both length() of Rind(==%.0f) and P(==%.0f) must be 1.",
+    stop(sprintf("GLM_parallel:error: both length() of Rind(==%.0f) and Pind(==%.0f) must be 1.",
                       length(Rind), length(Pind)))
   }
 
