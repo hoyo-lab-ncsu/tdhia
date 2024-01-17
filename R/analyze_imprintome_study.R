@@ -87,9 +87,9 @@ analyze_imprintome_study <- function (model_params, max_p_val = 0.1) {
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = Pind,
                                              C = C, family = family, n_p_adj = n_p_adj)
   }
-  cat("\n\nFitting Models...\n")
+  # cat("\n\nFitting Models...\n")
   test <- foreach_fun(1)
-  print(test[1,8:9])
+  cat(sprintf("Model: %s ~ %s + C...", test[1,1], test[1,2]))
 
   #Initialize parallel computing
   cl <- parallel::makePSOCKcluster(parallel::detectCores() - 1)
@@ -115,17 +115,18 @@ analyze_imprintome_study <- function (model_params, max_p_val = 0.1) {
   df_fits_sorted <- df_fits %>% dplyr::arrange(.data$P_VAL)
 
   # Report results from GLM
-  cat(sprintf("> %.0f cpg sites have p_val < %.2f\n",
-              sum(df_fits_sorted$P_VAL < max_p_val), max_p_val))
+  # cat(sprintf("> %.0f cpg sites have p_val < %.2f\n",
+              # sum(df_fits_sorted$P_VAL < max_p_val), max_p_val))
   cat(sprintf("> %.0f cpg sites have adj_p_val < %.2f\n",
               sum(df_fits_sorted$ADJ_P_VAL < max_p_val), max_p_val))
+  print(df_fits_sorted[df_fits_sorted$ADJ_P_VAL < max_p_val, c(1:7,9)])
 
   # TODO: fill in what this does
   lambda <-
     stats::median(stats::qchisq( as.numeric( as.character(df_fits_sorted$P_VAL)),
                                  df = 1, lower.tail = F),
                   na.rm = T) / stats::qchisq( 0.5, 1)
-  cat(sprintf("> Lambda: %f\n", lambda))
+  # cat(sprintf("> Lambda: %f\n", lambda))
 
 
   return(df_fits_sorted)
