@@ -16,6 +16,8 @@
 #' @param discard_unmapped_cpgs  a boolean flag, when set to TRUE, discards any
 #' CpG sites that are not mapped to a unique genomic location from MAPINFO column
 #' in the manifest file.
+#' @param discard_non_icr_cpgs a boolean flag, when set to TRUE, discards any CpG
+#'  sites that do not map to an ICR.
 #' @param return_n_probes a boolean flag, when set to TRUE, adds a column,n_probes,
 #'  to the output cpg beta matrix (cpg_beta_df), that represents the
 #'  number of probes whose beta value was averaged together for that cpg site.
@@ -28,9 +30,12 @@
 #' specified when the data was loaded in \code{load_idat}.
 #'
 convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
-                                   discard_unmapped_cpgs = TRUE, return_n_probes = FALSE) {
+                                   discard_unmapped_cpgs = TRUE,
+                                   discard_non_icr_cpgs = TRUE,
+                                   return_n_probes = FALSE) {
   # Get manifest data
   mft = probe_beta$manifest
+  icr_mapping = tdhia::mapping_cpg_icr_ids
 
   save(list = ls(all.names = TRUE), file = "convert_probes_to_cpgs.RData")
   # load(file = "convert_probes_to_cpgs.RData")
@@ -56,27 +61,46 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   cat(sprintf("CpG filter: %.0f of probes in dataset mapped to %.0f unique CpG sites id data.\n",
               nrow(probe_beta$probe_beta_df), nrow(cpg_beta_df)))
 
+  # Convert to dataframe to add rownames and drop first column (Cpg IDs)
+  cpg_beta_df <- as.data.frame(cpg_beta_df)
+  rownames(cpg_beta_df) <- cpg_beta_df$CpG_ID
+  cpg_beta_df <- dplyr::select(cpg_beta_df,-.data$CpG_ID)
+
+
   # Discard CpG_ID(s) that do not map uniquely to a single genome location
   #   Defined in manifest file where MAPINFO == (0 or NA)
   if (discard_unmapped_cpgs) {
     f_unmmaped = function (x) is.na(x) | x==0;
-    unmapped_cpg_ids <- sapply(cpg_beta_df$CpG_ID,
+    unmapped_cpg_ids <- sapply(rownames(cpg_beta_df),
                                function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Name)[1]]))
 
     # Remove unmapped cpgs
     cpg_beta_df <- cpg_beta_df[!unmapped_cpg_ids,]
 
-    # Convert to dataframe to add rownames and drop first column (Cpg IDs)
-    cpg_beta_df <- as.data.frame(cpg_beta_df)
-    rownames(cpg_beta_df) <- cpg_beta_df$CpG_ID
-    cpg_beta_df <- dplyr::select(cpg_beta_df,-.data$CpG_ID)
-
     cat(sprintf("CpG filter: discarded %.0f%% of CpG sites (%i/ %i) because they
       do not map uniquely to the genome. %i CpG sites remain.\n",
                 100*sum(unmapped_cpg_ids)/length(unmapped_cpg_ids), sum(unmapped_cpg_ids),
-                length(unmapped_cpg_ids), length(unmapped_cpg_ids) - sum(unmapped_cpg_ids)))
+                length(unmapped_cpg_ids), nrow(cpg_beta_df)))
 
   }
+
+
+  if (discard_non_icr_cpgs){
+    discard_non_icr <- cpg_beta_df %>%
+      tibble::rownames_to_column("CpG_id") %>%
+      left_join(y = select(icr_mapping, c("CpG_id", "ICR_id")),
+                              by = "CpG_id",unmatched = "drop",
+                multiple = "first") %>%
+      pull("ICR_id") %>% is.na()
+    # Remove non-icr cpgs
+    cpg_beta_df <- cpg_beta_df[!discard_non_icr,]
+
+    cat(sprintf("CpG filter: discarded %.0f%% of CpG sites (%i/ %i) because they
+      do not map to an ICR. %i CpG sites remain.\n",
+                100*sum(discard_non_icr)/nrow(cpg_beta_df), sum(discard_non_icr),
+                nrow(cpg_beta_df), nrow(cpg_beta_df)))
+  }
+
 
   # Extract n_probes from dataframe (to be stored separately)
   n_probes <- cpg_beta_df$n_probes
@@ -84,6 +108,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
 
   if (quantile_norm) {
     # Quantile Normalization by column
+    cat("Performing quantile normalization...\n")
     norm_mat <- preprocessCore::normalize.quantiles(as.matrix(cpg_beta_df))
     dimnames(norm_mat) <- list(rownames(cpg_beta_df), colnames(cpg_beta_df))
     cpg_beta_df <- norm_mat

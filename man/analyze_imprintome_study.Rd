@@ -28,9 +28,10 @@ both (defaults to 1).
 (columns).
 \item family: string for family model argument for glm(). (ex. 'binomial', 'gaussian')
 \item n_p_adj: n for p value adjustment
+}
+
 @param max_p_val max p-value threshold, prints number of entries below this
-threshold, but does not alter computation.
-}}
+threshold, but does not alter computation.}
 }
 \value{
 sorted results from statistical analysis

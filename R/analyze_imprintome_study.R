@@ -29,6 +29,7 @@
 #'  (columns).
 #'  - family: string for family model argument for glm(). (ex. 'binomial', 'gaussian')
 #'  - n_p_adj: n for p value adjustment
+#'
 #'  @param max_p_val max p-value threshold, prints number of entries below this
 #'  threshold, but does not alter computation.
 #'
@@ -38,7 +39,7 @@
 #'
 #' @return sorted results from statistical analysis
 #'
-analyze_imprintome_study <- function (model_params, max_p_val = 0.1) {
+analyze_imprintome_study <- function (model_params, max_p_val = 0.05) {
 
   save(list = ls(all.names = TRUE), file = "analyze_imprintome_study.RData")
   # load(file = "analyze_imprintome_study.RData")
@@ -73,23 +74,32 @@ analyze_imprintome_study <- function (model_params, max_p_val = 0.1) {
   Rind <- 1:ncol(R)
   Pind <- 1:ncol(P)
 
-  # Helper function for parallel processing of fitting models, either parallelize
-  # over columns in R or P
+  # Print short label for model (excluding confounders)
+  cat(sprintf("Model Label: %s ~ %s\n", colnames(R)[1], colnames(P)[1]))
+  cat("Output of first model:\n")
+
+  # Define parallel processing function for GLM
+  # Run function on first input in verbose to show model for debugging
   if (length(Rind) > 1) {
     # For each response variable
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = x, P = P, Pind = Pind,
-                                             C = C, family = family, n_p_adj = n_p_adj)
+                                             C = C, family = family)
+    test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = Pind,
+                 C = C, family = family, verbose = TRUE)
   } else if (length(Pind) > 1) {
     # For each predictor variable
     foreach_fun <-  function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = x,
-                                              C = C, family = family, n_p_adj = n_p_adj)
+                                              C = C, family = family)
+    test_run <- GLM_parallel(R = R, Rind = Rind, P = P, Pind = 1,
+                 C = C, family = family, verbose = TRUE)
   } else {
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = Pind,
-                                             C = C, family = family, n_p_adj = n_p_adj)
+                                             C = C, family = family, )
+    test_run <- GLM_parallel(R = R, Rind = Rind, P = P, Pind = Pind,
+                 C = C, family = family, verbose = TRUE)
   }
-  # cat("\n\nFitting Models...\n")
-  test <- foreach_fun(1)
-  cat(sprintf("Model: %s ~ %s + C...", test[1,1], test[1,2]))
+  cat(sprintf("Formula: %s\n", test_run$Formula))
+
 
   #Initialize parallel computing
   cl <- parallel::makePSOCKcluster(parallel::detectCores() - 1)
@@ -102,24 +112,30 @@ analyze_imprintome_study <- function (model_params, max_p_val = 0.1) {
 
   # Fit mdoels to data in parallel
   start <- Sys.time()
-  cat("> Fitting model...\n")
+  cat(sprintf(">>  Fitting all %.0f models...", length(par_ind)))
   df_fits <- foreach::foreach(x = par_ind, .combine = rbind,
                               .export = "GLM_parallel") %dopar% {
                                 foreach_fun(x)
                               }
   # End processing time
   finish <- Sys.time()
+  cat(" Finished.\n")
   # cat(sprintf(">Processing time: %f %s\n", finish - start, units(finish - start)))
 
   # Sort by p value
   df_fits_sorted <- df_fits %>% dplyr::arrange(.data$P_VAL)
+  # Recalculate P adjust
+  df_fits_sorted$ADJ_P_VAL <- custom_p.adjust(df_fits_sorted$P_VAL, method = "fdr",
+                                              n = n_p_adj)
 
   # Report results from GLM
-  # cat(sprintf("> %.0f cpg sites have p_val < %.2f\n",
-              # sum(df_fits_sorted$P_VAL < max_p_val), max_p_val))
-  cat(sprintf("> %.0f cpg sites have adj_p_val < %.2f\n",
+  cat(sprintf(">>  %.0f cpg sites have p_val < %.2f\n",
+              sum(df_fits_sorted$P_VAL < max_p_val), max_p_val))
+  cat(sprintf(">>  %.0f cpg sites have adj_p_val < %.2f\n",
               sum(df_fits_sorted$ADJ_P_VAL < max_p_val), max_p_val))
   print(df_fits_sorted[df_fits_sorted$ADJ_P_VAL < max_p_val, c(1:7,9)])
+  cat("\n\n")
+
 
   # TODO: fill in what this does
   lambda <-

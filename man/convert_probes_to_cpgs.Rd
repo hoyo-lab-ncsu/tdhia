@@ -8,6 +8,7 @@ convert_probes_to_cpgs(
   probe_beta,
   quantile_norm = FALSE,
   discard_unmapped_cpgs = TRUE,
+  discard_non_icr_cpgs = TRUE,
   return_n_probes = FALSE
 )
 }
@@ -24,6 +25,9 @@ normalization is done earlier in the pipeline, at the probe level.}
 \item{discard_unmapped_cpgs}{a boolean flag, when set to TRUE, discards any
 CpG sites that are not mapped to a unique genomic location from MAPINFO column
 in the manifest file.}
+
+\item{discard_non_icr_cpgs}{a boolean flag, when set to TRUE, discards any CpG
+sites that do not map to an ICR.}
 
 \item{return_n_probes}{a boolean flag, when set to TRUE, adds a column,n_probes,
 to the output cpg beta matrix (cpg_beta_df), that represents the
