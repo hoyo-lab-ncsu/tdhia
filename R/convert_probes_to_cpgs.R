@@ -88,10 +88,10 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   if (discard_non_icr_cpgs){
     discard_non_icr <- cpg_beta_df %>%
       tibble::rownames_to_column("CpG_id") %>%
-      left_join(y = select(icr_mapping, c("CpG_id", "ICR_id")),
+      dplyr::left_join(y = dplyr::select(icr_mapping, c("CpG_id", "ICR_id")),
                               by = "CpG_id",unmatched = "drop",
                 multiple = "first") %>%
-      pull("ICR_id") %>% is.na()
+      dplyr::pull("ICR_id") %>% is.na()
     # Remove non-icr cpgs
     cpg_beta_df <- cpg_beta_df[!discard_non_icr,]
 

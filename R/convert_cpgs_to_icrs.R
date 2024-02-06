@@ -85,7 +85,7 @@ convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRU
   rownames(icr_beta_df) <- icr_beta_df$ICR_ID
   # Extract number of CPGs for each ICR
   n_CpGs <- icr_beta_df$n_CpGs
-  icr_beta_df <- icr_beta_df %>% select(-c("ICR_ID", "n_CpGs"))
+  icr_beta_df <- icr_beta_df %>% dplyr::select(-c("ICR_ID", "n_CpGs"))
 
   icr_beta <- list(icr_beta_df = as.data.frame(icr_beta_df),
                    platform = cpg_beta$platform,
