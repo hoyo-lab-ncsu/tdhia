@@ -9,7 +9,8 @@ convert_cpgs_to_icrs(
   icr_mapping = NULL,
   sort_by_icr = TRUE,
   max_icr_fail_rate = 0.2,
-  quantile_norm = FALSE
+  quantile_norm = FALSE,
+  db_flag = FALSE
 )
 }
 \arguments{
@@ -26,6 +27,8 @@ above this proportion (0-1), the ICR is discarded from the results.}
 \item{quantile_norm}{a boolean flag, when true normalizes the beta values
 between columns of the output icr beta matrix. Default is FALSE because this
 normalization is done earlier in the pipeline.}
+
+\item{db_flag}{boolean when true export workspace to disk for debugging.}
 }
 \value{
 a dataframe containing beta values where rows are ICR ids and columns

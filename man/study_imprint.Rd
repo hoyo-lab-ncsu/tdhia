@@ -10,7 +10,10 @@ study_imprint(
   C,
   family,
   n_p_adj = max(c(ncol(R), ncol(P))),
-  max_p_val = 0.05
+  max_p_val = 0.05,
+  impute_na = TRUE,
+  n.cores = NULL,
+  db_flag = FALSE
 )
 }
 \arguments{
@@ -33,6 +36,14 @@ less). Defaults to max columns to response and predictor variables}
 
 \item{max_p_val}{max p-value threshold, prints number of entries below this
 threshold, but does not alter computation.}
+
+\item{impute_na}{boolean flag, when TRUE missing values in R or P are
+recovered with multiple imputations with the mice package.}
+
+\item{n.cores}{number of cores used for parallel computation. Default is NULL
+and set to max cores detected minus 1.}
+
+\item{db_flag}{boolean when true export workspace to disk for debugging.}
 }
 \value{
 results with fitted coefficients from the glm, sorted by p-value
@@ -51,5 +62,6 @@ If P has many variables/ columns and R has one, models are parallelized over P:
 R[,1] ~ P[,i] + C[,1] + C[,2] + C[,3] ...
 
 This designed that either R or P are the CpG beta values or the ICR beta
-values. The code handles other cases.
+values. The code handles either case. Note that R and P cannot both be
+multicolumn.
 }

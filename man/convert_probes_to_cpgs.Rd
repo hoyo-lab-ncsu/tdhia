@@ -9,7 +9,8 @@ convert_probes_to_cpgs(
   quantile_norm = FALSE,
   discard_unmapped_cpgs = TRUE,
   discard_non_icr_cpgs = TRUE,
-  return_n_probes = FALSE
+  return_n_probes = FALSE,
+  db_flag = FALSE
 )
 }
 \arguments{
@@ -32,6 +33,8 @@ sites that do not map to an ICR.}
 \item{return_n_probes}{a boolean flag, when set to TRUE, adds a column,n_probes,
 to the output cpg beta matrix (cpg_beta_df), that represents the
 number of probes whose beta value was averaged together for that cpg site.}
+
+\item{db_flag}{boolean when true export workspace to disk for debugging.}
 }
 \value{
 a dataframe containing beta values where rows are cpg sites and columns

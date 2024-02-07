@@ -15,7 +15,7 @@
 #' @param quantile_norm a boolean flag, when true normalizes the beta values
 #' between columns of the output icr beta matrix. Default is FALSE because this
 #' normalization is done earlier in the pipeline.
-#'
+#' @param db_flag boolean when true export workspace to disk for debugging.
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #'
@@ -25,8 +25,9 @@
 #'
 #'
 convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
-                                 max_icr_fail_rate = 0.20, quantile_norm = FALSE) {
-  save(list = ls(all.names = TRUE), file = "convert_cpgs_to_icrs.RData")
+                                 max_icr_fail_rate = 0.20, quantile_norm = FALSE,
+                                 db_flag = FALSE) {
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "convert_cpgs_to_icrs.RData")}
   # load(file = "convert_cpgs_to_icrs.RData")
 
   # Load dataframe that maps CpG sites to ICR site
@@ -85,7 +86,7 @@ convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRU
   rownames(icr_beta_df) <- icr_beta_df$ICR_ID
   # Extract number of CPGs for each ICR
   n_CpGs <- icr_beta_df$n_CpGs
-  icr_beta_df <- icr_beta_df %>% select(-c("ICR_ID", "n_CpGs"))
+  icr_beta_df <- icr_beta_df %>% dplyr::select(-c("ICR_ID", "n_CpGs"))
 
   icr_beta <- list(icr_beta_df = as.data.frame(icr_beta_df),
                    platform = cpg_beta$platform,

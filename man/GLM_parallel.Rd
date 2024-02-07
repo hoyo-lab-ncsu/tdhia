@@ -4,7 +4,17 @@
 \alias{GLM_parallel}
 \title{GLM_parallel}
 \usage{
-GLM_parallel(R, Rind = 1, P, Pind = 1, C, family = "binomial", verbose = FALSE)
+GLM_parallel(
+  R,
+  Rind = 1,
+  P,
+  Pind = 1,
+  C,
+  family = "binomial",
+  verbose = FALSE,
+  impute_na = TRUE,
+  db_flag = FALSE
+)
 }
 \arguments{
 \item{R}{dataframe where each column is a Response variable.}
@@ -17,11 +27,16 @@ Default for Rind is 1 for single column dataframe.}
 \item{Pind}{column index for P if it has multiple columns (for parallel processing).
 Default for Pind is 1 for single column dataframe.}
 
-\item{C}{dataframe of confounder variables to be including in model}
+\item{C}{dataframe of confounder variable(s) to be including in model}
 
 \item{family}{string denoting GLM family}
 
 \item{verbose}{boolean flag, when true prints fits to model.}
+
+\item{impute_na}{boolean flag, when TRUE inputs missing NA values with MICE
+package.}
+
+\item{db_flag}{boolean flag, when TRUE saves workspace to disk for debugging}
 }
 \value{
 fit of general linear model, including
@@ -37,6 +52,9 @@ perform general linear modeling with the equation of the form:
 Response ~ Predictor + Confounders
 \code{R[,Rind] ~ P[,Pind] + C[, 1] + C[, 2] + C[, 3] + C[, ...]}
 
-One predictor and one response variable is assumed. Either R or P can be
-parallelized (but only one of them)
+One predictor and one response variable (column) is assumed. If fitting a
+series of models for several R's or P's, this function can be called in
+parallel, and the particular column to be used for each iteration can be
+specified by the column index Rind or Pind. NA values from R or P can be
+imputed with the impute_na flag.
 }

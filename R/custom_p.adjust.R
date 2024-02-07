@@ -11,14 +11,14 @@
 #' @param n of comparisons.
 #'
 #'
-custom_p.adjust <- function (p, method = p.adjust.methods, n = length(p))
+custom_p.adjust <- function (p, method = stats::p.adjust.methods, n = length(p))
 {
   method <- match.arg(method)
   if (method == "fdr")
     method <- "BH"
   nm <- names(p)
   p <- as.numeric(p)
-  p0 <- setNames(p, nm)
+  p0 <- stats::setNames(p, nm)
   if (all(nna <- !is.na(p)))
     nna <- TRUE
   else p <- p[nna]
