@@ -14,7 +14,7 @@
 #' cg:CpG, ch:CHG, mu:multi-unique, rp:repetitive element, or rs:SNP)
 #' @param max_sig_pval a maximum threshold for the signal detection value, beta
 #' values higher than this max are set to NA.
-#' @param set_failed_beta_na boolean flag, when TRUE beta measurements with pval >
+#' @param set_failed_betas_na boolean flag, when TRUE beta measurements with pval >
 #' max_sig_pval will be set to NA. When false, the beta value is left as is.
 #' @param max_probe_fail_rate proportion value (0-1), if a probe fails the p-value
 #' threshold above this proportion of the samples, all measurements from this probe
@@ -23,16 +23,18 @@
 #' values across all samples are discarded (default = TRUE)
 #' @param verbose boolean flag, when TRUE prints the results of each filtering
 #' step (default = TRUE).
+#' @param db_flag boolean when true export workspace to disk for debugging.
 #'
 #' @returns a dataframe containing beta values where rows are probe_ids and columns
 #' are the sample_ids (basenames of the IDAT files or some other mapping
 #' specified by idat_remappings).
 #'
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
-                          max_sig_pval = 0.2, set_failed_beta_na = TRUE,
+                          max_sig_pval = 0.2, set_failed_betas_na = TRUE,
                           max_probe_fail_rate = 0.5,
-                          discard_failed_probes = TRUE, verbose = TRUE) {
-  save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")
+                          discard_failed_probes = TRUE, verbose = TRUE,
+                          db_flag = FALSE) {
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")}
   # load(file = "filter_probes_debug.RData")
 
   # Only print cat() output if the user requests it
@@ -81,7 +83,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   # Set individual probe_beta values to NA if the p-value is above max threshold
   #-----------------------------------------------------------------------------
   sig_pval_pass <- filt_probe_pval_df < max_sig_pval
-  if (!is.null(max_sig_pval) && set_failed_beta_na) {
+  if (!is.null(max_sig_pval) && set_failed_betas_na) {
     filt_probe_beta_df[!sig_pval_pass] <- NA
     verbosecat(sprintf("Probe filter: %.0f%% of probe beta measurements ( %i/ %i) failed
                  the signal max p-value threshold of %.2f, setting them to NA.\n",

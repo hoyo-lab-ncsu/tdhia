@@ -8,10 +8,11 @@ filter_probes(
   probe_beta,
   discard_unmapped_probes = TRUE,
   max_sig_pval = 0.2,
-  set_failed_beta_na = TRUE,
+  set_failed_betas_na = TRUE,
   max_probe_fail_rate = 0.5,
   discard_failed_probes = TRUE,
-  verbose = TRUE
+  verbose = TRUE,
+  db_flag = FALSE
 )
 }
 \arguments{
@@ -28,7 +29,7 @@ cg:CpG, ch:CHG, mu:multi-unique, rp:repetitive element, or rs:SNP)}
 \item{max_sig_pval}{a maximum threshold for the signal detection value, beta
 values higher than this max are set to NA.}
 
-\item{set_failed_beta_na}{boolean flag, when TRUE beta measurements with pval >
+\item{set_failed_betas_na}{boolean flag, when TRUE beta measurements with pval >
 max_sig_pval will be set to NA. When false, the beta value is left as is.}
 
 \item{max_probe_fail_rate}{proportion value (0-1), if a probe fails the p-value
@@ -40,6 +41,8 @@ values across all samples are discarded (default = TRUE)}
 
 \item{verbose}{boolean flag, when TRUE prints the results of each filtering
 step (default = TRUE).}
+
+\item{db_flag}{boolean when true export workspace to disk for debugging.}
 }
 \value{
 a dataframe containing beta values where rows are probe_ids and columns

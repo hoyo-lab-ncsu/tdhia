@@ -9,8 +9,7 @@ load_idata_to_probes(
   platform = "TruDx_imprintome",
   mft = NULL,
   multicore = TRUE,
-  idat_name_remapping = NULL,
-  idat_discard_unmapped = TRUE,
+  idat_basenames = NULL,
   quantile_norm = FALSE,
   mask = FALSE
 )
@@ -19,8 +18,8 @@ load_idata_to_probes(
 \item{idat_dir_paths}{the full filesystem path to directory containing the idat
 files to be processed, formatted as a string or a vector of strings.}
 
-\item{platform}{string for the platform that the array belongs to, as specifed
-within the SeSame package with openSesame().}
+\item{platform}{string for the platform that the array belongs to, as specified
+within the SeSame package with openSesame(). default: "TruDx_imprintome"}
 
 \item{mft}{manifest file for particular imprintome array used in data collection.
 A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
@@ -29,17 +28,18 @@ See ?manifest_v1A2 for more info.}
 \item{multicore}{boolean flag, when true the max number of cores minus 1 is
 used for the current system.}
 
-\item{idat_name_remapping}{a dataframe containing two columns used to convert the
-basename of the IDAT files (used to label columns of output dataframe), into
-a different set of identifiers/mappings.
-\itemize{
-\item idat_basename: column of base filenames of IDAT (no repeated values).
-\item id: column of strings of new mapping (no repeated values).
+\item{idat_basenames}{a character vector or dataframe.
+If idat_basenames is a character vector, then the elements are the
+idat_basenames to be processed. An idat basename is the filename without the
+red and green channel suffix included. So the idat basename
+"207344530007_R08C02" would be used for the pair of files:
+\enumerate{
+\item 207344530007_R08C02_Red.idat
+\item 207344530007_R08C02_Grn.idat
+If idat_basenames is a dataframe, then it contains two columns: idat_basename
+and id. idat_basename is a character vector of idat basenames. id is a numeric
+or string vector for what each idat basename should be renamed to.
 }}
-
-\item{idat_discard_unmapped}{a boolean flag, when set to TRUE discards any idat base
-filenames that are not included in the idat_name_remapping argument (note:
-idat_name_remapping must be specified).}
 
 \item{quantile_norm}{a boolean flag, when set to TRUE, applies quantile
 normalization between the columns in the probe_beta dataframe (default = FALSE).}
@@ -49,7 +49,7 @@ when TRUE excludes some probes due to issues of inter-dependence of measurements
 (default = FALSE).}
 }
 \value{
-a named list object with the following fields:
+a named list with the following fields:
 \itemize{
 \item probe_beta_df: dataframe of beta values, probe_id x sample_id
 \item probe_pval_df: dataframe of signal p-values, probe_id x sample_id
@@ -59,8 +59,11 @@ a named list object with the following fields:
 }
 \description{
 Loads a series flourescence measurements from a custom infinium methylation array
-and converts into methylation beta values.
+and caclulates the methylation beta values and associated detection p-values.
 }
 \details{
-beta = M/(M+U)   (for probes with significant detection p-values)
+beta = M/(M+U)
+
+This function processes the signal for all probes in the array, with no
+filtering performed.
 }

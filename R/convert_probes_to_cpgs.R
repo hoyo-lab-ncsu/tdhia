@@ -21,6 +21,7 @@
 #' @param return_n_probes a boolean flag, when set to TRUE, adds a column,n_probes,
 #'  to the output cpg beta matrix (cpg_beta_df), that represents the
 #'  number of probes whose beta value was averaged together for that cpg site.
+#' @param db_flag boolean when true export workspace to disk for debugging.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
@@ -32,12 +33,12 @@
 convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
                                    discard_unmapped_cpgs = TRUE,
                                    discard_non_icr_cpgs = TRUE,
-                                   return_n_probes = FALSE) {
+                                   return_n_probes = FALSE, db_flag = FALSE) {
   # Get manifest data
   mft = probe_beta$manifest
   icr_mapping = tdhia::mapping_cpg_icr_ids
 
-  save(list = ls(all.names = TRUE), file = "convert_probes_to_cpgs.RData")
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "convert_probes_to_cpgs.RData")}
   # load(file = "convert_probes_to_cpgs.RData")
 
 

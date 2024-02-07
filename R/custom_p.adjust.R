@@ -7,7 +7,8 @@
 #' @param n of comparisons.
 #'
 #' @importFrom stats p.adjust
-custom_p.adjust <- function (p, method = "BH", n = length(p))
+#'
+custom_p.adjust <- function (p, method = stats::p.adjust.methods, n = length(p))
 {
   method <- match.arg(method)
   if (method == "fdr")

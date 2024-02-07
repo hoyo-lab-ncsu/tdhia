@@ -26,10 +26,12 @@ Imports:
 	tibble,
 	purrr,
 	parallel,
-	doParallel,
 	foreach,
 	ggplot2,
-	reshape2
+	reshape2,
+	doSNOW,
+	snow,
+	mice
 Suggests: 
     knitr,
     rmarkdown
