@@ -2,39 +2,45 @@
 #' load_idata_to_probes
 #'
 #' Loads a series flourescence measurements from a custom infinium methylation array
-#' and converts into methylation beta values.
+#' and caclulates the methylation beta values and associated detection p-values.
 #'
-#' beta = M/(M+U)   (for probes with significant detection p-values)
+#' beta = M/(M+U)
+#'
+#' This function processes the signal for all probes in the array, with no
+#' filtering performed.
 #'
 #' @param idat_dir_paths the full filesystem path to directory containing the idat
 #' files to be processed, formatted as a string or a vector of strings.
+#'
 #' @param platform string for the platform that the array belongs to, as specified
-#' within the SeSame package with openSesame(). default:
+#' within the SeSame package with openSesame(). default: "TruDx_imprintome"
+#'
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
+#'
 #' @param multicore boolean flag, when true the max number of cores minus 1 is
 #' used for the current system.
-#' @param idat_name_remapping a dataframe containing two columns used to convert the
-#' basename of the IDAT files (used to label columns of output dataframe), into
-#' a different set of identifiers/mappings.
-#'  - idat_basename: column of base filenames of IDATs to be processed (no
-#'  repeated values).
-#'      example: "207344530007_R08C02" would match with the files:
-#'        1. 207344530007_R08C02_Red.idat
-#'        2. 207344530007_R08C02_Grn.idat
-#'  - id: column of strings of new mapping (no repeated values).
-#'      example: 100, or "studyname_100"
-#' @param idat_discard_unmapped a boolean flag, when set to TRUE discards any idat base
-#'  filenames that are not included in the idat_name_remapping argument (note:
-#'  idat_name_remapping must be specified).
+#'
+#' @param idat_basenames a character vector or dataframe.
+#' If idat_basenames is a character vector, then the elements are the
+#' idat_basenames to be processed. An idat basename is the filename without the
+#' red and green channel suffix included. So the idat basename
+#' "207344530007_R08C02" would be used for the pair of files:
+#'   1. 207344530007_R08C02_Red.idat
+#'   2. 207344530007_R08C02_Grn.idat
+#' If idat_basenames is a dataframe, then it contains two columns: idat_basename
+#' and id. idat_basename is a character vector of idat basenames. id is a numeric
+#'  or string vector for what each idat basename should be renamed to.
+#'
 #' @param quantile_norm a boolean flag, when set to TRUE, applies quantile
 #' normalization between the columns in the probe_beta dataframe (default = FALSE).
+#'
 #' @param mask a boolean flag specified in opensesame() in the Sesame package,
 #' when TRUE excludes some probes due to issues of inter-dependence of measurements
 #' (default = FALSE).
 #'
-#' @returns a named list object with the following fields:
+#' @returns a named list with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
 #'  - platform: string that describes platform for methylation array
@@ -43,11 +49,9 @@
 load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
            mft = NULL, multicore = TRUE,
-           idat_name_remapping = NULL, idat_discard_unmapped = TRUE,
-           quantile_norm = FALSE, mask = FALSE) {
+           idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE) {
   # Load manifest file if platform is ture diagnostic imprintome array
   if (is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
-
   # save(list = ls(all.names = TRUE), file = "load_idata_debug.RData")
   # load(file = "load_idata_debug.RData")
 
@@ -68,13 +72,18 @@ load_idata_to_probes <-
                   "Files are missing! See basename_tbl variable"))
   }
 
-  # Get unique list of basenames (removes repeats)
-  idat_basenames <- unique(all_idat_basenames)
+  # Get unique list of basenames (removes repeats) found in input folder
+  obs_idat_basenames <- unique(all_idat_basenames)
 
-  # Discard IDAT files that are not included in idat_name_remapping file
-  if (!is.null(idat_name_remapping) &&  idat_discard_unmapped) {
-    idat_basenames <- idat_basenames[is.element(idat_basenames,
-                                                idat_name_remapping$idat_basename)]
+  # Discard IDAT files that are not included in idat_basenames list
+  if (!is.null(idat_basenames)) {
+    if (is.data.frame(idat_basenames)) {
+      sub_idats <- idat_basenames$idat_basename
+    } else if (is.vector(idat_basenames)) {
+      sub_idats <- idat_basenames
+    } else {stop ("idat_basenames need to be a vector or dataframe")}
+    obs_idat_basenames <-
+      obs_idat_basenames[is.element(obs_idat_basenames, sub_idats)]
   }
 
 
@@ -94,18 +103,18 @@ load_idata_to_probes <-
   }
 
   # Load each of the IDAT file pairs, process with standard SeSame pipeline
-  cat(sprintf("Processing %.0f IDAT Files...", length(idat_basenames)))
+  cat(sprintf("Processing %.0f IDAT Files...", length(obs_idat_basenames)))
   if (!is.null(multicore_arg)) {
     cat(sprintf(" (Using %i/%i cores.)...", default_ncores, parallel::detectCores()))
   }
   probe_beta_matrix <-
-    sesame::openSesame(paste0(idat_dir_paths, '/', idat_basenames),
+    sesame::openSesame(paste0(idat_dir_paths, '/', obs_idat_basenames),
                        platform=platform, manifest = mft, mask = mask,
                        BPPARAM = multicore_arg, fun = sesame::getBetas)
 
 
   probe_pval_matrix <-
-    sesame::openSesame(paste0(idat_dir_paths, '/', idat_basenames),
+    sesame::openSesame(paste0(idat_dir_paths, '/', obs_idat_basenames),
                        platform=platform, manifest = mft,
                        BPPARAM = multicore_arg, fun = sesame::pOOBAH, return.pval=TRUE)
 
@@ -122,21 +131,17 @@ load_idata_to_probes <-
 
   # If a column mapping is specified, rename column names in probe_beta_df
   #   Discard unmapped columns if user specifies it
-  if (!is.null(idat_name_remapping)) {
+  if (is.data.frame(idat_basenames)) {
 
-    # If idat_discard_unmapped is TRUE, any columns in [probe_beta_df] not included in
-    # [column mapping] are discarded. This is useful if the IDAT folder has data
-    # from multiple studies
-    if (idat_discard_unmapped) {
       probe_beta_df <- probe_beta_df[,is.element(colnames(probe_beta_df),
-                                  idat_name_remapping$idat_basename)]
+                                  idat_basenames$idat_basename)]
       probe_pval_df <- probe_pval_df[,is.element(colnames(probe_pval_df),
-                                                 idat_name_remapping$idat_basename)]
-    }
+                                                 idat_basenames$idat_basename)]
+
     # Rename by matching new id to each idat basename using a left_join()
     remapped_colnames <-
       dplyr::left_join(df_remap <- data.frame(idat_basename = colnames(probe_beta_df)),
-                       dplyr::select(idat_name_remapping, c("idat_basename", "id")),
+                       dplyr::select(idat_basenames, c("idat_basename", "id")),
                        by = "idat_basename",
                      na_matches = "never", unmatched = "error",
                      relationship = "one-to-one")
