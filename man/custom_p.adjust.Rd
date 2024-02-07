@@ -4,12 +4,12 @@
 \alias{custom_p.adjust}
 \title{custom_p.adjust}
 \usage{
-custom_p.adjust(p, method = p.adjust.methods, n = length(p))
+custom_p.adjust(p, method = "BH", n = length(p))
 }
 \arguments{
 \item{p}{numeric vector of p-values (possibly with NAs). Any other R object is coerced by as.numeric.}
 
-\item{method}{correction method, a character string. Can be abbreviated.}
+\item{method}{correction method, a character string. Can be abbreviated. Options include "bonferroni", "holm", "hochberg", "hommel", "BH", "BY", or "none".}
 
 \item{n}{of comparisons.}
 }

@@ -11,7 +11,7 @@ Depends: R (>= 4.3)
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.0
 Roxygen: list(markdown = TRUE)
 biocViews:
 Imports: 
@@ -27,7 +27,9 @@ Imports:
 	purrr,
 	parallel,
 	doParallel,
-	foreach
+	foreach,
+	ggplot2,
+	reshape2
 Suggests: 
     knitr,
     rmarkdown

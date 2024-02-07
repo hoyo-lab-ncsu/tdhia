@@ -1,24 +1,20 @@
-
-
-
-
 #' custom_p.adjust
 #'
 #' @description Given a set of p-values, returns p-values adjusted using one of several methods.
 #'
 #' @param p numeric vector of p-values (possibly with NAs). Any other R object is coerced by as.numeric.
-#' @param method correction method, a character string. Can be abbreviated.
+#' @param method correction method, a character string. Can be abbreviated. Options include "bonferroni", "holm", "hochberg", "hommel", "BH", "BY", or "none".
 #' @param n of comparisons.
 #'
-#'
-custom_p.adjust <- function (p, method = p.adjust.methods, n = length(p))
+#' @importFrom stats p.adjust
+custom_p.adjust <- function (p, method = "BH", n = length(p))
 {
   method <- match.arg(method)
   if (method == "fdr")
     method <- "BH"
   nm <- names(p)
   p <- as.numeric(p)
-  p0 <- setNames(p, nm)
+  p0 <- stats::setNames(p, nm)
   if (all(nna <- !is.na(p)))
     nna <- TRUE
   else p <- p[nna]
