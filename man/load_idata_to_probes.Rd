@@ -19,8 +19,8 @@ load_idata_to_probes(
 \item{idat_dir_paths}{the full filesystem path to directory containing the idat
 files to be processed, formatted as a string or a vector of strings.}
 
-\item{platform}{string for the platform that the array belongs to, as specifed
-within the SeSame package with openSesame().}
+\item{platform}{string for the platform that the array belongs to, as specified
+within the SeSame package with openSesame(). default:}
 
 \item{mft}{manifest file for particular imprintome array used in data collection.
 A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
@@ -33,8 +33,13 @@ used for the current system.}
 basename of the IDAT files (used to label columns of output dataframe), into
 a different set of identifiers/mappings.
 \itemize{
-\item idat_basename: column of base filenames of IDAT (no repeated values).
+\item idat_basename: column of base filenames of IDATs to be processed (no
+repeated values).
+example: "207344530007_R08C02" would match with the files:
+1. 207344530007_R08C02_Red.idat
+2. 207344530007_R08C02_Grn.idat
 \item id: column of strings of new mapping (no repeated values).
+example: 100, or "studyname_100"
 }}
 
 \item{idat_discard_unmapped}{a boolean flag, when set to TRUE discards any idat base

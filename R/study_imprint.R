@@ -46,9 +46,12 @@
 study_imprint <- function (R, P, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
                            db_flag = FALSE) {
-
   if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint.RData")}
   # load(file = "study_imprint.RData")
+
+  # This expression prevents devtools from issuing a NOTE warning
+  # x is defined within some local functions below
+  x <- NULL
 
   cat("Analyzing imprintome study...\n")
 

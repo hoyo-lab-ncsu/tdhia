@@ -8,8 +8,8 @@
 #'
 #' @param idat_dir_paths the full filesystem path to directory containing the idat
 #' files to be processed, formatted as a string or a vector of strings.
-#' @param platform string for the platform that the array belongs to, as specifed
-#' within the SeSame package with openSesame().
+#' @param platform string for the platform that the array belongs to, as specified
+#' within the SeSame package with openSesame(). default:
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
@@ -18,8 +18,13 @@
 #' @param idat_name_remapping a dataframe containing two columns used to convert the
 #' basename of the IDAT files (used to label columns of output dataframe), into
 #' a different set of identifiers/mappings.
-#'  - idat_basename: column of base filenames of IDAT (no repeated values).
+#'  - idat_basename: column of base filenames of IDATs to be processed (no
+#'  repeated values).
+#'      example: "207344530007_R08C02" would match with the files:
+#'        1. 207344530007_R08C02_Red.idat
+#'        2. 207344530007_R08C02_Grn.idat
 #'  - id: column of strings of new mapping (no repeated values).
+#'      example: 100, or "studyname_100"
 #' @param idat_discard_unmapped a boolean flag, when set to TRUE discards any idat base
 #'  filenames that are not included in the idat_name_remapping argument (note:
 #'  idat_name_remapping must be specified).
