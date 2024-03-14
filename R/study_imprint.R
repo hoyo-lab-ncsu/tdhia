@@ -156,25 +156,30 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   # Execute parallel processing
   df_fits <- foreach::foreach(x = par_ind, .combine = rbind,
                               .export = "GLM_parallel",.options.snow = opts
-                              ) %dopar%
-    {
-      foreach_fun(x)
-    }
+  ) %dopar% {
+    foreach_fun(x)
+  }
+  # End processing time
+  finish <- Sys.time()
+  cat(" Finished.\n")
 
-  # Model variables
-  model_vars <- df_fits$Variable[df_fits$Response == df_fits$Response[1]]
-  # Seperate results for each variable of model
+
+  # Separate results for each variable of model
+  cat("Separating results for each variable used in model...\n")
+  model_vars <-   df_fits$Variable[df_fits$Model_Id==1]
+  if ((!is.null(P)) ){model_vars <- model_vars[2:length(model_vars)]}
+  # GO through each model variable and extract results
   dfs_sep <- list()
   for (n in seq_along(model_vars)) {
     dfs_sep[[n]] <- df_fits[df_fits$Variable == model_vars[n],]
   }
   names(dfs_sep) <- model_vars
-
-
-  # End processing time
-  finish <- Sys.time()
-  cat(" Finished.\n")
-  # cat(sprintf(">Processing time: %f %s\n", finish - start, units(finish - start)))
+  # If cpg or ICR sites are a predictor, name the dataframe "site_id
+  if (!is.null(P)) {
+    df_temp <- list(df_fits[df_fits$Variable %in% colnames(P),])
+    names(df_temp) <- "site_id"
+    dfs_sep <- c(df_temp, dfs_sep)
+  }
 
   # Set NA p-values to a max value of 1 (for sorting)
   na_fun <- function(df) { df$P_VAL[is.na(df$P_VAL)] <- 1; return(df)}
@@ -182,6 +187,7 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   sort_fun <- function(df) {df=df[order(df$P_VAL, decreasing=FALSE),]; return(df)}
 
   # Calculate adjusted p_value
+  cat("Adjusting p-values...\n")
   adj_p_val <- function(df) {
     df$ADJ_P_VAL <- custom_p.adjust(df$P_VAL, method = "fdr", n = n_p_adj);
     return(df)
@@ -191,16 +197,13 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   dfs_corr <- lapply(dfs_sorted, adj_p_val)
 
 
-  lapply(dfs_corr, head)
-
-
   sum_fun <- function(df) {
     # Report results from GLM
 
 
   }
 
-  cat("Summarizing Results...")
+  cat("Summarizing Results...\n")
   for (n in seq_along(model_vars)) {
     if (dfs_corr[[n]]$Confounder[1] == 0) {
     cat(sprintf("%s:\n", model_vars[n]))

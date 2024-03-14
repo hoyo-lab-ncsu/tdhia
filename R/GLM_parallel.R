@@ -130,7 +130,8 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   rownames(df_res) <- NULL
 
   # Record whether variable is confounder
-  n_pred <- max(c(0, ncol(P))) + max(c(0, ncol(Pe)))
+  # Get number of columns for P[,Pind] and Pe
+  n_pred <- max(c(0, length(Pind))) + max(c(0, ncol(Pe)))
   df_res$Confounder <- 0
   df_res$Confounder[(n_pred +1) : nrow(df_res)] <- rep(1, nrow(df_res) - n_pred)
 
@@ -138,6 +139,7 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   df_res$ADJ_P_VAL <- NA
   df_res$Family <- family
   df_res$Formula <- formula_string
+  df_res$Model_Id <-max(c(Rind, Pind))
 
   if (verbose) {print(cf)}
 
