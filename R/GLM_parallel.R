@@ -1,10 +1,20 @@
 
 #' GLM_parallel
 #'
-#' @description perform general linear modeling with the equation of the form:
+#' @description perform general linear modeling with the equation of two
+#' possible forms:
 #'
-#' Response ~ Predictor + Confounders
-#' \code{R[,Rind] ~ P[,Pind] + C[, 1] + C[, 2] + C[, 3] + C[, ...]}
+#' Response ~ Parallel_Predictor + Predictors + Confounders
+#' Parallel_Response ~ Predictors + Confounders
+#'
+#' \code{R[,Rind] ~ P[,Pind] + Pe[,1] + Pe[,...] + C[, 1] + C[, ...]}
+#'
+#' R[,Rind]: Either a single response variable, or several response variables
+#'  where a separate model is fitted for each (parallelized).
+#' P[,Pind]: A series of predictors where a separate model is fitted for each
+#'  (parallelized). Note only R or P can be parallelized, but not both.
+#' Pe: Extra predictors, to be included in all models.
+#' C: confounder variables, to be included in all models.
 #'
 #' One predictor and one response variable (column) is assumed. If fitting a
 #' series of models for several R's or P's, this function can be called in
@@ -19,6 +29,7 @@
 #' @param Pind column index for P if it has multiple columns (for parallel processing).
 #' Default for Pind is 1 for single column dataframe.
 #' @param C dataframe of confounder variable(s) to be including in model
+#' @param parallilize_P boolean flag, when set to TRUE,
 #' @param family string denoting GLM family
 #' @param verbose boolean flag, when true prints fits to model.
 #' @param impute_na boolean flag, when TRUE inputs missing NA values with MICE
@@ -29,28 +40,41 @@
 #' - Estimate: point estimates of coefficients for each of the predictors
 #' - Std. Error: standard error of the estimates
 #' - Cumulative two-tailed probability
-GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial",
-                        verbose = FALSE, impute_na = TRUE, db_flag = FALSE) {
+GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
+                        family = "binomial",
+                        verbose = FALSE, impute_na = TRUE, db_flag = TRUE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "GLM_parallel.RData") }
   # load(file = "GLM_parallel.RData")
 
   stopifnot("GLM_parallel:error: R must be a dataframe" = is.data.frame(R) ||
               is.matrix(R))
   stopifnot("GLM_parallel:error: P must be a dataframe" = is.data.frame(P) ||
-              is.matrix(P))
+              is.matrix(P) || is.null(P))
   if (length(Rind)!=1 || length(Pind)!=1) {
     stop(sprintf(paste0("GLM_parallel:error: both length() of Rind(==%.0f) and ",
                         "Pind(==%.0f) must be 1."),
                  length(Rind), length(Pind)))
   }
 
-  # Condense R and P and C into a single matrix: R,P,C
-  model_data <- cbind(data.frame(R = R[, Rind], P = P[, Pind]), C)
-  # Rename Response and Predictor columns to their variables
-  names(model_data)[1] <- colnames(R)[Rind]
-  names(model_data)[2] <- colnames(P)[Pind]
+  # If P is null, then set the index to be null also
+  if (is.null(P)) Pind = NULL
 
-  # model_data[runif(10,1,nrow(model_data)),1]<- NA
+
+  # Join all response and predictors into one matrix, with response being first
+  # column, then all predictors, then all confounders.
+
+  # Version of cbind that ignores any argument that is set to null
+  null_cbind <-function(...) {x=list(...);x=x[lengths(x)!=0]; do.call(cbind,x)}
+
+  # Condense R and P and C into a single matrix: R, P, Pe, C
+  model_data <- null_cbind(R[, Rind], P[,Pind], Pe, C)
+
+  # Rename Response and Predictor columns to their variables
+  #   Required because these variables might be parallelized
+  names(model_data)[1] <- colnames(R)[Rind]
+  if (!is.null (P)) {
+    names(model_data)[2] <- colnames(P)[Pind]
+  }
 
 
   # Calculate the number of imputations required
@@ -64,16 +88,17 @@ GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial",
   if(n_imputes > 0 && n_imputes < 5) {n_imputes = 5}
 
   # Define formula string for fitted model
+  plus_str <- function(x) {if(is.null(x)) {return(x)} else {return(" + ")}}
   formula_string <-
-    paste0(colnames(R)[Rind], " ~ ", colnames(P)[Pind]," + ",
-           paste0(colnames(C), c(rep(" +", ncol(C)-1), ""), collapse=" "))
+    paste0(colnames(R)[Rind], " ~ ", colnames(P)[Pind], plus_str(P),
+           paste0(colnames(Pe), c(rep(" +", max(c(ncol(Pe)-1, 0))), ""),  collapse=" "), " + ",
+           paste0(colnames(C),  c(rep(" +",  max(c(ncol(C )-1, 0))), ""), collapse=" "))
 
   # Impute missing data if flag is set and data actually missing
   if (impute_na && n_imputes > 0 ) {
 
     # Perform multiple imputations of the dataset
     imp <- mice::mice(model_data, print = FALSE, m = n_imputes, maxit = 10, seed = 0)
-
 
     # Fit each of the imputations
     fits <- with(imp, glm(stats::formula(formula_string), family = family))
@@ -82,39 +107,39 @@ GLM_parallel = function(R, Rind = 1, P, Pind = 1, C, family = "binomial",
     est <- mice::pool(fits)
     # Grab coefficient summary table
     cf <- summary(est)
-    # Extract/name certain columns to make the same output without imputation
-    pred_coeff <- cf[2,c(2,3,4,6)]
-    colnames(pred_coeff) <- c("Estimate", "Std. Error", "Statistic", "Pr(>|z|)")
+    rownames(cf) <- cf$term
+    cf <- cf[,c(2,3,4,6)]
+    colnames(cf) <- c("Estimate", "StdError", "Statistic", "P_VAL")
 
   } else {
     # Either imputation is disabled, or imputation is not needed
-
     # Calculate glm
     mod = stats::glm(data = model_data, stats::formula(formula_string),
                      family = family)
 
     # Grab predictor from second row of summary output
     cf = summary(mod)$coefficients
-
-    # Get output for predictor
-    pred_coeff <- t(as.data.frame(cf[2,]))
-    colnames(pred_coeff)[3] <- "Statistic"
-
+    # cf <- cf[,c(1,2,3, 5)]
+    colnames(cf)[2:4] <-c("StdError", "Statistic", "P_VAL")
   }
 
+  # Add response column and variable column from rownames
+  df_res <-
+    cbind(data.frame(Response = colnames(R)[Rind],
+                     Variable = rownames(cf[2:nrow(cf),])), cf[2:nrow(cf),])
+  rownames(df_res) <- NULL
+
+  # Record whether variable is confounder
+  n_pred <- max(c(0, ncol(P))) + max(c(0, ncol(Pe)))
+  df_res$Confounder <- 0
+  df_res$Confounder[(n_pred +1) : nrow(df_res)] <- rep(1, nrow(df_res) - n_pred)
+
+  # Slot for adjusted p-value, calculated outside of this function
+  df_res$ADJ_P_VAL <- NA
+  df_res$Family <- family
+  df_res$Formula <- formula_string
 
   if (verbose) {print(cf)}
 
-  # Produce tidy dataframe of output
-  out <- cbind(data.frame(Response = colnames(R)[Rind]),
-               Predictor = colnames(P)[Pind],
-               pred_coeff,
-               data.frame(ADJ_P_VAL = NA, Imputes = n_imputes,
-                          Frac_R_Missing = sum(is.na(R[,Rind]))/nrow(R),
-                          Frac_P_Missing = sum(is.na(P[,Pind]))/nrow(P),
-                          Family = family, Formula = formula_string))
-  names(out)[6] <- "P_VAL"
-  rownames(out) <- NULL
-
-  return(out)
+  return(df_res)
 }

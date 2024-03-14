@@ -50,7 +50,7 @@ load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
            mft = NULL, multicore = TRUE,
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE) {
-  # Load manifest file if platform is ture diagnostic imprintome array
+  # Load manifest file if platform is true diagnostic imprintome array
   if (is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
   # save(list = ls(all.names = TRUE), file = "load_idata_debug.RData")
   # load(file = "load_idata_debug.RData")

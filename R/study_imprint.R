@@ -43,7 +43,7 @@
 #' @importFrom rlang .data
 #'
 #' @return results with fitted coefficients from the glm, sorted by p-value
-study_imprint <- function (R, P, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
+study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
                            db_flag = FALSE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint.RData")}
@@ -56,19 +56,32 @@ study_imprint <- function (R, P, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
   cat("Analyzing imprintome study...\n")
 
   # Reorder rows in P and C to match R, keep both as dataframes even if 1 column
+  if (!is.null(P)) {
   P <- P %>%
     tibble::rownames_to_column(var = "row_names") %>%
     dplyr::arrange(factor(.data$row_names, levels = rownames(R))) %>%
     tibble::column_to_rownames(var = "row_names")
   if( !all(rownames(R)==rownames(P))) {
     stop("glm: rownames of R and P dataframes do not match.")}
+  }
 
-  C <- C %>%
-    tibble::rownames_to_column(var = "row_names") %>%
-    dplyr::arrange(factor(.data$row_names, levels = rownames(R))) %>%
-    tibble::column_to_rownames(var = "row_names")
-  if( !all(rownames(R)==rownames(C))) {
-    stop("glm: rownames of R and C dataframes do not match.")}
+  if (!is.null(Pe)) {
+    Pe <- Pe %>%
+      tibble::rownames_to_column(var = "row_names") %>%
+      dplyr::arrange(factor(.data$row_names, levels = rownames(R))) %>%
+      tibble::column_to_rownames(var = "row_names")
+    if( !all(rownames(R)==rownames(Pe))) {
+      stop("glm: rownames of R and Pe dataframes do not match.")}
+  }
+
+  if (!is.null(Pe)) {
+    C <- C %>%
+      tibble::rownames_to_column(var = "row_names") %>%
+      dplyr::arrange(factor(.data$row_names, levels = rownames(R))) %>%
+      tibble::column_to_rownames(var = "row_names")
+    if( !all(rownames(R)==rownames(C))) {
+      stop("glm: rownames of R and C dataframes do not match.")}
+  }
 
   # Calculate missing Values
   fract_r_na <- sum(is.na(R))/(nrow(R)*ncol(R))
@@ -78,11 +91,11 @@ study_imprint <- function (R, P, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
   n_imput <- mean(c(fract_r_na, fract_p_na))
 
   #  Get indexes for response and predictor variables
-  Rind <- 1:ncol(R)
-  Pind <- 1:ncol(P)
+  Rind <- 1: max(is.null(ncol(R)),ncol(R))
+  Pind <- 1: max(is.null(ncol(P)),ncol(P))
 
   # Print short label for model (excluding confounders)
-  cat(sprintf("First model label: %s ~ %s + confounders\n", colnames(R)[1],
+  cat(sprintf("First model label: %s ~ %s ...\n", colnames(R)[1],
               colnames(P)[1]))
   cat("Example output of first model:\n")
 
@@ -92,26 +105,32 @@ study_imprint <- function (R, P, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
   if (length(Rind) > 1) {
     # For each response variable
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = x, P = P, Pind = Pind,
-                                             C = C, family = family,
+                                             Pe = Pe, C = C, family = family,
                                              impute_na = impute_na,
                                              db_flag = db_flag)
     test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = Pind,
-                             C = C, family = family, verbose = TRUE)
+                             Pe = Pe, C = C, family = family,
+                             impute_na = impute_na,
+                             db_flag = db_flag, verbose = TRUE)
   } else if (length(Pind) > 1) {
     # For each predictor variable
     foreach_fun <-  function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = x,
-                                              C = C, family = family,
+                                              Pe = Pe, C = C, family = family,
                                               impute_na = impute_na,
                                               db_flag = db_flag)
     test_run <- GLM_parallel(R = R, Rind = Rind, P = P, Pind = 1,
-                             C = C, family = family, verbose = TRUE)
+                             Pe = Pe, C = C, family = family,
+                             impute_na = impute_na,
+                             db_flag = db_flag, verbose = TRUE)
   } else {
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = Pind,
-                                             C = C, family = family,
+                                             Pe = Pe, C = C, family = family,
                                              impute_na = impute_na,
                                              db_flag = db_flag)
-    test_run <- GLM_parallel(R = R, Rind = Rind, P = P, Pind = Pind,
-                             C = C, family = family, verbose = TRUE)
+    test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = 1,
+                             Pe = Pe, C = C, family = family,
+                             impute_na = impute_na,
+                             db_flag = db_flag, verbose = TRUE)
   }
   cat(sprintf("Formula: %s\n", test_run$Formula))
 
@@ -142,42 +161,73 @@ study_imprint <- function (R, P, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
       foreach_fun(x)
     }
 
+  # Model variables
+  model_vars <- df_fits$Variable[df_fits$Response == df_fits$Response[1]]
+  # Seperate results for each variable of model
+  dfs_sep <- list()
+  for (n in seq_along(model_vars)) {
+    dfs_sep[[n]] <- df_fits[df_fits$Variable == model_vars[n],]
+  }
+  names(dfs_sep) <- model_vars
+
+
   # End processing time
   finish <- Sys.time()
   cat(" Finished.\n")
   # cat(sprintf(">Processing time: %f %s\n", finish - start, units(finish - start)))
 
-  # Sort by p value
-  df_fits_sorted <- df_fits %>% dplyr::arrange(.data$P_VAL)
-  df_fits_sorted$P_VAL[is.na(df_fits_sorted$P_VAL)] <- 1
-  # Recalculate P adjust
-  df_fits_sorted$ADJ_P_VAL <- custom_p.adjust(df_fits_sorted$P_VAL, method = "fdr",
-                                              n = n_p_adj)
+  # Set NA p-values to a max value of 1 (for sorting)
+  na_fun <- function(df) { df$P_VAL[is.na(df$P_VAL)] <- 1; return(df)}
+  # Sort each variable by p-value
+  sort_fun <- function(df) {df=df[order(df$P_VAL, decreasing=FALSE),]; return(df)}
+
+  # Calculate adjusted p_value
+  adj_p_val <- function(df) {
+    df$ADJ_P_VAL <- custom_p.adjust(df$P_VAL, method = "fdr", n = n_p_adj);
+    return(df)
+  }
+  dfs_sorted <- lapply(dfs_sep, na_fun)
+  dfs_sorted <- lapply(dfs_sorted, sort_fun)
+  dfs_corr <- lapply(dfs_sorted, adj_p_val)
 
 
-  # Report results from GLM
-  cat(sprintf(">>  %.0f cpg sites have p_val < %.2f\n",
-              sum(df_fits_sorted$P_VAL < max_p_val), max_p_val))
-  cat(sprintf(">>  %.0f cpg sites have adj_p_val < %.2f\n",
-              sum(df_fits_sorted$ADJ_P_VAL < max_p_val), max_p_val))
-  print(df_fits_sorted[df_fits_sorted$ADJ_P_VAL < max_p_val, c(1:7,11)])
-  cat("\n\n")
+  lapply(dfs_corr, head)
 
 
-  # TODO: fill in what this does
-  lambda <-
-    stats::median(stats::qchisq( as.numeric( as.character(df_fits_sorted$P_VAL)),
-                                 df = 1, lower.tail = F),
-                  na.rm = T) / stats::qchisq( 0.5, 1)
-  # cat(sprintf("> Lambda: %f\n", lambda))
+  sum_fun <- function(df) {
+    # Report results from GLM
 
 
-  return(df_fits_sorted)
+  }
+
+  cat("Summarizing Results...")
+  for (n in seq_along(model_vars)) {
+    if (dfs_corr[[n]]$Confounder[1] == 0) {
+    cat(sprintf("%s:\n", model_vars[n]))
+    cat(sprintf(">>  %.0f cpg sites have p_val < %.2f\n",
+                sum(dfs_corr[[n]]$P_VAL < max_p_val), max_p_val))
+    cat(sprintf(">>  %.0f cpg sites have adj_p_val < %.2f\n",
+                sum(dfs_corr[[n]]$ADJ_P_VAL < max_p_val), max_p_val))
+    if (sum(dfs_corr[[n]]$ADJ_P_VAL < max_p_val)>0) {
+      print(dfs_corr[[n]][dfs_corr[[n]]$ADJ_P_VAL < max_p_val,])
+    }
+    cat("\n")
+    }
+  }
+
+
+  return(dfs_corr)
 }
 
 
 
 
+# TODO: fill in what this does
+# lambda <-
+#   stats::median(stats::qchisq( as.numeric( as.character(df_fits_sorted$P_VAL)),
+#                                df = 1, lower.tail = F),
+#                 na.rm = T) / stats::qchisq( 0.5, 1)
+# cat(sprintf("> Lambda: %f\n", lambda))
 
 
 
