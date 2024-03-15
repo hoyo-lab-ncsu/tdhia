@@ -167,7 +167,7 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   # Separate results for each variable of model
   cat("Separating results for each variable used in model...\n")
   model_vars <-   df_fits$Variable[df_fits$Model_Id==1]
-  if ((!is.null(P)) ){model_vars <- model_vars[2:length(model_vars)]}
+  if (!is.null(P) ) {model_vars <- model_vars[2:length(model_vars)]}
   # GO through each model variable and extract results
   dfs_sep <- list()
   for (n in seq_along(model_vars)) {
@@ -197,26 +197,9 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   dfs_corr <- lapply(dfs_sorted, adj_p_val)
 
 
-  sum_fun <- function(df) {
-    # Report results from GLM
-
-
-  }
-
-  cat("Summarizing Results...\n")
-  for (n in seq_along(model_vars)) {
-    if (dfs_corr[[n]]$Confounder[1] == 0) {
-    cat(sprintf("%s:\n", model_vars[n]))
-    cat(sprintf(">>  %.0f cpg sites have p_val < %.2f\n",
-                sum(dfs_corr[[n]]$P_VAL < max_p_val), max_p_val))
-    cat(sprintf(">>  %.0f cpg sites have adj_p_val < %.2f\n",
-                sum(dfs_corr[[n]]$ADJ_P_VAL < max_p_val), max_p_val))
-    if (sum(dfs_corr[[n]]$ADJ_P_VAL < max_p_val)>0) {
-      print(dfs_corr[[n]][dfs_corr[[n]]$ADJ_P_VAL < max_p_val,])
-    }
-    cat("\n")
-    }
-  }
+  # Print out results of analysis
+  summarize_study(dfs_corr, max_p_val, print_sites = FALSE,
+                  print_confounders = TRUE)
 
 
   return(dfs_corr)

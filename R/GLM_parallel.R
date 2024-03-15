@@ -119,6 +119,11 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
 
     # Grab predictor from second row of summary output
     cf = summary(mod)$coefficients
+
+    # If P is not null, remove the extra suffix "TRUE" to its var name
+    # Example:  "cg27785526TRUE" ->  "cg27785526"
+    rownames(cf)[2] <- stringr::str_replace(rownames(cf)[2], "TRUE$","")
+
     # cf <- cf[,c(1,2,3, 5)]
     colnames(cf)[2:4] <-c("StdError", "Statistic", "P_VAL")
   }
@@ -126,7 +131,8 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   # Add response column and variable column from rownames
   df_res <-
     cbind(data.frame(Response = colnames(R)[Rind],
-                     Variable = rownames(cf[2:nrow(cf),])), cf[2:nrow(cf),])
+                     Variable = rownames(cf[2:nrow(cf),])),
+          cf[2:nrow(cf),])
   rownames(df_res) <- NULL
 
   # Record whether variable is confounder
