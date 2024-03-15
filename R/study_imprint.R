@@ -21,9 +21,11 @@
 #' @param R response variable(s): data frame that is patients (rows) x variables
 #'  (columns) could either be beta values for cpg or ICR sites, or
 #'  study metadata.
-#' @param P predictor variable(s) data frame that is patients (rows) x variables
-#'  (columns), could either be beta values for cpg or ICR sites, or
-#'  study metadata.
+#' @param P parallelized predictor variable(s) data frame that is patients
+#'  (rows) x variables (columns), could either be beta values for cpg or ICR
+#'  sites. For study metadata, use Pe input argument.
+#' @param Pe extra predictor variables that are not parallelized (incuded in all
+#'  fitted models).
 #' @param C predictor variable(s) data frame that is patients (rows) x variables
 #'  (columns).
 #' @param family string for family model argument for glm(). (ex. 'binomial', 'gaussian')

@@ -7,6 +7,7 @@
 study_imprint(
   R,
   P,
+  Pe,
   C,
   family,
   n_p_adj = max(c(ncol(R), ncol(P))),
@@ -21,9 +22,12 @@ study_imprint(
 (columns) could either be beta values for cpg or ICR sites, or
 study metadata.}
 
-\item{P}{predictor variable(s) data frame that is patients (rows) x variables
-(columns), could either be beta values for cpg or ICR sites, or
-study metadata.}
+\item{P}{parallelized predictor variable(s) data frame that is patients
+(rows) x variables (columns), could either be beta values for cpg or ICR
+sites. For study metadata, use Pe input argument.}
+
+\item{Pe}{extra predictor variables that are not parallelized (incuded in all
+fitted models).}
 
 \item{C}{predictor variable(s) data frame that is patients (rows) x variables
 (columns).}

@@ -7,13 +7,14 @@
 GLM_parallel(
   R,
   Rind = 1,
-  P,
+  P = NULL,
   Pind = 1,
-  C,
+  Pe = NULL,
+  C = NULL,
   family = "binomial",
   verbose = FALSE,
   impute_na = TRUE,
-  db_flag = FALSE
+  db_flag = TRUE
 )
 }
 \arguments{
@@ -26,6 +27,8 @@ Default for Rind is 1 for single column dataframe.}
 
 \item{Pind}{column index for P if it has multiple columns (for parallel processing).
 Default for Pind is 1 for single column dataframe.}
+
+\item{Pe}{dataframe of extra predictor variables to be included in all models.}
 
 \item{C}{dataframe of confounder variable(s) to be including in model}
 
@@ -47,10 +50,20 @@ fit of general linear model, including
 }
 }
 \description{
-perform general linear modeling with the equation of the form:
+perform general linear modeling with the equation of two
+possible forms:
 
-Response ~ Predictor + Confounders
-\code{R[,Rind] ~ P[,Pind] + C[, 1] + C[, 2] + C[, 3] + C[, ...]}
+Response ~ Parallel_Predictor + Predictors + Confounders
+Parallel_Response ~ Predictors + Confounders
+
+\code{R\[,Rind] ~ P\[,Pind] + Pe\[,1] + Pe\[,...] + C\[, 1] + C\[, ...]}
+
+R[,Rind]: Either a single response variable, or several response variables
+where a separate model is fitted for each (parallelized).
+P[,Pind]: A series of predictors where a separate model is fitted for each
+(parallelized). Note only R or P can be parallelized, but not both.
+Pe: Extra predictors, to be included in all models.
+C: confounder variables, to be included in all models.
 
 One predictor and one response variable (column) is assumed. If fitting a
 series of models for several R's or P's, this function can be called in

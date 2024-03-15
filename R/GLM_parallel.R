@@ -7,11 +7,11 @@
 #' Response ~ Parallel_Predictor + Predictors + Confounders
 #' Parallel_Response ~ Predictors + Confounders
 #'
-#' \code{R[,Rind] ~ P[,Pind] + Pe[,1] + Pe[,...] + C[, 1] + C[, ...]}
+#' \code{R\[,Rind] ~ P\[,Pind] + Pe\[,1] + Pe\[,...] + C\[, 1] + C\[, ...]}
 #'
-#' R[,Rind]: Either a single response variable, or several response variables
+#' R\[,Rind]: Either a single response variable, or several response variables
 #'  where a separate model is fitted for each (parallelized).
-#' P[,Pind]: A series of predictors where a separate model is fitted for each
+#' P\[,Pind]: A series of predictors where a separate model is fitted for each
 #'  (parallelized). Note only R or P can be parallelized, but not both.
 #' Pe: Extra predictors, to be included in all models.
 #' C: confounder variables, to be included in all models.
@@ -28,8 +28,8 @@
 #' @param P dataframe where each column is a Predictor variable.
 #' @param Pind column index for P if it has multiple columns (for parallel processing).
 #' Default for Pind is 1 for single column dataframe.
+#' @param Pe dataframe of extra predictor variables to be included in all models.
 #' @param C dataframe of confounder variable(s) to be including in model
-#' @param parallilize_P boolean flag, when set to TRUE,
 #' @param family string denoting GLM family
 #' @param verbose boolean flag, when true prints fits to model.
 #' @param impute_na boolean flag, when TRUE inputs missing NA values with MICE
