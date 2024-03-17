@@ -42,7 +42,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 
   # Extract manifest dataframe
   mft = probe_beta$manifest
-  verbosecat(sprintf("Probe manifest: manifest file has a total of %.0f probes.\n",
+  verbosecat(sprintf("Probe manifest: manifest file has a total of %.0f probes.\n\n",
               nrow(mft)))
 
 
@@ -65,9 +65,9 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_beta_df <- probe_beta$probe_beta_df[!unmapped_probe_ids & cpg_ids,]
     filt_probe_pval_df <- probe_beta$probe_pval_df[!unmapped_probe_ids & cpg_ids,]
 
-    verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) in dataset  b/c they don't
+    verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) in dataset b/c they don't
                 map uniquely to the genome or a CpG site.
-                %.0f probes now remain.\n",
+                %.0f probes now remain.\n\n",
                 100*nrow(filt_probe_beta_df)/nrow(probe_beta$probe_beta_df),
                 nrow(probe_beta$probe_beta_df)- nrow(filt_probe_beta_df),
                 nrow(probe_beta$probe_beta_df),
@@ -86,10 +86,18 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   if (!is.null(max_sig_pval) && set_failed_betas_na) {
     filt_probe_beta_df[!sig_pval_pass] <- NA
     verbosecat(sprintf("Probe filter: %.0f%% of probe beta measurements ( %i/ %i) failed
-                 the signal max p-value threshold of %.2f, setting them to NA.\n",
+                 the signal max p-value threshold of %.2f, setting them to NA.\n\n",
                 100*sum(is.na(filt_probe_beta_df))/prod(dim(filt_probe_beta_df)),
                 sum(is.na(filt_probe_beta_df)),prod(dim(filt_probe_beta_df)),
                 max_sig_pval))
+
+    # Five number summary of failure rates
+    verbosecat('Distribution of failiure rates for probes:\n')
+    qsum <- (quantile(unname(rowSums(is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df)),
+             seq(.1,1,.1)))
+    df_sum = data.frame(Quantile = names(qsum), "Fraction.Failed" = unname(qsum))
+    if (verbose) print(df_sum)
+    verbosecat("\n")
   }
   # hist(rowSums(!is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df),
   #      main = paste("Histogram of probe pass rate"),
@@ -109,7 +117,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_beta_df[row_fail_flag,] <- NA
     verbosecat(sprintf("Probe filter: %.0f%% of probes ( %i/ %i) had a signal p-value
                 fail rate above threshold of %.0f%%, setting all beta values to NA
-                for those probes.\n",
+                for those probes.\n\n",
         100*sum(row_fail_flag)/length(row_fail_flag), sum(row_fail_flag),
         length(row_fail_flag), 100*max_probe_fail_rate))
   } else {probe_fail_rate_df = NULL}
@@ -131,7 +139,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_pval_df2 <- filt_probe_pval_df
   }
   verbosecat(sprintf("Probe filter: discarded %.0f%% probes ( %i/ %i) because all measurements are now NA.
-              %i probes now remain. \n",
+              %i probes now remain. \n\n",
       100*(nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2))/nrow(filt_probe_beta_df),
       nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2),
       nrow(filt_probe_beta_df),
