@@ -16,25 +16,36 @@ _> suffix might be lower or upper case in filenames, code ignores cased for suff
 ## User Instructions
   
 This pipeline is designed to be easy to use with basic R experience.
-  
-1. To use the pipeline, first open the fold for the repository
-2. Open **"run_this_first.R"** file within RStudio, and execute this file as source (there is a **Source** button next to run button on upper right side of editor, don't copy and paste code into command line).
-3. This code set's the working directory to the base folder of the code repository, downloads and installs some packages if required, and creates a csv file in the base folder, named **"file_paths.csv"**.
-4. The user can open this csv file, and copy & paste in the required file paths in the second column for each of the variables (example csv file filled in found [here](media/example_file_paths.csv)), with one variable defined per row:  
-   A. **idat_dir_paths**: full file system path to the folder containing all of the IDAT files.  
-   B. **study_meta_path**: full file system path to the study metadata file (contains info about which IDAT files to process, ID numbers for patients etc., see Study Metadata File Requirements below).    
-   C. **output_dir_path**: full file system path to the folder where the output files will be written.  
-5. The user then opens **"process_imprintome.R"** and runs the file from source. This will:  
-   A. **Process the IDAT files** and calculate the beta values from each probe.  
-   B. **Average probe beta value(s)** that map to the same CpG site.  
-   C. **Average CpG beta value(s)** that map to the same ICR.  
-   D. Pay attention if there are any **warning messages** that test for problems within the dataset.  
-<br><br>
+
+Example scripts (need to convert to vignettes): https://github.com/bacorli2/tdhia_scripts
     
 ## Technical Overview of Current Pipeline
 
-1. To be added.
-<br><br>
+
+### Summary:
+1. Importation and Processing: Import IDAT files, process with standard sesame pipeline using the True Diagnostic Imprintome array manifest. Calculate matrix of beta values (probe_beta_matrix) and sesame detection p-values (probe_beta_pval). Dimensions for both: probe_id x samples. Function: load_idata_to_probes.R  
+2. Filter probes: select for relevant probes that also yield a high quality signal. Function: filter_probes.R.  
+  a. Probes are discarded if they do not map to a distinct cpg site, (need specific genomic location and suffix with “cg*” for probe name).  
+  b. Set any beta values to NA if the sesame signal detection p-value is greater than 0.2.  
+  c. Discard probes that fail the 0.2 p-value threshold more than 20% of samples (an entire row of the probe_beta_matrix is discarded if the p-value > 0.2 for more than 20% of the samples). These are discarded because the probe is deemed unreliable.   
+3. Convert to CpG measurements: the probe_beta_matrix is converted to a cpg_beta_matrix with calculating the mean beta value when multiple probes map to the same cpg site (NA values disregarded). So, if multiple probes map to a single cpg site, we calculate the mean beta value for each patient, if there are any NA values, we disregard them. If there are only NA values, then we return NA for this step. Dimensions for cpg_beta_matrix: cpg site id x patients. Any probes that map to a cpg site that does not map to an ICR is also discarded. We typically get coverage for 7000 - 9000 cpg sites after probe filtering, out the total ~10,000 cpg sites.  
+Function: convert_probes_to_cpgs.R.  
+4. Option: Convert to ICR measurements: use the same simple averaging, we can convert the cpg_beta_matrix to an icr_beta_matrix (for statistical analysis). I don’t typically use this because this would assume that all the mappings of cpg sites to icr sites on a biological level are correct (or else true signal will quickly get masked with any mistakes). I usually perform any analysis at the cpg level and then look up which ICR sites they belong to for summarizing results. We typically get coverage for 1030 of the 1088 total ICR sites. Function: convert_cpgs_to_icrs.R.  
+5. Option: Threshold the beta values for hemi-methylation state. We can convert the cpg_beta_matrix or icr_beta_matrix from a continuous variable to binary by a naïve threshold within some range (such as 0.5 +- 0.15).  
+6. Statistical Analysis: Use the cpg_beta_matrix and the study metadata (additional data for each sample/patient) to test for associations of individual cpg sites and study metadata variables.  
+  a. Define models for analysis, the cpg_beta_matrix can either be used as a response variable or predictor depending on the situation. We produce a series of models where the fitting is parallelized over the different cpg sites (since they each need a separate linear model). If the response variable is continuous (i.e. beta measurements for each CPG or ICR site), we use a gaussian model, if the response variable is binary (thresholded for hemi-methylation state), we use a binomial mode.  
+    1. Example: testing for association between methylation state of cpg sites in offspring versus the heavy metal exposure of the parents.   
+    2. Models: cpg_ids ~ metal + other_predictors + confounders.  
+    3. Example: testing for association with methylation state of cpg sites in offspring versus their birth weight.
+  
+  b. Models: birth_weight ~ cpg_ids + other_predictors + confounders.  
+Filling in NA values (imputation): The GLM package cannot handle any NA values in the dataset, so we must fill them in (it would initially appear that glm() can handle NA values, but after digging deep into the discussion threads it looks like it cannot do so, the function discards entire rows/columns if there are NA values even if you tell it differently). We do this with imputation with the MICE package. Basically, we take our statistical model above, the cpg_beta_matrix, and have MICE produce multiple imputations and use them to produce reasonable values to fill in any missing datapoints. I don’t know if this is a proper approach or not.  
+  c. Fit models and calculate statistics: use glm package to fit a series of models, one for each cpg or icr site (parallelized for multicore support).   
+  d. P-value Correction: the p-values for predictors are corrected for FDR. We currently correct the cpg level analysis with n~= 1000 (number of ICR sites covered by cpg sites that passed QC in step 2c). A more rigorous correction would be n~= 9000 (number of cpg sites analyzed, a proper FDR correction). Maybe the n=1000 correction is too liberal/ forgiving.  
+  e. Output: list of cpg sites with statistically significant FDR corrected p-values, and what ICR sites they map to.  
+
+Note: The words matrix specially refers to dataframes in R (since that is an R specific term).
+
     
 ## Study Metadata File Requirements
   
@@ -46,24 +57,31 @@ _Required columns_:
 3. **Patient_ID**: the original medical record number of the patient (this is used to open the pair of IDAT files mentioned previously, it is the base name of the IDAT files).  
 <br><br>
     
-## Output Files Description
+## Example summary output
   
-1. **probe_beta_matrix.csv**: table containing beta values for each probe for each patient.  
-   * _Rows_: each probe, labeled with probe_id from methylation array.  
-   * _Columns_: each patient, with global_patient_id created from the study metadata file (merges the "source" and "patient_study_id" columns into a single string.  
-3. **cpg_beta_matrix.csv**: table containing beta values for each cpg site for each patient.  
-   * _Rows_: each cpg site, labeled with cpg_id from cpg-ICR metadata file.  
-   * _Columns_: each patient, with global_patient_id.  
-5. **icr_beta_matrix.csv**: table containing beta values for each ICR site for each patient.  
-   * _Rows_: each icr, labeled with icr_id from cpg-ICR metadata file.  
-   * _Columns_: each patient, with global_patient_id.  
-7. **summary_icr_beta_matrix.csv**: outputs mean and standard deviation of beta value for each ICR across all patients in study.  
-<br><br><br><br>
-    
-## !! Security Notice !!
-1. This repository is a _developmental version and private_.
-2. It is designed to **not include any HIPAA/ protected study metadata**, it only contains the general functions, and metadata associated with imprintome arrays, and scripts to process particular studies (but not the study data).
-3. However this can't be _automatically gauranteed_- if a developed adds a commit with protected data at any time, it will be accessible even if the file gets deleted via version control history.
-4. If you want to release this code/ make it public (to include with a publication), you need permission from Dr. Hoyo and the repository has to be carefully reviewed to make sure it is **completely devoid** of protected data.
-5. Only the current commit should be released (copied to a new public github repository), and not include past version controlled code changes (included in the .git folder, do not copy that to avoid exposing all of the code changes made during development of repository).
+```
+Example outputs
+Probe filtering:
+Probe manifest: manifest file has a total of 22819 probes.
+Probe filter: discarding 46% probes ( 12381/ 22819) in dataset  b/c they don't
+                map uniquely to the genome or a CpG site.
+                10438 probes now remain.
+Probe filter: 20% of probe beta measurements ( 397097/ 1993658) failed
+                 the signal max p-value threshold of 0.20, setting them to NA.
+Probe filter: 22% of probes ( 2320/ 10438) had a signal p-value
+                fail rate above threshold of 25%, setting all beta values to NA
+                for those probes.
+Probe filter: discarded 22% probes ( 2320/ 10438) because all measurements are now NA.
+              8118 probes now remain. 
 
+Cpg Filtering:
+CpG filter: 8118 of probes in dataset mapped to 7174 unique CpG sites id data.
+CpG filter: discarded 0% of CpG sites (0/ 7174) because they
+      do not map uniquely to the genome. 7174 CpG sites remain.
+CpG filter: discarded 7% of CpG sites (485/ 6689) because they
+      do not map to an ICR. 6689 CpG sites remain.
+
+ICR Filtering
+ICR Filter: discarded 1% of ICRs ( 11/ 1088) b/c their signal fail rate was > 20%.
+              1029 ICRs still remain.
+```              
