@@ -138,20 +138,21 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_beta_df2 <- filt_probe_beta_df
     filt_probe_pval_df2 <- filt_probe_pval_df
   }
-  verbosecat(sprintf("Probe filter: discarded %.0f%% probes ( %i/ %i) because all measurements are now NA.
+  verbosecat(sprintf("Probe filter: pruning %.0f%% probes ( %i/ %i) because all measurements are now NA.
               %i probes now remain. \n\n",
       100*(nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2))/nrow(filt_probe_beta_df),
       nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2),
       nrow(filt_probe_beta_df),
       nrow(filt_probe_beta_df2)))
 
-  # hist(rowSums(!is.na(filt_probe_beta_df2))/ncol(filt_probe_beta_df2),
-  #      main = paste("Histogram of probe pass rate"),
-  #      xlab = "Fraction passed probes")
-
+  # Report how many missing measurements at end of all filtering steps.
+  verbosecat(sprintf("Probe filter: After all pruning and filtering, %.0f%% probes measurments ( %i/ %i) are now NA.\n\n",
+                     100*sum(is.na(filt_probe_beta_df2)) / prod(dim(filt_probe_beta_df2)),
+                     sum(is.na(filt_probe_beta_df2)),
+                     prod(dim(filt_probe_beta_df2))))
 
  probe_beta <- list(probe_beta_df = filt_probe_beta_df2,
-                      probe_pval_df = filt_probe_beta_df2,
+                      probe_pval_df = filt_probe_pval_df2,
                       platform = probe_beta$platform,
                       manifest = probe_beta$manifest,
                       probe_fail_rate_df = probe_fail_rate_df
