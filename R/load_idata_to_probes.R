@@ -48,7 +48,7 @@
 #'
 load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
-           mft = NULL, multicore = TRUE,
+           mft = NULL, multicore = TRUE, sesame_prep = "0CDB",
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE) {
   # Load manifest file if platform is true diagnostic imprintome array
   if (is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
@@ -109,14 +109,15 @@ load_idata_to_probes <-
   }
   probe_beta_matrix <-
     sesame::openSesame(paste0(idat_dir_paths, '/', obs_idat_basenames),
-                       platform=platform, manifest = mft, mask = mask,
+                       platform=platform, manifest = mft, prep = sesame_prep,
                        BPPARAM = multicore_arg, fun = sesame::getBetas)
 
 
   probe_pval_matrix <-
     sesame::openSesame(paste0(idat_dir_paths, '/', obs_idat_basenames),
-                       platform=platform, manifest = mft,
-                       BPPARAM = multicore_arg, fun = sesame::pOOBAH, return.pval=TRUE)
+                       platform=platform, manifest = mft, prep = sesame_prep,
+                       BPPARAM = multicore_arg, fun = sesame::pOOBAH,
+                       return.pval  =TRUE)
 
   # Debugging: saving output from sesame pipeline
   # Todo: pipeline is currently run twice to get beta and p-values, recode to run once

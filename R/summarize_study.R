@@ -17,9 +17,9 @@ summarize_study <- function(dfs, max_p_val, print_sites = TRUE, print_confounder
   for (n in seq_along(model_vars)) {
     if (dfs[[n]]$Confounder[1] == 0 || print_confounders) {
       cat(sprintf("%s:\n", model_vars[n]))
-      cat(sprintf(">>  %.0f cpg sites have p_val < %.2f\n",
+      cat(sprintf(">>  %.0f models have p_val < %.2f\n",
                   sum(dfs[[n]]$P_VAL < max_p_val), max_p_val))
-      cat(sprintf(">>  %.0f cpg sites have adj_p_val < %.2f\n",
+      cat(sprintf(">>  %.0f models have adj_p_val < %.2f\n",
                   sum(dfs[[n]]$ADJ_P_VAL < max_p_val), max_p_val))
       if (sum(dfs[[n]]$ADJ_P_VAL < max_p_val)>0 && print_sites) {
 

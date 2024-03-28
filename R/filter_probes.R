@@ -83,7 +83,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   # Set individual probe_beta values to NA if the p-value is above max threshold
   #-----------------------------------------------------------------------------
   sig_pval_pass <- filt_probe_pval_df < max_sig_pval
-  if (!is.null(max_sig_pval) && set_failed_betas_na) {
+  if ((!is.null(max_sig_pval)) && set_failed_betas_na) {
     filt_probe_beta_df[!sig_pval_pass] <- NA
     verbosecat(sprintf("Probe filter: %.0f%% of probe beta measurements ( %i/ %i) failed
                  the signal max p-value threshold of %.2f, setting them to NA.\n\n",
@@ -98,6 +98,9 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     df_sum = data.frame(Quantile = names(qsum), "Fraction.Failed" = unname(qsum))
     if (verbose) print(df_sum)
     verbosecat("\n")
+  } else {
+    verbosecat(sprintf("Probe filter: keeping all individual beta values that
+                       exceed p-value.\n\n"))
   }
   # hist(rowSums(!is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df),
   #      main = paste("Histogram of probe pass rate"),
