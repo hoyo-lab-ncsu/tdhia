@@ -47,7 +47,8 @@
 #' @return results with fitted coefficients from the glm, sorted by p-value
 study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
-                           db_flag = FALSE) {
+                           db_flag = FALSE, rm.na.R = FALSE, rm.na.P = FALSE,
+                           rm.na.Pe = FALSE, rm.na.C = FALSE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint.RData")}
   # load(file = "study_imprint.RData")
 
@@ -57,7 +58,8 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
 
   cat("Analyzing imprintome study...\n")
 
-  # Reorder rows in P and C to match R, keep both as dataframes even if 1 column
+  # Reorder rows between P,Pe,C to match R
+  # ----------------------------------------------------------------------------
   if (!is.null(P)) {
   P <- P %>%
     tibble::rownames_to_column(var = "row_names") %>%
@@ -92,7 +94,67 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   cat(sprintf("  P: %.0f%% of values are missing (NA values).\n", fract_p_na*100 ))
   n_imput <- mean(c(fract_r_na, fract_p_na))
 
+  # Remove rows in dataset with NA values (if requested)
+  # NAs in parallel variable (for cpgs or icrs) can be imputed in model fitting
+  #-----------------------------------------------------------------------------
+  cat("Checking for NAs and Removing if specified.\n")
+
+  is.R.na = rep(FALSE, nrow(R))
+  if (!is.null(R)) {
+    temp <- rowSums(is.na(R)) > 0
+    cat(sprintf("   rm.na, R: %.0f/ %.0f rows have 1+ NAs...", sum(temp),
+                length(is.R.na)))
+    if (rm.na.R) { is.R.na = temp
+      cat(" Marked for removal.\n")
+    } else {cat("Keeping them.\n")}
+  }
+
+  is.P.na = rep(FALSE, nrow(R))
+  if (!is.null(P)) {
+    temp =  rowSums(is.na(P)) > 0
+    cat(sprintf("  rm.na, P: %.0f/ %.0f rows have 1+ NAs...", sum(temp),
+                length(is.P.na)))
+    if (rm.na.P) { is.P.na = temp
+    cat(" Marked for removal.\n")
+    } else {cat("Keeping them.\n")}
+  }
+
+  is.Pe.na = rep(FALSE, nrow(R))
+  if (!is.null(Pe)) {
+    temp = rowSums(is.na(Pe)) > 0
+    cat(sprintf("   rm.na, Pe: %.0f/ %.0f rows have 1+ NAs...", sum(temp),
+                length(is.Pe.na)))
+    if (rm.na.Pe) { is.Pe.na = temp
+    cat(" Marked for removal.\n")
+    } else {cat("Keeping them.\n")}
+  }
+
+  is.C.na = rep(FALSE, nrow(R))
+  if (!is.null(C)) {
+    temp = rowSums(is.na(C)) > 0
+    cat(sprintf("   rm.na, C: %.0f/ %.0f rows have 1+ NAs...", sum(temp),
+                length(is.C.na)))
+    if (rm.na.C) { is.C.na = temp
+    cat(" Marked for removal.\n")
+    } else {cat("Keeping them.\n")}
+  }
+
+
+  # Remove all rows marked for removal
+  rm.na.flags <- is.R.na | is.P.na | is.Pe.na | is.C.na
+  cat(sprintf(">> rm.na: Removing %.0f rows total (before imputation)...\n",
+              sum(rm.na.flags)))
+  cat(sprintf(">> rm.na:%.0f rows now remain.\n",
+              sum(!rm.na.flags)))
+
+  R  <- R[!rm.na.flags, ]
+  P  <- P[!rm.na.flags, ]
+  Pe <- Pe[!rm.na.flags,]
+  C  <- C[!rm.na.flags, ]
+
+
   #  Get indexes for response and predictor variables
+  #-----------------------------------------------------------------------------
   Rind <- 1: max(is.null(ncol(R)),ncol(R))
   Pind <- 1: max(is.null(ncol(P)),ncol(P))
 
