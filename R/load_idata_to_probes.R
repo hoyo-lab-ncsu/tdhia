@@ -22,8 +22,9 @@
 #' @param multicore boolean flag, when true the max number of cores minus 1 is
 #' used for the current system.
 #'
-#' @param sesame_pre string of number/ letters to control sesame normalization
+#' @param sesame_prep string of number/ letters to control sesame normalization
 #' steps. Default is 0CDB.
+#'
 #' @param idat_basenames a character vector or dataframe.
 #' If idat_basenames is a character vector, then the elements are the
 #' idat_basenames to be processed. An idat basename is the filename without the

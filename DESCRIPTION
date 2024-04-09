@@ -26,6 +26,8 @@ Imports:
 	tibble,
 	purrr,
 	parallel,
+	doParallel,
+	zoo,
 	foreach,
 	ggplot2,
 	reshape2,

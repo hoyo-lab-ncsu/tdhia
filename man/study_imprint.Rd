@@ -14,7 +14,11 @@ study_imprint(
   max_p_val = 0.05,
   impute_na = TRUE,
   n.cores = NULL,
-  db_flag = FALSE
+  db_flag = FALSE,
+  rm.na.R = FALSE,
+  rm.na.P = FALSE,
+  rm.na.Pe = FALSE,
+  rm.na.C = FALSE
 )
 }
 \arguments{
@@ -48,6 +52,14 @@ recovered with multiple imputations with the mice package.}
 and set to max cores detected minus 1.}
 
 \item{db_flag}{boolean when true export workspace to disk for debugging.}
+
+\item{rm.na.R}{flag to remove NA values in R prior to imputation.}
+
+\item{rm.na.P}{flag to remove NA values in P prior to imputation.}
+
+\item{rm.na.Pe}{flag to remove NA values in Pe prior to imputation.}
+
+\item{rm.na.C}{flag to remove NA values in C prior to imputation.}
 }
 \value{
 results with fitted coefficients from the glm, sorted by p-value

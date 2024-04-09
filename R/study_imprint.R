@@ -39,6 +39,10 @@
 #' @param n.cores number of cores used for parallel computation. Default is NULL
 #' and set to max cores detected minus 1.
 #' @param db_flag boolean when true export workspace to disk for debugging.
+#' @param rm.na.R flag to remove NA values in R prior to imputation.
+#' @param rm.na.P flag to remove NA values in P prior to imputation.
+#' @param rm.na.Pe flag to remove NA values in Pe prior to imputation.
+#' @param rm.na.C flag to remove NA values in C prior to imputation.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom foreach %dopar%
@@ -112,7 +116,7 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   is.P.na = rep(FALSE, nrow(R))
   if (!is.null(P)) {
     temp =  rowSums(is.na(P)) > 0
-    cat(sprintf("  rm.na, P: %.0f/ %.0f rows have 1+ NAs...", sum(temp),
+    cat(sprintf("   rm.na, P: %.0f/ %.0f rows have 1+ NAs...", sum(temp),
                 length(is.P.na)))
     if (rm.na.P) { is.P.na = temp
     cat(" Marked for removal.\n")
@@ -147,10 +151,10 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   cat(sprintf(">> rm.na:%.0f rows now remain.\n",
               sum(!rm.na.flags)))
 
-  R  <- R[!rm.na.flags, ]
-  P  <- P[!rm.na.flags, ]
-  Pe <- Pe[!rm.na.flags,]
-  C  <- C[!rm.na.flags, ]
+  R  <- R[!rm.na.flags, , drop = FALSE]
+  P  <- P[!rm.na.flags, , drop = FALSE]
+  Pe <- Pe[!rm.na.flags, , drop = FALSE]
+  C  <- C[!rm.na.flags, , drop = FALSE]
 
 
   #  Get indexes for response and predictor variables

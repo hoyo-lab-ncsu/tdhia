@@ -9,6 +9,7 @@ load_idata_to_probes(
   platform = "TruDx_imprintome",
   mft = NULL,
   multicore = TRUE,
+  sesame_prep = "0CDB",
   idat_basenames = NULL,
   quantile_norm = FALSE,
   mask = FALSE
@@ -27,6 +28,9 @@ See ?manifest_v1A2 for more info.}
 
 \item{multicore}{boolean flag, when true the max number of cores minus 1 is
 used for the current system.}
+
+\item{sesame_prep}{string of number/ letters to control sesame normalization
+steps. Default is 0CDB.}
 
 \item{idat_basenames}{a character vector or dataframe.
 If idat_basenames is a character vector, then the elements are the

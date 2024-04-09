@@ -93,7 +93,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 
     # Five number summary of failure rates
     verbosecat('Distribution of failiure rates for probes:\n')
-    qsum <- (quantile(unname(rowSums(is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df)),
+    qsum <- (stats::quantile(unname(rowSums(is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df)),
              seq(.1,1,.1)))
     df_sum = data.frame(Quantile = names(qsum), "Fraction.Failed" = unname(qsum))
     if (verbose) print(df_sum)
