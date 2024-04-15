@@ -24,13 +24,13 @@ _> suffix might be lower or upper case in filenames, code ignores cased for suff
 ### RStudio  
 1. **Set Working Directory to TDHIA**: Open RStudio, click [ **Session** ] >> [ **Set Working Directory** ] >> [ **Browse** ] to the location of the tdhia repository (step 2, in this example case located in ~/Documents/Github/tdhia/).
 2. **Install Devtools**: run in the command line: >> install.packages("devtools")
-3. **Install BiocManager**: run >> install.packages("BiocManager")
-4. **Update BiocManager**: run >> BiocManager::install(version = "3.18")
-5. **Load TDHIA Package**: run >> devtools::load_all()
+3. **Install BiocManager**: run > install.packages("BiocManager")
+4. **Update BiocManager**: run > BiocManager::install(version = "3.18")
+5. **Load TDHIA Package**: run > devtools::load_all()
 6. **Package Dependencies**: R Studio will attempt to load the pacakge and download dependcies, it may error. Try running several times, in between attempts run:
-   1. >> BiocManager::valid()     and then if packages needs to be updated, the valid() call will print out commands you need to copy to the command line and run to update any biocmanager packages.
-   2. >> update.packages()      checks for r pacakge updates.
-1. Once installed, 
+   1. > BiocManager::valid()     and then if packages needs to be updated, the valid() call will print out commands you need to copy to the command line and run to update any biocmanager packages.
+   2. > update.packages()      checks for r pacakge updates.
+1. Once installed, open an example analysis script found in tdhia_scripts repository: basic_scripts/imprintome_metal_exposure.R. Keep the working directory to the tdhia package.
 
 Example scripts (need to convert to vignettes): https://github.com/bacorli2/tdhia_scripts
     
