@@ -13,16 +13,24 @@ _Note: IDAT files are assumed to be named by patient_ID, and they should exist i
 _> suffix might be lower or upper case in filenames, code ignores cased for suffix._
 <br><br>
     
-## Initial Setup and Installation
-  
+## User Instructions
+### Initial Setup and Installation
 1. Download and install the latest version of [R](https://www.r-project.org/), [R Studio](https://posit.co/download/rstudio-desktop/). If on windows, also install [R Tools](https://cran.r-project.org/bin/windows/Rtools/).
 2. Download this repository to your computer by either:
    1. Clicking the green **[Code]** button at the top of this page and download repository as a zip file (not recommended because you have to redownload for any updates to the code).
    2. Cloning this repository using a github client (**recommended option**, cloning allows you to sync the code on your computer with any updates added here). For windows and Mac, you can install [Github Desktop](https://desktop.github.com/). Once installed clock the green **[Code]** button on this page, and select "Open in Github Desktop", a dialogue box will appear to "Clone" this repository. It will download the repository to a default location (usually in ~/Documents/Github/tdhia/). You can download updates to this repository by clicking "Fetch Origin" and "Sync" within github desktop, and all the files will be automatically updated.
 3. Clone or download the github that has **example scripts** for this package, using the same steps as previously: [tdhia_scripts](https://github.com/bacorli2/tdhia_scripts).
-4. **Set Working Directory to TDHIA**: Open RStudio, click [ **Session** ] >> [ **Set Working Directory** ] >> [ **Browse** ] to the location of the tdhia repository (step 2, in this example case located in ~/Documents/Github/tdhia/).
-5. **Install Devtools**: run in the command line: >install.packages("devtools")
-6. **Install BiocManager**:
+
+### RStudio  
+1. **Set Working Directory to TDHIA**: Open RStudio, click [ **Session** ] >> [ **Set Working Directory** ] >> [ **Browse** ] to the location of the tdhia repository (step 2, in this example case located in ~/Documents/Github/tdhia/).
+2. **Install Devtools**: run in the command line: >> install.packages("devtools")
+3. **Install BiocManager**: run >> install.packages("BiocManager")
+4. **Update BiocManager**: run >> BiocManager::install(version = "3.18")
+5. **Load TDHIA Package**: run >> devtools::load_all()
+6. **Package Dependencies**: R Studio will attempt to load the pacakge and download dependcies, it may error. Try running several times, in between attempts run:
+   1. >> BiocManager::valid()     and then if packages needs to be updated, the valid() call will print out commands you need to copy to the command line and run to update any biocmanager packages.
+   2. >> update.packages()      checks for r pacakge updates.
+1. Once installed, 
 
 Example scripts (need to convert to vignettes): https://github.com/bacorli2/tdhia_scripts
     
