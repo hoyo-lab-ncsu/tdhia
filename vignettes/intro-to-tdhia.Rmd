@@ -10,10 +10,11 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
-)
+knitr::opts_chunk$set(echo = TRUE, root.dir = here::i_am("README.md"), 
+                      collapse = TRUE, comment = "#>")
+
+if(!require(here)){ install.packages("here") }
+here::i_am("README.md")
 devtools::load_all()
 ```
 
@@ -22,25 +23,75 @@ Imprintome Array (TDHIA) with the tdhia package.
 
 ## Dataset generation
 
-We begin by first generating simulated data. Sesame imports IDAT files into a SigSet data object. We are going to artificially generate SigSet files. Let's do a dataset of 25 SigSets (IDATS).
+We begin by first generating simulated data. Sesame imports IDAT files into a SigSet data object. We are going to artificially generate SigSet files. Let's do a dataset of 10 SigSets (IDATS).
 
 
 ```{r}
-ss <- simulate_idat_data(25)
+ss <- simulate_idat_data(10)
 ```
 
-We can now load this data into tdhia and calculate the beta values and signal detection p-values.
+We can now load this data into tdhia and calculate the beta values and signal 
+detection p-values. This is returned in a named list, with the following fields:  
+**probe_beta_df**: dataframe of beta values, probe_id x sample_id.  
+**probe_pval_df**: dataframe of signal p-values, probe_id x sample_id.  
+**platform**: string that describes platform for methylation array.  
+**manifest**: dataframe of the manifest file used for SeSame processing.  
+  
 
 
-```{r}
-
+```{r,  cache = TRUE}
+# 1) Load IDATS and convert to probe beta matrix
+# Output: rows: probe_id     x     columns: patient
 probe_beta <-
     load_idata_to_probes(idat_dir_paths = ss, multicore = TRUE, 
-                         quantile_norm = FALSE)
+                         quantile_norm = FALSE, db_flag = FALSE)
 
 ```
 
-Also a quote using `>`:
+We can filter out low quality probes with the filt_probe_beta(). This function 
+returns a named list with the same format as *probe_beta* above.  
 
-> "He who gives up [code] safety for [code] speed deserves neither."
-([via](https://twitter.com/hadleywickham/status/504368538874703872))
+
+```{r}
+# 2) Filter probes that are not mapped and discard poor signal
+# Output: rows: probe_id     x     columns: patient
+filt_probe_beta <-
+  filter_probes(probe_beta = probe_beta, discard_unmapped_probes = TRUE ,
+                max_sig_pval = 0.2, set_failed_betas_na = FALSE, 
+                max_probe_fail_rate = 0.25,
+                discard_failed_probes = TRUE, db_flag = TRUE)
+```
+
+Once probe data has been filtered convert the probe beta matrix to a cpg data 
+matrix, stored in a named list of the form:  
+**cpg_beta_df**: dataframe of beta values, probe_id x sample_id.  
+**platform**: string that describes platform for methylation array.  
+**manifest**: dataframe of the manifest file used for SeSame processing.  
+**cpg_n_probes**: number of probes for each cpg site.
+  
+Probe beta values that belong to the same cpg site for a given patient are averaged.  
+
+```{r}
+#3  Convert probe beta matrix to a cpg beta matrix
+# Output: rows: cpg_id     x     columns: patient
+cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE, 
+                                   db_flag = TRUE, smooth_adj_cpgs = TRUE)
+```
+
+Finally, we can convert the cpg beta matric to an icr beta matric, which is 
+returned in a named list of the form:  
+**icr_beta_df**: dataframe of beta values, icr_id x sample_id.  
+**platform**: string that describes platform for methylation array.  
+**manifest**: dataframe of the manifest file used for SeSame processing.  
+**n_CpGs**: number of cpg sites in each icr site.
+  
+Probe beta values that belong to the same cpg site for a given patient are averaged.  
+
+
+```{r}
+
+#4  Convert probe beta matrix to an icr beta matrix
+# Output: rows: icr_id     x     columns: patient
+icr_beta <- convert_cpgs_to_icrs(cpg_beta, max_icr_fail_rate = 0.2)
+
+```

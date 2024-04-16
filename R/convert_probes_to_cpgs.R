@@ -30,6 +30,11 @@
 #' @returns a dataframe containing beta values where rows are cpg sites and columns
 #' are either (1) the basenames of the idat files or (2) some other mapping
 #' specified when the data was loaded in \code{load_idat}.
+#'  - cpg_beta_df: dataframe of beta values, probe_id x sample_id
+#'  - platform: string that describes platform for methylation array
+#'  - manifest: dataframe of the manifest file used for SeSame processing
+#'  - cpg_n_probes: number of probes for each cpg site.
+#'
 #'
 convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
                                    discard_unmapped_cpgs = TRUE,

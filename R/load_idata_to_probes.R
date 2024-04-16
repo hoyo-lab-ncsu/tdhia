@@ -52,44 +52,52 @@
 load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
            mft = NULL, multicore = TRUE, sesame_prep = "0CDB",
-           idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE) {
-  # Load manifest file if platform is true diagnostic imprintome array
-  if (is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
-  # save(list = ls(all.names = TRUE), file = "load_idata_debug.RData")
-  # load(file = "load_idata_debug.RData")
+           idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
+           db_flag = FALSE) {
+    # Load manifest file if platform is true diagnostic imprintome array
+    if (is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
 
-  # Get list of IDAT files in target path
-  all_idat_names <- dir(path = idat_dir_paths, pattern = "*.idat", ignore.case = TRUE)
-
-  # Extract the basenames of IDAT files
-  #   Removes _Grn.idat and _Red.idat from file names (case insensitive)
-  all_idat_basenames <- stringr::str_replace(
-    all_idat_names, pattern = stringr::regex("_(Grn|Red).idat$", ignore_case = TRUE),
-    replacement = "")
+    if(db_flag) save(list = ls(all.names = TRUE), file = "load_idata_to_probes.RData")
+    # load(file = "load_idata_debug.RData")
 
 
-  # Debugging: verify that two IDAT files are associated with each basename:
-  #    One file for red and one for green channel fluorescence
-  basename_tbl <- as.data.frame(table(all_idat_basenames))
-  if (!all(basename_tbl$Freq==2)){
-    warning(paste("IDAT_PAIR: Not all IDAT file basenames have 2 IDAT files associated with them.",
-                  "Files are missing! See basename_tbl variable"))
-  }
+    if (!is(idat_dir_paths[[1]],"data.frame")) {
+      # Get list of IDAT files in target path
+      all_idat_names <- dir(path = idat_dir_paths, pattern = "*.idat", ignore.case = TRUE)
 
-  # Get unique list of basenames (removes repeats) found in input folder
-  obs_idat_basenames <- unique(all_idat_basenames)
+      # Extract the basenames of IDAT files
+      #   Removes _Grn.idat and _Red.idat from file names (case insensitive)
+      all_idat_basenames <- stringr::str_replace(
+        all_idat_names, pattern = stringr::regex("_(Grn|Red).idat$", ignore_case = TRUE),
+        replacement = "")
 
-  # Discard IDAT files that are not included in idat_basenames list
-  if (!is.null(idat_basenames)) {
-    if (is.data.frame(idat_basenames)) {
-      sub_idats <- idat_basenames$idat_basename
-    } else if (is.vector(idat_basenames)) {
-      sub_idats <- idat_basenames
-    } else {stop ("idat_basenames need to be a vector or dataframe")}
-    obs_idat_basenames <-
-      obs_idat_basenames[is.element(obs_idat_basenames, sub_idats)]
-  }
 
+      # Debugging: verify that two IDAT files are associated with each basename:
+      #    One file for red and one for green channel fluorescence
+      basename_tbl <- as.data.frame(table(all_idat_basenames))
+      if (!all(basename_tbl$Freq==2)){
+        warning(paste("IDAT_PAIR: Not all IDAT file basenames have 2 IDAT files associated with them.",
+                      "Files are missing! See basename_tbl variable"))
+      }
+
+      # Get unique list of basenames (removes repeats) found in input folder
+      obs_idat_basenames <- unique(all_idat_basenames)
+
+      # Discard IDAT files that are not included in idat_basenames list
+      if (!is.null(idat_basenames)) {
+        if (is.data.frame(idat_basenames)) {
+          sub_idats <- idat_basenames$idat_basename
+        } else if (is.vector(idat_basenames)) {
+          sub_idats <- idat_basenames
+        } else {stop ("idat_basenames need to be a vector or dataframe")}
+        obs_idat_basenames <-
+          obs_idat_basenames[is.element(obs_idat_basenames, sub_idats)]
+      }
+
+      full_idat_basenames <- paste0(idat_dir_paths, '/', obs_idat_basenames)
+    } else {
+      full_idat_basenames <- idat_dir_paths
+    }
 
   # Caching SeSame Data Files (required for running SeSame firs time...)
   cat("Checking that Sesame idatSignature file is locally cached...")
@@ -106,20 +114,24 @@ load_idata_to_probes <-
     multicore_arg = NULL
   }
 
+
+
+
+
   # Load each of the IDAT file pairs, process with standard SeSame pipeline
-  cat(sprintf("Processing %.0f IDAT Files...", length(obs_idat_basenames)))
+  cat(sprintf("Processing %.0f IDAT Files...", length(full_idat_basenames)))
   if (!is.null(multicore_arg)) {
     cat(sprintf(" (Using %i/%i cores.)...", default_ncores, parallel::detectCores()))
   }
   probe_beta_matrix <-
-    sesame::openSesame(paste0(idat_dir_paths, '/', obs_idat_basenames),
-                       platform=platform, manifest = mft, prep = sesame_prep,
+    sesame::openSesame(full_idat_basenames,
+                       platform = platform, manifest = mft, prep = sesame_prep,
                        BPPARAM = multicore_arg, fun = sesame::getBetas)
 
 
   probe_pval_matrix <-
-    sesame::openSesame(paste0(idat_dir_paths, '/', obs_idat_basenames),
-                       platform=platform, manifest = mft, prep = sesame_prep,
+    sesame::openSesame(full_idat_basenames,
+                       platform = platform, manifest = mft, prep = sesame_prep,
                        BPPARAM = multicore_arg, fun = sesame::pOOBAH,
                        return.pval  =TRUE)
 

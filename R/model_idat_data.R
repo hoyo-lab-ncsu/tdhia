@@ -26,18 +26,18 @@ model_idat_data <- function(ref_idat_path, model_save_path = NA, data_colnames =
   
 # Load IDAT data
 ref_sigset <- sesame::readIDATpair(ref_idat_path, platform = "TDHIA",
-  manifest = thdia::manifest_v1A2, controls = NULL, verbose = FALSE)
+  manifest = tdhia::manifest_v1A2, controls = NULL, verbose = FALSE)
 
 
 # We will store modeling data about sigset in a named list.
 sigset_model <- list()
 # Keep the Probe_ID, col, mask, and attributes directly.
-sigset_model$sigset_template <- 
-  data.frame(Probe_ID = ref_sigset$Probe_ID, MG = NA, MR = NA, UG = NA, 
-                            UR = NA, col = ref_sigset$col, mask = ref_sigset$mask)
+sigset_model$sigset_template <- ref_sigset
+sigset_model$sigset_template[,data_colnames] <- NA
+
 # Save mask of what values are NA for data
 sigset_model$sigset_mask <- as.data.frame(
-  is.na(dplyr::select(ref_sigset, dplyer::any_of(data_colnames))))
+  is.na(dplyr::select(ref_sigset, dplyr::any_of(data_colnames))))
 
 
 # Create an empirical distribution function for each column
