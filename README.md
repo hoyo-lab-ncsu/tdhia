@@ -14,13 +14,33 @@ _> suffix might be lower or upper case in filenames, code ignores cased for suff
 <br><br>
     
 ## User Instructions
-  
-This pipeline is designed to be easy to use with basic R experience.
+### Initial Setup and Installation
+1. Download and install the latest version of [R](https://www.r-project.org/), [R Studio](https://posit.co/download/rstudio-desktop/). If on windows, also install [R Tools](https://cran.r-project.org/bin/windows/Rtools/).
+2. Download this repository to your computer by either:
+   1. Clicking the green **[Code]** button at the top of this page and download repository as a zip file (not recommended because you have to redownload for any updates to the code).
+   2. Cloning this repository using a github client (**recommended option**, cloning allows you to sync the code on your computer with any updates added here). For windows and Mac, you can install [Github Desktop](https://desktop.github.com/). Once installed click the green **[Code]** button on this page, and select "Open in Github Desktop", a dialogue box will appear to "Clone" this repository. It will download the repository to a default location (usually in ~/Documents/Github/tdhia/). You can download updates to this repository by clicking "Fetch Origin" and "Sync" within github desktop, and all the files will be automatically updated.
+3. Clone or download the second github that has **example scripts** for this package, using the same steps as previously: [tdhia_scripts](https://github.com/bacorli2/tdhia_scripts).
 
-Example scripts (need to convert to vignettes): https://github.com/bacorli2/tdhia_scripts
-    
+### RStudio  
+1. **Set Working Directory to TDHIA**: Open RStudio, click [ **Session** ] >> [ **Set Working Directory** ] >> [ **Browse** ] to the location of the tdhia repository (step 2, in this example case located in ~/Documents/Github/tdhia/).
+2. **Install Devtools**: run in the command line: >> install.packages("devtools")
+3. **Install BiocManager**: run: **install.packages("BiocManager")**
+4. **Update BiocManager**: run: **BiocManager::install(version = "3.18")**
+5. **Load TDHIA Package**: run: **devtools::load_all()**
+6. **Package Dependencies**: R Studio will attempt to load the pacakge and download dependcies, it may error. Try running several times, in between attempts run:
+   1. **BiocManager::valid()**     and then if packages needs to be updated, the valid() call will print out commands you need to copy to the command line and run to update any biocmanager packages.
+   2. **update.packages()**      checks for r pacakge updates.
+
+### Analysis Script
+1. Open an example analysis script found in tdhia_scripts repository: **basic_scripts/imprintome_metal_exposure.R**. Keep the working directory to the tdhia package.
+2. **Change Paths**: within the script, change the following variables to the correct paths on your computers.
+   1. **idat_dir_paths**: full system path to the folder with IDAT files.
+   2. **output_dir_path**: full system path to the folder where you want output files saved.
+   3. **study_data**: full system path to study metadata.
+3. You will need to get access to the IDAT files and study metadata csv file, please speak to one of the maintainers of this github.
+3. **Run the script**: please note that the IDAT file processing takes ~10 minutes, so results are cached in **[output_dir_path]/heavymetals_placenta_probe_beta.rda**. If you need to reanalyze the IDAT files, you need to delete that rda file. Otherwise it will load results from the filesysem.
+
 ## Technical Overview of Current Pipeline
-
 
 ### Summary:
 1. **Importation and Processing**: Import IDAT files, process with standard sesame pipeline using the True Diagnostic Imprintome array manifest. Calculate matrix of beta values (probe_beta_matrix) and sesame detection p-values (probe_beta_pval). Dimensions for both: probe_id x samples. _Function: load_idata_to_probes.R_.  
