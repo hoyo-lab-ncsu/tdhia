@@ -60,6 +60,7 @@ load_idata_to_probes <-
 
   # Get list of IDAT files in target path
   all_idat_names <- dir(path = idat_dir_paths, pattern = "*.idat", ignore.case = TRUE)
+
   # Extract the basenames of IDAT files
   #   Removes _Grn.idat and _Red.idat from file names (case insensitive)
   all_idat_basenames <- stringr::str_replace(

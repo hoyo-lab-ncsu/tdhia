@@ -107,3 +107,20 @@
 "sample_data"
 
 
+
+#' sigset_model
+#'
+#' data to be filled in
+#'
+#' @format none
+#' \describe{
+#'   \item{Null}{   }
+#' }
+#' @source none
+"sigset_model"
+
+
+
+
+
+

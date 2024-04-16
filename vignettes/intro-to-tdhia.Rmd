@@ -1,23 +1,46 @@
 ---
-title: "intro-to-tdhia"
+title: "Analyzing TDHIA IDAT files"
+author: "Vignette Author"
+date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{intro-to-tdhia}
+  %\VignetteIndexEntry{Vignette Title}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r banner, out.width = '70%', echo = FALSE}
-knitr::include_graphics("../inst/banner.jpg")
-```
-
-```{r, include = FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+devtools::load_all()
 ```
 
-```{r setup}
-library(tdhia)
+Here we will demonstrate how to process IDAT files from the True Diagnostic Human
+Imprintome Array (TDHIA) with the tdhia package.
+
+## Dataset generation
+
+We begin by first generating simulated data. Sesame imports IDAT files into a SigSet data object. We are going to artificially generate SigSet files. Let's do a dataset of 25 SigSets (IDATS).
+
+
+```{r}
+ss <- simulate_idat_data(25)
 ```
+
+We can now load this data into tdhia and calculate the beta values and signal detection p-values.
+
+
+```{r}
+
+probe_beta <-
+    load_idata_to_probes(idat_dir_paths = ss, multicore = TRUE, 
+                         quantile_norm = FALSE)
+
+```
+
+Also a quote using `>`:
+
+> "He who gives up [code] safety for [code] speed deserves neither."
+([via](https://twitter.com/hadleywickham/status/504368538874703872))
