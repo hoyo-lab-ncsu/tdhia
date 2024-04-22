@@ -45,8 +45,14 @@ detection p-values. This is returned in a named list, with the following fields:
 probe_beta <-
     load_idata_to_probes(idat_dir_paths = ss, multicore = TRUE, 
                          quantile_norm = FALSE, db_flag = FALSE)
-
 ```
+  
+You can access the probe beta matrix with the **probe_beta_df** field.
+```{r,  cache = TRUE}
+# Access probe beta matrix
+head(probe_beta$probe_beta_df)
+```
+
 
 We can filter out low quality probes with the filt_probe_beta(). This function 
 returns a named list with the same format as *probe_beta* above.  
@@ -61,6 +67,14 @@ filt_probe_beta <-
                 max_probe_fail_rate = 0.25,
                 discard_failed_probes = TRUE, db_flag = TRUE)
 ```
+
+You can access the filtered probe beta matrix with the **probe_beta_df** field.
+```{r,  cache = TRUE}
+# Access filtered probe beta matrix
+head(filt_probe_beta$probe_beta_df)
+```
+
+
 
 Once probe data has been filtered convert the probe beta matrix to a cpg data 
 matrix, stored in a named list of the form:  
@@ -77,6 +91,14 @@ Probe beta values that belong to the same cpg site for a given patient are avera
 cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE, 
                                    db_flag = TRUE, smooth_adj_cpgs = TRUE)
 ```
+
+You can access the filtered probe beta matrix with the **cpg_beta_df** field.
+```{r,  cache = TRUE}
+# Access filtered probe beta matrix
+head(cpg_beta$cpg_beta_df)
+```
+
+
 
 Finally, we can convert the cpg beta matric to an icr beta matric, which is 
 returned in a named list of the form:  
@@ -95,3 +117,11 @@ Probe beta values that belong to the same cpg site for a given patient are avera
 icr_beta <- convert_cpgs_to_icrs(cpg_beta, max_icr_fail_rate = 0.2)
 
 ```
+
+You can access the filtered probe beta matrix with the **probe_beta_df** field.
+```{r,  cache = TRUE}
+# Access filtered probe beta matrix
+head(icr_beta$icr_beta_df)
+```
+
+
