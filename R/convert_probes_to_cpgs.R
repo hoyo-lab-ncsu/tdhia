@@ -64,7 +64,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   cpg_beta_df <-
     probe_beta_df2 %>%
     dplyr::group_by(.data$CpG_ID) %>%
-    dplyr::summarize(dplyr::across(dplyr::where(is.numeric),
+    dplyr::summarize(dplyr::across(dplyr::where(base::is.numeric),
                                    function(x) mean(x, na.rm = TRUE)),
                      n_probes = dplyr::n())
   cat(sprintf("CpG filter: %.0f of probes in dataset mapped to %.0f unique CpG sites id data.\n",
@@ -79,7 +79,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   # Discard CpG_ID(s) that do not map uniquely to a single genome location
   #   Defined in manifest file where MAPINFO == (0 or NA)
   if (discard_unmapped_cpgs) {
-    f_unmmaped = function (x) is.na(x) | x==0;
+    f_unmmaped = function (x) base::is.na(x) | x==0;
     unmapped_cpg_ids <- sapply(rownames(cpg_beta_df),
                                function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Name)[1]]))
 
@@ -100,7 +100,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
       dplyr::left_join(y = dplyr::select(icr_mapping, c("CpG_id", "ICR_id")),
                               by = "CpG_id",unmatched = "drop",
                 multiple = "first") %>%
-      dplyr::pull("ICR_id") %>% is.na()
+      dplyr::pull("ICR_id") %>% base::is.na()
     # Remove non-icr cpgs
     cpg_beta_df <- cpg_beta_df[!discard_non_icr,]
 

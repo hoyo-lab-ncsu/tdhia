@@ -5,16 +5,16 @@
 \title{simulate_idat_data}
 \usage{
 simulate_idat_data(
-  sigset_model = NA,
   n_idats = 1,
+  sigset_model = NULL,
   rand.seed = 0,
   data_colnames = c("MG", "MR", "UG", "UR")
 )
 }
 \arguments{
-\item{sigset_model}{model of idat file to be used as reference to simulations.}
-
 \item{n_idats}{number of sigsets to simulate}
+
+\item{sigset_model}{model of idat file to be used as reference to simulations.}
 
 \item{rand.seed}{random seed to reproduce results}
 

@@ -12,7 +12,8 @@ load_idata_to_probes(
   sesame_prep = "0CDB",
   idat_basenames = NULL,
   quantile_norm = FALSE,
-  mask = FALSE
+  mask = FALSE,
+  db_flag = FALSE
 )
 }
 \arguments{
@@ -51,6 +52,8 @@ normalization between the columns in the probe_beta dataframe (default = FALSE).
 \item{mask}{a boolean flag specified in opensesame() in the Sesame package,
 when TRUE excludes some probes due to issues of inter-dependence of measurements
 (default = FALSE).}
+
+\item{db_flag}{boolean when true exports function workspace to disk.}
 }
 \value{
 a named list with the following fields:

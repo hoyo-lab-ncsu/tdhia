@@ -46,6 +46,12 @@ position.}
 a dataframe containing beta values where rows are cpg sites and columns
 are either (1) the basenames of the idat files or (2) some other mapping
 specified when the data was loaded in \code{load_idat}.
+\itemize{
+\item cpg_beta_df: dataframe of beta values, probe_id x sample_id
+\item platform: string that describes platform for methylation array
+\item manifest: dataframe of the manifest file used for SeSame processing
+\item cpg_n_probes: number of probes for each cpg site.
+}
 }
 \description{
 Converts a dataframe of beta values of specific methylation probes into beta

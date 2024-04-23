@@ -43,6 +43,8 @@
 #' when TRUE excludes some probes due to issues of inter-dependence of measurements
 #' (default = FALSE).
 #'
+#' @param db_flag boolean when true exports function workspace to disk.
+#'
 #' @returns a named list with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
@@ -55,7 +57,7 @@ load_idata_to_probes <-
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
            db_flag = FALSE) {
     # Load manifest file if platform is true diagnostic imprintome array
-    if (is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
+    if (base::is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
 
     if(db_flag) save(list = ls(all.names = TRUE), file = "load_idata_to_probes.RData")
     # load(file = "load_idata_debug.RData")
