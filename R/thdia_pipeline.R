@@ -31,8 +31,12 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, multicore = TRUE,
                            idat_basenames = NULL, sesame_prep = "0CDB",
                            discard_unmapped_probes = TRUE , max_sig_pval = 0.2,
                            set_failed_betas_na = FALSE, max_probe_fail_rate = 0.25,
-                           discard_failed_probes = TRUE, db_flag = FALSE,
-                           smooth_adj_cpgs = FALSE, max_icr_fail_rate = 0.2) {
+                           discard_failed_probes = TRUE, smooth_adj_cpgs = FALSE,
+                           max_icr_fail_rate = 0.2, db_flag = FALSE) {
+
+
+  if(db_flag) save(list = ls(all.names = TRUE), file = "tdhia_pipeline.RData")
+  # load(file = "tdhia_pipeline.RData")
 
   # 1) Load IDATS and convert to probe beta matrix
   # Output: probe_id(row) x patient(col)
