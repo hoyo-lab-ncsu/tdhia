@@ -45,7 +45,7 @@
 #'
 #' @param db_flag boolean when true exports function workspace to disk.
 #'
-#' @param enforce_req_idats check that all idat files specified in idat_basenames
+#' @param enforce_req_idats check that all idat files requested in idat_basenames
 #'  are found on disk. Throws error if this is not the case.
 #'
 #' @returns a named list with the following fields:
@@ -96,7 +96,7 @@ load_idata_to_probes <-
         }
       }
 
-      if (!all(basename_tbl$Freq==2)){
+      if (!all(basename_tbl$Freq==2)) {
         warning(paste("IDAT_PAIR: Not all IDAT file basenames have 2 IDAT files associated with them.",
                       "Files are missing! See basename_tbl variable"))
       }
@@ -105,7 +105,7 @@ load_idata_to_probes <-
       unq_obs_idat_basenames <- unique(obs_idat_full_basenames)
 
       # Check that all specified idat_basenames specified exist in unq_obs_idat_basenames
-      if (!all(idat_basenames %in% basename(unq_obs_idat_basenames)) & enforce_all_idats) {
+      if (!all(idat_basenames %in% basename(unq_obs_idat_basenames)) & enforce_req_idats) {
         stop("load_idata_to_probes: some idat_basenames not found.")
       }
 
