@@ -45,7 +45,7 @@
 #'
 #' @param db_flag boolean when true exports function workspace to disk.
 #'
-#' @param enforce_all_idats check that all idat files specified in idat_basenames
+#' @param enforce_req_idats check that all idat files specified in idat_basenames
 #'  are found on disk. Throws error if this is not the case.
 #'
 #' @returns a named list with the following fields:
@@ -58,7 +58,7 @@ load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
            mft = NULL, multicore = TRUE, sesame_prep = "0CDB",
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
-           db_flag = FALSE, enforce_all_idats = FALSE) {
+           db_flag = FALSE, enforce_req_idats = FALSE) {
     # Load manifest file if platform is true diagnostic imprintome array
     if (base::is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
 
