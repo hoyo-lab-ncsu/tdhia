@@ -13,12 +13,13 @@ load_idata_to_probes(
   idat_basenames = NULL,
   quantile_norm = FALSE,
   mask = FALSE,
-  db_flag = FALSE
+  db_flag = FALSE,
+  enforce_req_idats = FALSE
 )
 }
 \arguments{
 \item{idat_dir_paths}{the full filesystem path to directory containing the idat
-files to be processed, formatted as a string or a vector of strings.}
+files to be processed, formatted as a string or a vector of strings (untested).}
 
 \item{platform}{string for the platform that the array belongs to, as specified
 within the SeSame package with openSesame(). default: "TruDx_imprintome"}
@@ -54,6 +55,9 @@ when TRUE excludes some probes due to issues of inter-dependence of measurements
 (default = FALSE).}
 
 \item{db_flag}{boolean when true exports function workspace to disk.}
+
+\item{enforce_req_idats}{check that all idat files requested in idat_basenames
+are found on disk. Throws error if this is not the case.}
 }
 \value{
 a named list with the following fields:

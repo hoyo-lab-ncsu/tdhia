@@ -14,9 +14,9 @@ tdhia_pipeline(
   set_failed_betas_na = FALSE,
   max_probe_fail_rate = 0.25,
   discard_failed_probes = TRUE,
-  db_flag = FALSE,
   smooth_adj_cpgs = FALSE,
-  max_icr_fail_rate = 0.2
+  max_icr_fail_rate = 0.2,
+  db_flag = FALSE
 )
 }
 \arguments{
@@ -44,13 +44,13 @@ values set to NA).}
 \item{discard_failed_probes}{boolean when true, the probes that fail the
 max_probe_fail_rate are removed entirely.}
 
-\item{db_flag}{flag for saving function work space for debugging.}
-
 \item{smooth_adj_cpgs}{boolean, when true, adjacent cpg beta values within an
 ICR are smoothed with a sliding window average.}
 
 \item{max_icr_fail_rate}{maximum allowable fraction of samples that can be
 missing before the entire ICR is excluded from dataset.}
+
+\item{db_flag}{flag for saving function work space for debugging.}
 }
 \value{
 named list with all of the output from each of the pipeline steps.
