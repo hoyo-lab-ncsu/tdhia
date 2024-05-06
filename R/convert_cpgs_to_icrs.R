@@ -91,7 +91,8 @@ convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRU
   icr_beta <- list(icr_beta_df = as.data.frame(icr_beta_df),
                    platform = cpg_beta$platform,
                    manifest = cpg_beta$manifest,
-                   n_CpGs = n_CpGs)
+                   n_CpGs = n_CpGs,
+                   cpg_icr_mapping = icr_mapping)
 
   return(icr_beta)
 }
