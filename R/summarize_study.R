@@ -11,12 +11,15 @@
 #' statistically significant (adjust p-value)
 #' @param print_confounders boolean, when true, will print out statistical
 #' summary of confoudner variables
-summarize_study <- function(dfs, max_p_val, print_sites = TRUE, print_confounders = FALSE) {
-  cat("Summarizing Results...\n")
-  model_vars <- names(dfs)
-  for (n in seq_along(model_vars)) {
-    if (dfs[[n]]$Confounder[1] == 0 || print_confounders) {
-      cat(sprintf("%s:\n", model_vars[n]))
+summarize_study <- function(dfs, varnames = NULL, max_p_val, print_sites = TRUE, print_confounders = FALSE) {
+  cat(sprintf("Formula: %s \n", dfs$example_formula))
+
+  if (is.null(varnames)) {
+    varnames <- names(dfs)
+  }
+  for (n in seq_along(varnames)) {
+    if (dfs[[n]]$Confounder[1] == 0 || print_confounders ) {
+      cat(sprintf("%s:\n", varnames[n]))
       cat(sprintf(">>  %.0f models have p_val < %.2f\n",
                   sum(dfs[[n]]$P_VAL < max_p_val), max_p_val))
       cat(sprintf(">>  %.0f models have adj_p_val < %.2f\n",

@@ -40,9 +40,13 @@
 #' - Estimate: point estimates of coefficients for each of the predictors
 #' - Std. Error: standard error of the estimates
 #' - Cumulative two-tailed probability
+#'
+#'
+#' @importFrom magrittr %>%
+#'
 GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
-                        family = "binomial",
-                        verbose = FALSE, impute_na = TRUE, db_flag = TRUE) {
+                        family = "binomial", verbose = FALSE, impute_na = TRUE,
+                        db_flag = TRUE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "GLM_parallel.RData") }
   # load(file = "GLM_parallel.RData")
 
@@ -59,23 +63,25 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   # If P is null, then set the index to be null also
   if (is.null(P)) Pind = NULL
 
-
-  # Join all response and predictors into one matrix, with response being first
-  # column, then all predictors, then all confounders.
-
-  # Version of cbind that ignores any argument that is set to null
-  null_cbind <-function(...) {x=list(...);x=x[lengths(x)!=0]; do.call(cbind,x)}
-
-  # Condense R and P and C into a single matrix: R, P, Pe, C
-  model_data <- null_cbind(R[, Rind], P[,Pind], Pe, C)
-
-  # Rename Response and Predictor columns to their variables
-  #   Required because these variables might be parallelized
-  names(model_data)[1] <- colnames(R)[Rind]
-  if (!is.null (P)) {
-    names(model_data)[2] <- colnames(P)[Pind]
+  # Join all data for model into one dataframe that preserves the variable type
+  # for each column, and supports only having some variable types included
+  model_data <- R %>% dplyr::select(dplyr::all_of(Rind))
+  formula_string <- paste0(colnames(R)[Rind], " ~ ")
+  if (!is.null(P)) {
+    model_data <- base::cbind(model_data, P %>% dplyr::select(dplyr::all_of(Pind)))
+    formula_string <- paste0(formula_string, paste0(colnames(P)[Pind], " + ", collapse = " "))
   }
-
+  if (!is.null(Pe)) {
+    model_data <- base::cbind(model_data, Pe)
+    formula_string <- paste0(formula_string, paste0(colnames(Pe), c(rep(" + ", max(
+      c(ncol(Pe)-1, 0)))), collapse=" "))
+  }
+  if (!is.null(C)) {
+    model_data <- base::cbind(model_data, C)
+    formula_string <- paste0(formula_string, paste0(colnames(C), c(rep(" + ", max(
+      c(ncol(C)-1, 0)))), collapse=" "))
+  }
+  formula_string = base::gsub("\\s\\+\\s$", "", formula_string)
 
   # Calculate the number of imputations required
   # Generally, number of imputations is % of missing data
@@ -87,12 +93,9 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   # If imputation is needed, set to at least 5 (original paper rec)
   if(n_imputes > 0 && n_imputes < 5) {n_imputes = 5}
 
-  # Define formula string for fitted model
-  plus_str <- function(x) {if(is.null(x)) {return(x)} else {return(" + ")}}
-  formula_string <-
-    paste0(colnames(R)[Rind], " ~ ", colnames(P)[Pind], plus_str(P),
-           paste0(colnames(Pe), c(rep(" +", max(c(ncol(Pe)-1, 0))), ""),  collapse=" "), " + ",
-           paste0(colnames(C),  c(rep(" +",  max(c(ncol(C )-1, 0))), ""), collapse=" "))
+
+  # # Start with Response and Predictor
+  # formula_string <- paste0(colnames(R)[Rind], " ~ ", colnames(P)[Pind], plus_str(P,is.null)
 
   # Impute missing data if flag is set and data actually missing
   if (impute_na && n_imputes > 0 ) {
@@ -131,15 +134,17 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   # Add response column and variable column from rownames
   df_res <-
     cbind(data.frame(Response = colnames(R)[Rind],
-                     Variable = rownames(cf[2:nrow(cf),])),
-          cf[2:nrow(cf),])
+                     Variable = rownames(cf)[2:nrow(cf)]),
+          cf[2:nrow(cf),,drop = FALSE])
   rownames(df_res) <- NULL
 
   # Record whether variable is confounder
   # Get number of columns for P[,Pind] and Pe
   n_pred <- max(c(0, length(Pind))) + max(c(0, ncol(Pe)))
   df_res$Confounder <- 0
-  df_res$Confounder[(n_pred +1) : nrow(df_res)] <- rep(1, nrow(df_res) - n_pred)
+  if (n_pred > 1) {
+      df_res$Confounder[(n_pred +1) : nrow(df_res)] <- rep(1, nrow(df_res) - n_pred)
+  }
 
   # Slot for adjusted p-value, calculated outside of this function
   df_res$ADJ_P_VAL <- NA
