@@ -101,7 +101,7 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   if (impute_na && n_imputes > 0 ) {
 
     # Perform multiple imputations of the dataset
-    imp <- mice::mice(model_data, print = FALSE, m = n_imputes, maxit = 10, seed = 0)
+    imp <- mice::mice(model_data, print = FALSE, m = n_imputes, maxit = 25, seed = 0)
 
     # Fit each of the imputations
     fits <- with(imp, glm(stats::formula(formula_string), family = family))
@@ -113,6 +113,8 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
     rownames(cf) <- cf$term
     cf <- cf[,c(2,3,4,6)]
     colnames(cf) <- c("Estimate", "StdError", "Statistic", "P_VAL")
+
+    aic <- mean(sapply(fits$analyses, function(x) x$aic))
 
   } else {
     # Either imputation is disabled, or imputation is not needed
@@ -129,6 +131,8 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
 
     # cf <- cf[,c(1,2,3, 5)]
     colnames(cf)[2:4] <-c("StdError", "Statistic", "P_VAL")
+    aic <- mod$aic
+
   }
 
   # Add response column and variable column from rownames
@@ -151,7 +155,7 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   df_res$Family <- family
   df_res$Formula <- formula_string
   df_res$Model_Id <-max(c(Rind, Pind))
-
+  df_res$aic <- aic
   if (verbose) {print(cf)}
 
   return(df_res)

@@ -53,7 +53,8 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
                            db_flag = FALSE, rm.na.R = FALSE, rm.na.P = FALSE,
                            rm.na.Pe = FALSE, rm.na.C = FALSE, rm.na.all = FALSE,
-                           print_confounders = FALSE, verbose = TRUE) {
+                           print_confounders = FALSE, verbose = TRUE,
+                           icr_mapping = NULL) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint.RData")}
   # load(file = "study_imprint.RData")
 
@@ -245,7 +246,7 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   if (!is.null(P) ) {model_vars <- model_vars[2:length(model_vars)]}
   model_vars <- model_vars[!is.na(model_vars)]
 
-  # GO through each model variable and extract results
+  # Go through each model variable and extract results
   dfs_sep <- list()
   for (n in seq_along(model_vars)) {
     dfs_sep[[n]] <- df_fits[df_fits$Variable == model_vars[n],]
@@ -261,9 +262,10 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   # Set NA p-values to a max value of 1 (for sorting)
   na_fun <- function(df) { df$P_VAL[is.na(df$P_VAL)] <- 1; return(df)}
   # Sort each variable by p-value
-  sort_fun <- function(df) {df=df[order(df$P_VAL, decreasing=FALSE),]; return(df)}
+  sort_fun <- function(df) {df=df[order(df$P_VAL, decreasing = FALSE),]; return(df)}
 
 
+  # Export for debugging
   if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint2.RData")}
   # load(file = "study_imprint2.RData")
 
@@ -287,7 +289,6 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
 
   return(dfs_corr)
 }
-
 
 
 
