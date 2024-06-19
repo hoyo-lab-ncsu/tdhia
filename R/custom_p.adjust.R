@@ -1,9 +1,11 @@
 #' custom_p.adjust
 #'
-#' @description Given a set of p-values, returns p-values adjusted using one of several methods.
+#' @description Given a set of p-values, returns p-values adjusted using one of
+#' several methods.
 #'
 #' @param p numeric vector of p-values (possibly with NAs). Any other R object is coerced by as.numeric.
-#' @param method correction method, a character string. Can be abbreviated. Options include "bonferroni", "holm", "hochberg", "hommel", "BH", "BY", or "none".
+#' @param method correction method, a character string. Can be abbreviated.
+#' Options include "bonferroni", "holm", "hochberg", "hommel", "BH", "BY", or "none".
 #' @param n of comparisons.
 #'
 #' @importFrom stats p.adjust
@@ -20,6 +22,8 @@ custom_p.adjust <- function (p, method = stats::p.adjust.methods, n = length(p))
     nna <- TRUE
   else p <- p[nna]
   lp <- length(p)
+  # Commented this out to allow reduced n with p.value adjustment
+  # See: https://stackoverflow.com/questions/30108510/p-adjust-with-n-than-number-of-tests
   # stopifnot(n >= lp)
   if (n <= 1)
     return(p0)
@@ -65,5 +69,7 @@ custom_p.adjust <- function (p, method = stats::p.adjust.methods, n = length(p))
     q <- sum(1/(1L:n))
     pmin(1, cummin(q * n/i * p[o]))[ro]
   }, none = p)
+  # Added this line to prevent adjusted p-values that are smaller than unadjusted.
+  p0 <- ifelse(p0 < p, p, p0)
   p0
 }

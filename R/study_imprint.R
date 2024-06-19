@@ -283,7 +283,7 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   dfs_corr$example_formula <- test_run$Formula[1]
 
   # Print out results of analysis
-  summarize_study(dfs_corr, varname = "imp_site",max_p_val, print_sites = FALSE,
+  summarize_study(dfs_corr, varname = "imp_site", max_p_val, print_sites = FALSE,
                   print_confounders = FALSE)
 
 
