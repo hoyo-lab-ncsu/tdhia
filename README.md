@@ -30,15 +30,18 @@ _> suffix might be lower or upper case in filenames, code ignores cased for suff
 6. **Package Dependencies**: R Studio will attempt to load the pacakge and download dependcies, it may error. Try running several times, in between attempts run:
    1. **BiocManager::valid()**     and then if packages needs to be updated, the valid() call will print out commands you need to copy to the command line and run to update any biocmanager packages.
    2. **update.packages()**      checks for r pacakge updates.
+7. **Analyze Simulated Dataset**: Try analyzing a simulated dataset in the Rmarkdown vignette:
+   1. Located in _tdhia/vignettes/intro-to-tdhia.Rmd_.
+   2. Read over the text to understand the basic steps and input/output for each funciton call in the pipeline.
 
-### Analysis Script
+### Basic Analysis Script, Real Data
 1. Open an example analysis script found in tdhia_scripts repository: **basic_scripts/imprintome_metal_exposure.R**. Keep the working directory to the tdhia package.
-2. **Change Paths**: within the script, change the following variables to the correct paths on your computers.
-   1. **idat_dir_paths**: full system path to the folder with IDAT files.
+2. You will need to be added to the proper lab protocols to get access to the IDAT files and study metadata csv file (mentioned below).
+3. **Change Paths**: within the script, change the following variables to the correct paths on your computers.
+   1. **idat_dir_paths**: full system path to the folder with IDAT files (raw data output from imprintome chip, two files per study participant, one for green and one for read channel).
    2. **output_dir_path**: full system path to the folder where you want output files saved.
-   3. **study_data**: full system path to study metadata.
-3. You will need to get access to the IDAT files and study metadata csv file, please speak to one of the maintainers of this github.
-3. **Run the script**: please note that the IDAT file processing takes ~10 minutes, so results are cached in **[output_dir_path]/heavymetals_placenta_probe_beta.rda**. If you need to reanalyze the IDAT files, you need to delete that rda file. Otherwise it will load results from the filesysem.
+   3. **study_data**: full system path to study metadata (this give additional info about each study participant, used for statistical analysis).
+4. **Run the script**: please note that the IDAT file processing takes ~10 minutes, so results are cached in **[output_dir_path]/heavymetals_placenta_probe_beta.rda**. If you need to reanalyze the IDAT files, you need to delete that rda file. Otherwise it will load results from the filesysem.
 
 ## Technical Overview of Current Pipeline
 
