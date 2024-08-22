@@ -4,7 +4,7 @@ author: "Vignette Author"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{Analyzing TDHIA IDAT files}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -13,7 +13,6 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE, root.dir = here::i_am("README.md"), 
                       collapse = TRUE, comment = "#>")
 
-if(!require(here)){ install.packages("here") }
 here::i_am("README.md")
 devtools::load_all()
 ```

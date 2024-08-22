@@ -34,7 +34,8 @@ Imports:
 	doSNOW,
 	snow,
 	mice,
-	here
+	here,
+	devtools
 Suggests: 
     knitr,
     rmarkdown

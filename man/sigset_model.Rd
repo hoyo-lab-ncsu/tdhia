@@ -3,11 +3,13 @@
 \docType{data}
 \name{sigset_model}
 \alias{sigset_model}
-\title{sigset_model}
+\title{Sigset Model}
 \format{
 none
 \describe{
-\item{Null}{   }
+\item{sigset_template}{   }
+\item{sigset_mask}{   }
+\item{sigset_values}{   }
 }
 }
 \source{
@@ -17,6 +19,6 @@ none
 sigset_model
 }
 \description{
-data to be filled in
+An example imprintome chip dataset from the SeSame package.
 }
 \keyword{datasets}

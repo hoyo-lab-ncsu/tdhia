@@ -77,7 +77,7 @@
 #'
 #' A table that maps CpG sites to specific imprint control regions.
 #'
-#' @format A data frame with 22819 rows and 23 columns
+#' @format A data frame with 22819 rows and 23 columns.
 #' \describe{
 #'   \item{X}{   }
 #'   \item{CpG_chr}{   }
@@ -94,16 +94,33 @@
 "mapping_cpg_icr_ids"
 
 
-
-#' Sample data
+#' Imprintome probe design scores
 #'
-#' data to be filled in
+#' A named list of passed and failed design scores for imprintome probes.
+#'
+#' @format A named list.
+#' \describe{
+#'   \item{Design_Score_Summary}{   }
+#'   \item{Pass_Score_Threshold}{   }
+#'   \item{Fail_Score_Threshold}{   }
+#'   \item{Failed_Designs}{   }
+#' }
+#' @source none
+"design_scores"
+
+
+
+#' Sigset Model
+#'
+#' An example imprintome chip dataset from the SeSame package.
 #'
 #' @format none
 #' \describe{
-#'   \item{Null}{   }
+#'   \item{sigset_template}{   }
+#'   \item{sigset_mask}{   }
+#'   \item{sigset_values}{   }
 #' }
 #' @source none
-"sample_data"
+"sigset_model"
 
 

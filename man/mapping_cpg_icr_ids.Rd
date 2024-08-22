@@ -5,7 +5,7 @@
 \alias{mapping_cpg_icr_ids}
 \title{Mapping between CpG site IDs and Imprint Control Region IDs}
 \format{
-A data frame with 22819 rows and 23 columns
+A data frame with 22819 rows and 23 columns.
 \describe{
 \item{X}{   }
 \item{CpG_chr}{   }
