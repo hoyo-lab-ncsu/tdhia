@@ -18,7 +18,11 @@ study_imprint(
   rm.na.R = FALSE,
   rm.na.P = FALSE,
   rm.na.Pe = FALSE,
-  rm.na.C = FALSE
+  rm.na.C = FALSE,
+  rm.na.all = FALSE,
+  print_confounders = FALSE,
+  verbose = TRUE,
+  icr_mapping = NULL
 )
 }
 \arguments{

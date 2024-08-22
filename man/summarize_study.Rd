@@ -4,7 +4,13 @@
 \alias{summarize_study}
 \title{summarize_study}
 \usage{
-summarize_study(dfs, max_p_val, print_sites = TRUE, print_confounders = FALSE)
+summarize_study(
+  dfs,
+  varnames = NULL,
+  max_p_val = 0.05,
+  print_sites = TRUE,
+  print_confounders = FALSE
+)
 }
 \arguments{
 \item{dfs}{a list of dataframes that give model output results for each

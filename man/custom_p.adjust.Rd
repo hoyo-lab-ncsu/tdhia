@@ -9,10 +9,12 @@ custom_p.adjust(p, method = stats::p.adjust.methods, n = length(p))
 \arguments{
 \item{p}{numeric vector of p-values (possibly with NAs). Any other R object is coerced by as.numeric.}
 
-\item{method}{correction method, a character string. Can be abbreviated. Options include "bonferroni", "holm", "hochberg", "hommel", "BH", "BY", or "none".}
+\item{method}{correction method, a character string. Can be abbreviated.
+Options include "bonferroni", "holm", "hochberg", "hommel", "BH", "BY", or "none".}
 
 \item{n}{of comparisons.}
 }
 \description{
-Given a set of p-values, returns p-values adjusted using one of several methods.
+Given a set of p-values, returns p-values adjusted using one of
+several methods.
 }
