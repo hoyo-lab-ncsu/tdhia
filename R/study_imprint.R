@@ -227,13 +227,14 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
     opts <- list(progress =  function(n) utils::setTxtProgressBar(pb, n))
   # } else { opts = NULL }
   # Execute parallel processing
-  df_fits <- foreach::foreach(x = par_ind, .combine = rbind,
-                              .export = "GLM_parallel",
-                              .packages = c("magrittr"),
-                              .options.snow = opts
+  df_fits_list <- foreach::foreach(#par_ind
+    x = par_ind, combine = rbind, .export = "GLM_parallel", .packages = c("magrittr"),
+    .options.snow = opts #.errorhandling = 'pass'
   ) %dopar% {
     foreach_fun(x)
   }
+  df_fits <- do.call(rbind, df_fits_list)
+
   # End processing time
   cat("\n")
   finish <- Sys.time()

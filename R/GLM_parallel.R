@@ -83,6 +83,14 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
   }
   formula_string = base::gsub("\\s\\+\\s$", "", formula_string)
 
+  # Check for same value in response
+  if ( dim(unique(R[Rind]))[1]==1) {
+    save(list = ls(all.names = TRUE), file = "GLM_parallel_error.RData") # load(file = "GLM_parallel.RData")
+    stop(sprintf("GLM_parallel: Response variable only has 1 unique value at
+                 Rind %i, Pind %i", Rind, Pind))
+  }
+
+
   # Calculate the number of imputations required
   # Generally, number of imputations is % of missing data
   # Unless no missing data, than imputes is set to 1 to not error package
