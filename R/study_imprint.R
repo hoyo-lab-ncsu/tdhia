@@ -6,13 +6,13 @@
 #' using response variable(s) R, predictor variable(s) R and confouding
 #' variable(s) C. The model formula takes on the form:
 #'
-#' If R has many variables/ columns and P has one, models are parallelized over R:
+#' If R has many columns and P has one, models are parallelized over R:
 #'
-#' R\[,i] ~ P\[,1] + C\[,1] + C\[,2] + C\[,3] ...
+#' R\[,i] ~ Pe\[,1] + Pe\[,2] + Pe\[,3] ...
 #'
 #' If P has many variables/ columns and R has one, models are parallelized over P:
 #'
-#' R\[,1] ~ P\[,i] + C\[,1] + C\[,2] + C\[,3] ...
+#' R\[,1] ~ P\[,i] + Pe\[,1] + Pe\[,2] + Pe\[,3] ...
 #'
 #' This designed that either R or P are the CpG beta values or the ICR beta
 #' values. The code handles either case. Note that R and P cannot both be
@@ -21,13 +21,11 @@
 #' @param R response variable(s): data frame that is patients (rows) x variables
 #'  (columns) could either be beta values for cpg or ICR sites, or
 #'  study metadata.
-#' @param P parallelized predictor variable(s) data frame that is patients
+#' @param P parallelized predictor variable(s)- data frame that is patients
 #'  (rows) x variables (columns), could either be beta values for cpg or ICR
 #'  sites. For study metadata, use Pe input argument.
 #' @param Pe extra predictor variables that are not parallelized (incuded in all
 #'  fitted models).
-#' @param C predictor variable(s) data frame that is patients (rows) x variables
-#'  (columns).
 #' @param family string for family model argument for glm(). (ex. 'binomial', 'gaussian')
 #' @param n_p_adj number of comparisons to use for p-value adjustment. Sometimes
 #'  is this is different than the number of actual comparisons (could be more or
@@ -42,23 +40,22 @@
 #' @param rm.na.R flag to remove NA values in R prior to imputation.
 #' @param rm.na.P flag to remove NA values in P prior to imputation.
 #' @param rm.na.Pe flag to remove NA values in Pe prior to imputation.
-#' @param rm.na.C flag to remove NA values in C prior to imputation.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom foreach %dopar%
 #' @importFrom rlang .data
 #'
 #' @return results with fitted coefficients from the glm, sorted by p-value
-study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
+study_imprint <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol(P))),
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
                            db_flag = FALSE, rm.na.R = FALSE, rm.na.P = FALSE,
-                           rm.na.Pe = FALSE, rm.na.C = FALSE, rm.na.all = FALSE,
+                           rm.na.Pe = FALSE, rm.na.all = FALSE,
                            print_confounders = FALSE, verbose = TRUE,
                            icr_mapping = NULL) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint.RData")}
   # load(file = "study_imprint.RData")
 
-  if (rm.na.all) rm.na.R <- rm.na.P <- rm.na.Pe <- rm.na.Pe <- rm.na.C <- TRUE
+  if (rm.na.all) rm.na.R <- rm.na.P <- rm.na.Pe <- rm.na.Pe <- TRUE
   # This expression prevents devtools from issuing a NOTE warning
   # x is defined within some local functions below
   x <- NULL
@@ -86,14 +83,6 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
       stop("glm: rownames of R and Pe dataframes do not match.")}
   }
 
-  if (!is.null(C)) {
-    C <- C %>%
-      tibble::rownames_to_column(var = "row_names") %>%
-      dplyr::arrange(factor(.data$row_names, levels = rownames(R))) %>%
-      tibble::column_to_rownames(var = "row_names")
-    if( !all(rownames(R)==rownames(C))) {
-      stop("glm: rownames of R and C dataframes do not match.")}
-  }
 
   # Calculate missing Values
   fract_r_na <- sum(is.na(R))/(nrow(R)*ncol(R))
@@ -137,19 +126,10 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
     } else {verbosecat("Keeping them.\n")}
   }
 
-  is.C.na = rep(FALSE, nrow(R))
-  if (!is.null(C)) {
-    temp = rowSums(is.na(as.matrix(C))) > 0
-    verbosecat(sprintf("   rm.na, C: %.0f/ %.0f rows have 1+ NAs...", sum(temp),
-                length(is.C.na)))
-    if (rm.na.C) { is.C.na = temp
-    verbosecat(" Marked for removal.\n")
-    } else {verbosecat("Keeping them.\n")}
-  }
 
 
   # Remove all rows marked for removal
-  rm.na.flags <- is.R.na | is.P.na | is.Pe.na | is.C.na
+  rm.na.flags <- is.R.na | is.P.na | is.Pe.na
   verbosecat(sprintf(">> rm.na: Removing %.0f rows total (before imputation)...\n",
               sum(rm.na.flags)))
   verbosecat(sprintf(">> rm.na:%.0f rows now remain.\n",
@@ -158,7 +138,7 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   R  <- R[!rm.na.flags, , drop = FALSE]
   P  <- P[!rm.na.flags, , drop = FALSE]
   Pe <- Pe[!rm.na.flags, , drop = FALSE]
-  C  <- C[!rm.na.flags, , drop = FALSE]
+
 
 
   #  Get indexes for response and predictor variables
@@ -177,30 +157,30 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
   if (length(Rind) > 1) {
     # For each response variable
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = x, P = P, Pind = Pind,
-                                             Pe = Pe, C = C, family = family,
+                                             Pe = Pe,  family = family,
                                              impute_na = impute_na,
                                              db_flag = db_flag, verbose = verbose)
     test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = Pind,
-                             Pe = Pe, C = C, family = family,
+                             Pe = Pe,  family = family,
                              impute_na = impute_na,
                              db_flag = db_flag, verbose = verbose)
   } else if (length(Pind) > 1) {
     # For each predictor variable
     foreach_fun <-  function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = x,
-                                              Pe = Pe, C = C, family = family,
+                                              Pe = Pe,  family = family,
                                               impute_na = impute_na,
                                               db_flag = db_flag, verbose = verbose)
     test_run <- GLM_parallel(R = R, Rind = Rind, P = P, Pind = 1,
-                             Pe = Pe, C = C, family = family,
+                             Pe = Pe,  family = family,
                              impute_na = impute_na,
                              db_flag = db_flag, verbose = verbose)
   } else {
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = Pind,
-                                             Pe = Pe, C = C, family = family,
+                                             Pe = Pe,  family = family,
                                              impute_na = impute_na,
                                              db_flag = db_flag, verbose = verbose)
     test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = 1,
-                             Pe = Pe, C = C, family = family,
+                             Pe = Pe,  family = family,
                              impute_na = impute_na,
                              db_flag = db_flag, verbose = verbose)
   }

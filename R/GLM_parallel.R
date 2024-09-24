@@ -7,14 +7,13 @@
 #' Response ~ Parallel_Predictor + Predictors + Confounders
 #' Parallel_Response ~ Predictors + Confounders
 #'
-#' \code{R\[,Rind] ~ P\[,Pind] + Pe\[,1] + Pe\[,...] + C\[, 1] + C\[, ...]}
+#' \code{R\[,Rind] ~ P\[,Pind] + Pe\[,1] + Pe\[,...]}
 #'
 #' R\[,Rind]: Either a single response variable, or several response variables
 #'  where a separate model is fitted for each (parallelized).
 #' P\[,Pind]: A series of predictors where a separate model is fitted for each
 #'  (parallelized). Note only R or P can be parallelized, but not both.
 #' Pe: Extra predictors, to be included in all models.
-#' C: confounder variables, to be included in all models.
 #'
 #' One predictor and one response variable (column) is assumed. If fitting a
 #' series of models for several R's or P's, this function can be called in
@@ -29,7 +28,6 @@
 #' @param Pind column index for P if it has multiple columns (for parallel processing).
 #' Default for Pind is 1 for single column dataframe.
 #' @param Pe dataframe of extra predictor variables to be included in all models.
-#' @param C dataframe of confounder variable(s) to be including in model
 #' @param family string denoting GLM family
 #' @param verbose boolean flag, when true prints fits to model.
 #' @param impute_na boolean flag, when TRUE inputs missing NA values with MICE
@@ -44,7 +42,7 @@
 #'
 #' @importFrom magrittr %>%
 #'
-GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
+GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
                         family = "binomial", verbose = FALSE, impute_na = TRUE,
                         db_flag = TRUE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "GLM_parallel.RData") }
@@ -75,11 +73,6 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL, C = NULL,
     model_data <- base::cbind(model_data, Pe)
     formula_string <- paste0(formula_string, paste0(colnames(Pe), c(rep(" + ", max(
       c(ncol(Pe)-1, 0)))), collapse=" "))
-  }
-  if (!is.null(C)) {
-    model_data <- base::cbind(model_data, C)
-    formula_string <- paste0(formula_string, paste0(colnames(C), c(rep(" + ", max(
-      c(ncol(C)-1, 0)))), collapse=" "))
   }
   formula_string = base::gsub("\\s\\+\\s$", "", formula_string)
 

@@ -21,6 +21,7 @@
 #' are set to NA.
 #' @param discard_failed_probes boolean flag, when TRUE any probes that have NA
 #' values across all samples are discarded (default = TRUE)
+#' @param min_probe_score discard probes below this design score threshold.
 #' @param verbose boolean flag, when TRUE prints the results of each filtering
 #' step (default = TRUE).
 #' @param db_flag boolean when true export workspace to disk for debugging.
@@ -31,7 +32,7 @@
 #'
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                           max_sig_pval = 0.2, set_failed_betas_na = TRUE,
-                          max_probe_fail_rate = 0.5,
+                          max_probe_fail_rate = 0.5, min_probe_score = 0.2,
                           discard_failed_probes = TRUE, verbose = TRUE,
                           db_flag = FALSE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")}
@@ -41,7 +42,11 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   verbosecat <-function(x) if (verbose) cat(x)
 
   # Extract manifest dataframe
-  mft = probe_beta$manifest
+  if (!is.null(probe_beta$manifest)) {
+  cat("Loading manifest from probe_beta data\n");  mft = probe_beta$manifest
+  } else {
+  cat("Loading manifest from internal data\n"); mft = tdhia::manifest_v1A2
+  }
   verbosecat(sprintf("Probe manifest: manifest file has a total of %.0f probes.\n\n",
               nrow(mft)))
 
@@ -55,13 +60,13 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     unmapped_probe_ids <- sapply(mft$Probe_ID,
                                  function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Probe_ID)[1]]))
 
-    # Keep probes that target a cg site
+    # Find probes that target a cg site
     cpg_ids <- grepl("^cg",rownames(probe_beta$probe_beta_df))
     # For reference probe_id stars with either:
     # ctl: control, cg: CPG, ch: CHG, mu: multi-unique,
     # rp: repetitive element, or rs: SNP probe
 
-    # Keep probes that are not unmapped and are a cpg site
+    # Keep probes that are mapped to a cpg site in the imprintome
     filt_probe_beta_df <- probe_beta$probe_beta_df[!unmapped_probe_ids & cpg_ids,]
     filt_probe_pval_df <- probe_beta$probe_pval_df[!unmapped_probe_ids & cpg_ids,]
 
@@ -141,12 +146,59 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     filt_probe_beta_df2 <- filt_probe_beta_df
     filt_probe_pval_df2 <- filt_probe_pval_df
   }
-  verbosecat(sprintf("Probe filter: pruning %.0f%% probes ( %i/ %i) because all measurements are now NA.
+  verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) because all measurements are now NA.
               %i probes now remain. \n\n",
       100*(nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2))/nrow(filt_probe_beta_df),
       nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2),
       nrow(filt_probe_beta_df),
       nrow(filt_probe_beta_df2)))
+
+
+  # Discard probes with low design scores
+  df_design_score <- rbind(tdhia::design_scores$Pass_Score_Threshold,
+                           tdhia::design_scores$Fail_Score_Threshold)
+  df_design_score <- tdhia::design_scores$Pass_Score_Threshold
+
+  temp_filt_probe <- filt_probe_beta_df2 %>% rownames_to_column(var = "probe_id") %>%
+    mutate(probe_id = substr(probe_id, 1, nchar(probe_id)-1)) %>%
+  merge(y=select(df_design_score, c("Assay_Design_Id", "Design_Score")),
+        by.x = "probe_id", by.y = "Assay_Design_Id", all.x= TRUE, all.y= FALSE,
+        no.dups = TRUE, sort = FALSE)
+
+
+  temp_filt_probe <- filt_probe_beta_df2 %>% rownames_to_column(var = "probe_id") %>%
+    left_join(y=select(df_design_score, c("Assay_Design_Id", "Design_Score")),
+          by =  join_by(probe_id==Assay_Design_Id),
+          keep = FALSE, na_matches = "never", #unmatched = "error",
+          relationship = "one-to-one")
+
+
+  # # Get design score for the remaining probes
+  # a <-  filt_probe_beta_df2 %>% rownames_to_column(var = "probe_id") %>% select("probe_id")
+  # a$probe_id <- substr(a$probe_id, 1, nchar(a$probe_id)-1)
+  # b <- select(df_design_score, c("Assay_Design_Id", "Design_Score"))
+  # c <- intersect(a$probe_id,b$Assay_Design_Id)
+  #
+  #
+  # # get design score for all probes
+  # a <-  tdhia::manifest_v1A2 %>% select("Probe_ID")
+  # a$probe_id <- substr(a$Probe_ID, 1, nchar(a$Probe_ID)-1)
+  # b <- select(df_design_score, c("Assay_Design_Id", "Design_Score"))
+  # c <- intersect(a$probe_id,b$Assay_Design_Id)
+
+
+  # keep_index <- temp_filt_probe$Design_Score >= min_probe_score
+  # filt_probe_beta_df3 <- filt_probe_beta_df2[keep_index,]
+  # filt_probe_pval_df3 <- filt_probe_pval_df2[keep_index,]
+  # filt_design_scores3 <- temp_filt_probe$Design_Score[keep_index]
+  # verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) b/c of
+  #                    low design score < %.2f.\n\n",
+  #                    100*sum(!keep_index)/nrow(filt_probe_beta_df3),
+  #                    sum(!keep_index), nrow(filt_probe_beta_df3),
+  #                    nrow(filt_probe_beta_df3)))
+
+  # df_design_score$Assay_Design_Id
+
 
   # Report how many missing measurements at end of all filtering steps.
   verbosecat(sprintf("Probe filter: After all pruning and filtering, %.0f%% probes measurments ( %i/ %i) are now NA.\n\n",
@@ -155,10 +207,11 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                      prod(dim(filt_probe_beta_df2))))
 
  probe_beta <- list(probe_beta_df = filt_probe_beta_df2,
-                      probe_pval_df = filt_probe_pval_df2,
-                      platform = probe_beta$platform,
-                      manifest = probe_beta$manifest,
-                      probe_fail_rate_df = probe_fail_rate_df
+                    probe_pval_df = filt_probe_pval_df2,
+                    # design_scores = filt_design_scores3,
+                    platform = probe_beta$platform,
+                    manifest = probe_beta$manifest,
+                    probe_fail_rate_df = probe_fail_rate_df
   )
 
   return(probe_beta)
