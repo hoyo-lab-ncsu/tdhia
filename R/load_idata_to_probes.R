@@ -202,7 +202,8 @@ load_idata_to_probes <-
 #' This function processes the signal for all probes in the array, with no
 #' filtering performed.
 #'
-#' @param unq_obs_idat_basenames list of idat basenames
+#' @param unq_obs_idat_basenames list of idat basenames, or list of imported
+#' sigsets, which is SeSame's class for imported IDAT files
 #' @param platform string for the platform that the array belongs to, as specified
 #' within the SeSame package with openSesame(). default: "TruDx_imprintome"
 #' @param mft manifest file for particular imprintome array used in data collection.
@@ -218,10 +219,13 @@ load_idata_to_probes <-
 process_IDATS <- function(unq_obs_idat_basenames, platform, mft, multicore_arg) {
 
 
+  if (is.character(unq_obs_idat_basenames)) {
   ss = BiocParallel::bplapply(
     unq_obs_idat_basenames, function(pfx) {
       sesame::readIDATpair(pfx,  platform = "", manifest = mft)}, BPPARAM = multicore_arg)
-
+  } else {
+  ss = unq_obs_idat_basenames
+}
 
   betas = do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
     sesame::getBetas(

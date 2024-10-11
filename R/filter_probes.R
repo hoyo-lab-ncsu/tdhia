@@ -159,16 +159,16 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                            tdhia::design_scores$Fail_Score_Threshold)
   df_design_score <- tdhia::design_scores$Pass_Score_Threshold
 
-  temp_filt_probe <- filt_probe_beta_df2 %>% rownames_to_column(var = "probe_id") %>%
-    mutate(probe_id = substr(probe_id, 1, nchar(probe_id)-1)) %>%
-  merge(y=select(df_design_score, c("Assay_Design_Id", "Design_Score")),
+  temp_filt_probe <- filt_probe_beta_df2 %>% tibble::rownames_to_column(var = "probe_id") %>%
+    dplyr::mutate(probe_id = substr(probe_id, 1, nchar(probe_id)-1)) %>%
+  base::merge(y=dplyr::select(df_design_score, c("Assay_Design_Id", "Design_Score")),
         by.x = "probe_id", by.y = "Assay_Design_Id", all.x= TRUE, all.y= FALSE,
         no.dups = TRUE, sort = FALSE)
 
 
-  temp_filt_probe <- filt_probe_beta_df2 %>% rownames_to_column(var = "probe_id") %>%
-    left_join(y=select(df_design_score, c("Assay_Design_Id", "Design_Score")),
-          by =  join_by(probe_id==Assay_Design_Id),
+  temp_filt_probe <- filt_probe_beta_df2 %>% tibble::rownames_to_column(var = "probe_id") %>%
+    dplyr::left_join(y=dplyr::select(df_design_score, c("Assay_Design_Id", "Design_Score")),
+          by =  dplyr::join_by(probe_id==Assay_Design_Id),
           keep = FALSE, na_matches = "never", #unmatched = "error",
           relationship = "one-to-one")
 
