@@ -13,6 +13,6 @@ correct_idat_names(idat_dir_path)
 results with fitted coefficients from the glm, sorted by p-value
 }
 \description{
-correct capialtization to match the convention expected by the
+correct capitalization to match the convention expected by the
 sesame package. Example filename: 4207113116_A_Grn.idat.
 }

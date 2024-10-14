@@ -15,9 +15,9 @@ RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
 biocViews:
 Imports: 
-	stringr (>=	1.5.1),
-	sesame (>= 1.20.0),
-	sesameData (>= 1.20.0),
+	stringr,
+	sesame,
+	sesameData,
 	dplyr,
 	preprocessCore,
 	magrittr,

@@ -1,7 +1,7 @@
 
 #' correct_idat_names
 #'
-#' @description correct capialtization to match the convention expected by the
+#' @description correct capitalization to match the convention expected by the
 #' sesame package. Example filename: 4207113116_A_Grn.idat.
 #'
 #' @param idat_dir_path full filesystem path to location of idats to be renamed.

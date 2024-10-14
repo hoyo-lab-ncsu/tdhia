@@ -1,6 +1,6 @@
 
 
-#' study_imprint
+#' analyze_association
 #'
 #' @description fits a series of general linear models with parallel processing
 #' using response variable(s) R, predictor variable(s) R and confouding
@@ -49,14 +49,14 @@
 #' @importFrom rlang .data
 #'
 #' @return results with fitted coefficients from the glm, sorted by p-value
-study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
+analyze_association <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P))),
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
                            db_flag = FALSE, rm.na.R = FALSE, rm.na.P = FALSE,
                            rm.na.Pe = FALSE, rm.na.C = FALSE, rm.na.all = FALSE,
                            print_confounders = FALSE, verbose = TRUE,
                            icr_mapping = NULL) {
-  if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint.RData")}
-  # load(file = "study_imprint.RData")
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "analyze_association.RData")}
+  # load(file = "analyze_association.RData")
 
   if (rm.na.all) rm.na.R <- rm.na.P <- rm.na.Pe <- rm.na.Pe <- rm.na.C <- TRUE
   # This expression prevents devtools from issuing a NOTE warning
@@ -267,7 +267,7 @@ study_imprint <- function (R, P, Pe, C, family, n_p_adj = max(c(ncol(R), ncol(P)
 
 
   # Export for debugging
-  if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint2.RData")}
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "analyze_association2.RData")}
   # load(file = "study_imprint2.RData")
 
 
