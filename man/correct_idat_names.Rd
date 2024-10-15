@@ -4,15 +4,24 @@
 \alias{correct_idat_names}
 \title{correct_idat_names}
 \usage{
-correct_idat_names(idat_dir_path)
+correct_idat_names(idat_dir_path, rename = TRUE, failcheck_error = TRUE)
 }
 \arguments{
-\item{idat_dir_path}{full filesystem path to location of idats to be renamed.}
+\item{idat_dir_path}{either a full filesystem path to the directory of idats
+to be rename, or a vector paths to individual IDAT files}
+
+\item{rename}{boolean, when true IDAT files are renamed, otherwise their
+fileneames are checked and an error or warning is raised}
+
+\item{failcheck_error}{boolean, when true an error is raised when filenames are
+checked, otherwise a warning is raised.}
 }
 \value{
 results with fitted coefficients from the glm, sorted by p-value
 }
 \description{
 correct capitalization to match the convention expected by the
-sesame package. Example filename: 4207113116_A_Grn.idat.
+sesame package. Example correct filenames:
+4207113116_1544_Grn.idat.
+4207113116_1544_Red.idat.
 }

@@ -9,7 +9,7 @@
 #' to be rename, or a vector paths to individual IDAT files
 #' @param rename boolean, when true IDAT files are renamed, otherwise their
 #' fileneames are checked and an error or warning is raised
-#' @failcheck_error boolean, when true an error is raised when filenames are
+#' @param failcheck_error boolean, when true an error is raised when filenames are
 #' checked, otherwise a warning is raised.
 #'
 #' @return results with fitted coefficients from the glm, sorted by p-value
