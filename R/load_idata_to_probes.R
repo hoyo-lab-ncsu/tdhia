@@ -66,9 +66,16 @@ load_idata_to_probes <-
     # load(file = "load_idata_to_probes.RData")
 
 
+
+
+
     if (!is(idat_dir_paths[[1]],"data.frame")) {
       # Get list of IDAT files in target path
       obs_idat_fullnames <- dir(path = idat_dir_paths, pattern = "/*.idat", full.names = TRUE, ignore.case = TRUE)
+
+
+      # verify that IDAT files are properly named, raise error if not
+      correct_idat_names(obs_idat_fullnames, rename = FALSE, failcheck_error = TRUE)
 
       # Find full path and basename of observed IDAT files
       #   Removes _Grn.idat and _Red.idat from file names (case insensitive)
