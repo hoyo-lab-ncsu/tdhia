@@ -10,8 +10,7 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE, root.dir = here::i_am("README.md"), 
-                      collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>")
 
 # here::i_am("README.md")
 # devtools::load_all()

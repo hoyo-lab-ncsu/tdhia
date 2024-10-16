@@ -9,8 +9,11 @@
 #' This function processes the signal for all probes in the array, with no
 #' filtering performed.
 #'
-#' @param idat_dir_paths the full filesystem path to directory containing the idat
-#' files to be processed, formatted as a string or a vector of strings (untested).
+#' @param idat_dir_paths input idat files that can be in two forms: (1) the full
+#' filesystem path to directory containing the idat files to be processed,
+#' formatted as a string or a vector of strings. (2) a vector of sigset objects
+#' (idat files once they are imported into memory, this option is used for
+#' simualted idat files since we don't save them to disk).
 #' @param platform string for the platform that the array belongs to, as specified
 #' within the SeSame package with openSesame(). default: "TruDx_imprintome"
 #' @param mft manifest file for particular imprintome array used in data collection.
@@ -39,7 +42,8 @@
 #' @param db_flag boolean when true exports function workspace to disk.
 #' @param enforce_req_idats check that all idat files requested in idat_basenames
 #'  are found on disk. Throws error if this is not the case.
-#'
+#' @param enforce_idat_names boolean when true raises error if input IDAT files
+#' do not follow proper capitalization pattern, if FALSE only issues warning.
 #' @returns a named list with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
@@ -50,7 +54,7 @@ load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
            mft = NULL, multicore = TRUE, sesame_prep = "0CDB",
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
-           db_flag = FALSE, enforce_req_idats = FALSE) {
+           db_flag = FALSE, enforce_req_idats = FALSE, enforce_idat_names = TRUE) {
     # Load manifest file if platform is true diagnostic imprintome array
     if (base::is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
 
@@ -58,14 +62,13 @@ load_idata_to_probes <-
     # load(file = "load_idata_to_probes.RData")
 
 
-
     if (!methods::is(idat_dir_paths[[1]],"data.frame")) {
       # Get list of IDAT files in target path
       obs_idat_fullnames <- dir(path = idat_dir_paths, pattern = "/*.idat", full.names = TRUE, ignore.case = TRUE)
 
-
       # verify that IDAT files are properly named, raise error if not
-      correct_idat_names(obs_idat_fullnames, rename = FALSE, failcheck_error = TRUE)
+      correct_idat_names(obs_idat_fullnames, rename = FALSE, failcheck_error = enforce_idat_names)
+
 
       # Find full path and basename of observed IDAT files
       #   Removes _Grn.idat and _Red.idat from file names (case insensitive)
@@ -89,7 +92,7 @@ load_idata_to_probes <-
         is_requested <- basename(basename_tbl$obs_idat_basenames) %in%
           idat_basenames
         if (sum(is_requested) != length(idat_basenames)) {
-         stop("Not all requested idat files were found in directories.")
+          stop("Not all requested idat files were found in directories.")
         }
       }
 
@@ -123,96 +126,134 @@ load_idata_to_probes <-
       unq_obs_idat_basenames <- idat_dir_paths
     }
 
-  # Caching SeSame Data Files (required for running SeSame firs time...)
-  cat("Checking that Sesame idatSignature file is locally cached...")
-  sesameData::sesameDataCache()
-  cat("Done.\n")
 
-  # Set Multicore parameter depending on operating system
-  if (multicore > 1) {
-    default_ncores <- multicore
-  } else {
-    default_ncores <- max(c(parallel::detectCores()-1,1))
-  }
+    # SeSame Processing
+    #___________________________________________________________________________
 
-  if (.Platform$OS.type == "windows" && multicore) {
-    multicore_arg <- BiocParallel::SnowParam(default_ncores)
-  } else if (multicore) {
-    multicore_arg <- BiocParallel::MulticoreParam(default_ncores)
-  } else {
-    multicore_arg = NULL
-  }
+    # Caching SeSame Data Files (required for running SeSame firs time...)
+    cat("Checking that Sesame idatSignature file is locally cached...")
+    sesameData::sesameDataCache()
+    cat("Done.\n")
 
-
-
-
-
-  # Load each of the IDAT file pairs, process with standard SeSame pipeline
-  cat(sprintf("Processing %.0f IDAT Files...", length(unq_obs_idat_basenames)))
-  if (!is.null(multicore_arg)) {
-    cat(sprintf(" (Using %i/%i cores.)...", default_ncores, parallel::detectCores()))
-  }
-  probe_beta_matrix <-
-    sesame::openSesame(unq_obs_idat_basenames,
-                       platform = platform, manifest = mft, prep = sesame_prep,
-                       BPPARAM = multicore_arg, fun = sesame::getBetas)
+    # Set Multicore parameter depending on operating system
+    if (multicore > 1) {
+      default_ncores <- multicore
+    } else {
+      default_ncores <- max(c(parallel::detectCores()-1,1))
+    }
+    if (.Platform$OS.type == "windows" && multicore) {
+      multicore_arg <- BiocParallel::SnowParam(default_ncores)
+    } else if (multicore) {
+      multicore_arg <- BiocParallel::MulticoreParam(default_ncores,progressbar = TRUE)
+    } else {
+      multicore_arg = NULL
+    }
 
 
-  probe_pval_matrix <-
-    sesame::openSesame(unq_obs_idat_basenames,
-                       platform = platform, manifest = mft, prep = sesame_prep,
-                       BPPARAM = multicore_arg, fun = sesame::pOOBAH,
-                       return.pval  =TRUE)
+    # Load each of the IDAT file pairs, process with standard SeSame pipeline
+    cat(sprintf("Processing %.0f IDAT Files...", length(unq_obs_idat_basenames)))
+    if (!is.null(multicore_arg)) {
+      cat(sprintf(" (Using %i/%i cores.)...", default_ncores, parallel::detectCores()))
+    }
 
-  # Debugging: saving output from sesame pipeline
-  # Todo: pipeline is currently run twice to get beta and p-values, recode to run once
-  # save(list = ls(all.names = TRUE), file = "load_idata_debug.RData")
-  # load(file = "load_idata_debug.RData")
+    idat.out <- process_IDATS(unq_obs_idat_basenames, platform, mft, multicore_arg)
+    probe_beta_matrix = idat.out$betas
+    probe_pval_matrix = idat.out$pvals
 
 
-  # Convert matrix to dataframe for easier manipulation
-  probe_beta_df <- as.data.frame(probe_beta_matrix)
-  probe_pval_df <- as.data.frame(probe_pval_matrix)
-  cat("Done.\n")
+    # Convert matrix to dataframe for easier manipulation
+    probe_beta_df <- as.data.frame(probe_beta_matrix)
+    probe_pval_df <- as.data.frame(probe_pval_matrix)
+    cat("Done.\n")
 
-  # If a column mapping is specified, rename column names in probe_beta_df
-  #   Discard unmapped columns if user specifies it
-  if (is.data.frame(idat_basenames)) {
+    # If a column mapping is specified, rename column names in probe_beta_df
+    #   Discard unmapped columns if user specifies it
+    if (is.data.frame(idat_basenames)) {
 
       probe_beta_df <- probe_beta_df[,is.element(colnames(probe_beta_df),
-                                  idat_basenames$idat_basename)]
+                                                 idat_basenames$idat_basename)]
       probe_pval_df <- probe_pval_df[,is.element(colnames(probe_pval_df),
                                                  idat_basenames$idat_basename)]
 
-    # Rename by matching new id to each idat basename using a left_join()
-    remapped_colnames <-
-      dplyr::left_join(df_remap <- data.frame(idat_basename = colnames(probe_beta_df)),
-                       dplyr::select(idat_basenames, c("idat_basename", "id")),
-                       by = "idat_basename",
-                     na_matches = "never", unmatched = "error",
-                     relationship = "one-to-one")
-    # Rename columns of probe_beta_df and probe_pval_df
-    colnames(probe_beta_df) <- remapped_colnames$id
-    colnames(probe_pval_df) <- remapped_colnames$id
+      # Rename by matching new id to each idat basename using a left_join()
+      remapped_colnames <-
+        dplyr::left_join(df_remap <- data.frame(idat_basename = colnames(probe_beta_df)),
+                         dplyr::select(idat_basenames, c("idat_basename", "id")),
+                         by = "idat_basename",
+                         na_matches = "never", unmatched = "error",
+                         relationship = "one-to-one")
+      # Rename columns of probe_beta_df and probe_pval_df
+      colnames(probe_beta_df) <- remapped_colnames$id
+      colnames(probe_pval_df) <- remapped_colnames$id
+    }
+
+
+    # Apply quantile normalization between all columns if specified by user.
+    if (quantile_norm) {
+      norm_probe_df <-
+        as.data.frame(preprocessCore::normalize.quantiles(as.matrix(probe_beta_df)),
+                      row.names = rownames(probe_beta_df))
+      colnames(norm_probe_df) <- colnames(probe_beta_df)
+      probe_beta_df <- norm_probe_df
+    }
+
+
+    probe_beta <- list(probe_beta_df = probe_beta_df,
+                       probe_pval_df = probe_pval_df,
+                       platform = platform,
+                       manifest = mft)
+    return(probe_beta)
+
   }
 
 
-  # Apply quantile normalization between all columns if specified by user.
-  if (quantile_norm) {
-    norm_probe_df <-
-      as.data.frame(preprocessCore::normalize.quantiles(as.matrix(probe_beta_df)),
-                    row.names = rownames(probe_beta_df))
-    colnames(norm_probe_df) <- colnames(probe_beta_df)
-    probe_beta_df <- norm_probe_df
+
+#' process_idats
+#'
+#' Processes idat files
+#'
+#' beta = M/(M+U)
+#'
+#' This function processes the signal for all probes in the array, with no
+#' filtering performed.
+#'
+#' @param unq_obs_idat_basenames list of idat basenames, or list of imported
+#' sigsets, which is SeSame's class for imported IDAT files
+#' @param platform string for the platform that the array belongs to, as specified
+#' within the SeSame package with openSesame(). default: "TruDx_imprintome"
+#' @param mft manifest file for particular imprintome array used in data collection.
+#' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
+#' See ?manifest_v1A2 for more info.
+#' @param multicore_arg boolean flag, when true the max number of cores minus 1 is
+#' used for the current system.
+#'
+#' @returns a named list with the following fields:
+#'  - betas: matrix of methylation beta values, probes x patients
+#'  - pvals: matrix of signal p-values, probes x patients
+#'
+process_IDATS <- function(unq_obs_idat_basenames, platform, mft, multicore_arg) {
+
+
+  if (is.character(unq_obs_idat_basenames)) {
+    ss = BiocParallel::bplapply(
+      unq_obs_idat_basenames, function(pfx) {
+        sesame::readIDATpair(pfx,  platform = "", manifest = mft)}, BPPARAM = multicore_arg)
+  } else {
+    ss = unq_obs_idat_basenames
   }
 
+  betas = do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
+    sesame::getBetas(
+      sdf =  sesame::noob(
+        sdf = sesame::dyeBiasNL(
+          sdf = sesame::inferInfiniumIChannel(ss))))},
+    BPPARAM = multicore_arg))
 
-  probe_beta <- list(probe_beta_df = probe_beta_df,
-                      probe_pval_df = probe_pval_df,
-                      platform = platform,
-                      manifest = mft)
-  return(probe_beta)
+  pvals <- do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
+    sesame::pOOBAH(return.pval = TRUE,
+                   sdf =  sesame::dyeBiasNL(
+                     sdf =  sesame::inferInfiniumIChannel(ss)))},
+    BPPARAM = multicore_arg))
 
+  return(list(betas = betas, pvals = pvals))
 }
-
-

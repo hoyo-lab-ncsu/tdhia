@@ -19,20 +19,20 @@ model_idat_data(
 }
 \value{
 sigset_model, a named list with the follow fields:
-sigset_template: a dataframe that is copied from the reference idat data,
+sigset_template: a data frame that is copied from the reference idat data,
 with all the numerical data cleared.
 sigset_mask: a boolean mask specifying what rows of data columns were NA.
 sigset_ecdfs: a set of empirical distribution functions for each data
 column.
 }
 \description{
-Produces a rough model to simualte IDAT data from a reference IDAT file.
-Can be used to tast pipelines or vignettes for the package. Simulated idat
+Produces a rough model to simulate IDAT data from a reference IDAT file.
+Can be used to test pipelines or vignettes for the package. Simulated idat
 files can be produced with the returned data object and calling:
 }
 \details{
 simulate_idat_data().
 
 Data is stored as a simple ecfd, later versions should switch to a smoothed
-pdf of the flourescent values.
+pdf of the fluorescent values.
 }

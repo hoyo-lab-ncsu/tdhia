@@ -14,12 +14,16 @@ load_idata_to_probes(
   quantile_norm = FALSE,
   mask = FALSE,
   db_flag = FALSE,
-  enforce_req_idats = FALSE
+  enforce_req_idats = FALSE,
+  enforce_idat_names = TRUE
 )
 }
 \arguments{
-\item{idat_dir_paths}{the full filesystem path to directory containing the idat
-files to be processed, formatted as a string or a vector of strings (untested).}
+\item{idat_dir_paths}{input idat files that can be in two forms: (1) the full
+filesystem path to directory containing the idat files to be processed,
+formatted as a string or a vector of strings. (2) a vector of sigset objects
+(idat files once they are imported into memory, this option is used for
+simualted idat files since we don't save them to disk).}
 
 \item{platform}{string for the platform that the array belongs to, as specified
 within the SeSame package with openSesame(). default: "TruDx_imprintome"}
@@ -59,6 +63,9 @@ when TRUE excludes some probes due to issues of inter-dependence of measurements
 
 \item{enforce_req_idats}{check that all idat files requested in idat_basenames
 are found on disk. Throws error if this is not the case.}
+
+\item{enforce_idat_names}{boolean when true raises error if input IDAT files
+do not follow proper capitalization pattern, if FALSE only issues warning.}
 }
 \value{
 a named list with the following fields:
