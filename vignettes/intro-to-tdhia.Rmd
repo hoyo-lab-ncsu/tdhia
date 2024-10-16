@@ -42,7 +42,7 @@ detection p-values. This is returned in a named list, with the following fields:
 # 1) Load IDATS and convert to probe beta matrix
 # Output: rows: probe_id     x     columns: patient
 probe_beta <-
-    load_idata_to_probes(idat_dir_paths = ss, multicore = TRUE, 
+    load_idata_to_probes(idat_dir_paths = ss, multicore = 2, 
                          quantile_norm = FALSE, db_flag = FALSE)
 ```
   

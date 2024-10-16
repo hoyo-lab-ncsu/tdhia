@@ -30,6 +30,7 @@
 #' are the sample_ids (basenames of the IDAT files or some other mapping
 #' specified by idat_remappings).
 #'
+#' @importFrom rlang .data
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                           max_sig_pval = 0.2, set_failed_betas_na = TRUE,
                           max_probe_fail_rate = 0.5, min_probe_score = 0.2,
@@ -155,22 +156,22 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 
 
   # Discard probes with low design scores
-  df_design_score <- rbind(tdhia::design_scores$Pass_Score_Threshold,
-                           tdhia::design_scores$Fail_Score_Threshold)
-  df_design_score <- tdhia::design_scores$Pass_Score_Threshold
-
-  temp_filt_probe <- filt_probe_beta_df2 %>% tibble::rownames_to_column(var = "probe_id") %>%
-    dplyr::mutate(probe_id = substr(probe_id, 1, nchar(probe_id)-1)) %>%
-  base::merge(y=dplyr::select(df_design_score, c("Assay_Design_Id", "Design_Score")),
-        by.x = "probe_id", by.y = "Assay_Design_Id", all.x= TRUE, all.y= FALSE,
-        no.dups = TRUE, sort = FALSE)
-
-
-  temp_filt_probe <- filt_probe_beta_df2 %>% tibble::rownames_to_column(var = "probe_id") %>%
-    dplyr::left_join(y=dplyr::select(df_design_score, c("Assay_Design_Id", "Design_Score")),
-          by =  dplyr::join_by(probe_id==Assay_Design_Id),
-          keep = FALSE, na_matches = "never", #unmatched = "error",
-          relationship = "one-to-one")
+  # df_design_score <- rbind(tdhia::design_scores$Pass_Score_Threshold,
+  #                          tdhia::design_scores$Fail_Score_Threshold)
+  # df_design_score <- tdhia::design_scores$Pass_Score_Threshold
+  #
+  # temp_filt_probe <- filt_probe_beta_df2 %>% tibble::rownames_to_column(var = "probe_id") %>%
+  #   dplyr::mutate(probe_id = substr(.data$probe_id, 1, nchar(.data$probe_id)-1)) %>%
+  # base::merge(y=dplyr::select(df_design_score, c("Assay_Design_Id", "Design_Score")),
+  #       by.x = "probe_id", by.y = "Assay_Design_Id", all.x= TRUE, all.y= FALSE,
+  #       no.dups = TRUE, sort = FALSE)
+  #
+  #
+  # temp_filt_probe <- filt_probe_beta_df2 %>% tibble::rownames_to_column(var = "probe_id") %>%
+  #   dplyr::left_join(y=dplyr::select(df_design_score, c("Assay_Design_Id", "Design_Score")),
+  #         by =  dplyr::join_by(probe_id==Assay_Design_Id),
+  #         keep = FALSE, na_matches = "never", #unmatched = "error",
+  #         relationship = "one-to-one")
 
 
   # # Get design score for the remaining probes

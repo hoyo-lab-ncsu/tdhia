@@ -28,8 +28,9 @@ within the SeSame package with openSesame(). default: "TruDx_imprintome"}
 A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 See ?manifest_v1A2 for more info.}
 
-\item{multicore}{boolean flag, when true the max number of cores minus 1 is
-used for the current system.}
+\item{multicore}{boolean flag or integer, when true the max number of cores minus 1 is
+used for the current system, FALSE sets to single core operation, any integer
+greater than zero sets to the specified number of cores.}
 
 \item{sesame_prep}{string of number/ letters to control sesame normalization
 steps. Default is 0CDB.}

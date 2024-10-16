@@ -11,20 +11,16 @@
 #'
 #' @param idat_dir_paths the full filesystem path to directory containing the idat
 #' files to be processed, formatted as a string or a vector of strings (untested).
-#'
 #' @param platform string for the platform that the array belongs to, as specified
 #' within the SeSame package with openSesame(). default: "TruDx_imprintome"
-#'
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
-#'
-#' @param multicore boolean flag, when true the max number of cores minus 1 is
-#' used for the current system.
-#'
+#' @param multicore boolean flag or integer, when true the max number of cores minus 1 is
+#' used for the current system, FALSE sets to single core operation, any integer
+#' greater than zero sets to the specified number of cores.
 #' @param sesame_prep string of number/ letters to control sesame normalization
 #' steps. Default is 0CDB.
-#'
 #' @param idat_basenames a character vector or dataframe.
 #' If idat_basenames is a character vector, then the elements are the
 #' idat_basenames to be processed. An idat basename is the filename without the
@@ -35,16 +31,12 @@
 #' If idat_basenames is a dataframe, then it contains two columns: idat_basename
 #' and id. idat_basename is a character vector of idat basenames. id is a numeric
 #'  or string vector for what each idat basename should be renamed to.
-#'
 #' @param quantile_norm a boolean flag, when set to TRUE, applies quantile
 #' normalization between the columns in the probe_beta dataframe (default = FALSE).
-#'
 #' @param mask a boolean flag specified in opensesame() in the Sesame package,
 #' when TRUE excludes some probes due to issues of inter-dependence of measurements
 #' (default = FALSE).
-#'
 #' @param db_flag boolean when true exports function workspace to disk.
-#'
 #' @param enforce_req_idats check that all idat files requested in idat_basenames
 #'  are found on disk. Throws error if this is not the case.
 #'
@@ -67,9 +59,7 @@ load_idata_to_probes <-
 
 
 
-
-
-    if (!is(idat_dir_paths[[1]],"data.frame")) {
+    if (!methods::is(idat_dir_paths[[1]],"data.frame")) {
       # Get list of IDAT files in target path
       obs_idat_fullnames <- dir(path = idat_dir_paths, pattern = "/*.idat", full.names = TRUE, ignore.case = TRUE)
 
@@ -139,7 +129,11 @@ load_idata_to_probes <-
   cat("Done.\n")
 
   # Set Multicore parameter depending on operating system
-  default_ncores <- max(c(parallel::detectCores()-1,1))
+  if (multicore > 1) {
+    default_ncores <- multicore
+  } else {
+    default_ncores <- max(c(parallel::detectCores()-1,1))
+  }
   if (.Platform$OS.type == "windows" && multicore) {
     multicore_arg <- BiocParallel::SnowParam(default_ncores)
   } else if (multicore) {

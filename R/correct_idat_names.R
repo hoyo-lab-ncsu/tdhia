@@ -51,7 +51,7 @@ correct_idat_names <- function (idat_dir_path, rename = TRUE, failcheck_error = 
     df_log = data.frame(old_name = idat_fullnames, new_name = new_idat_fullnames)
 
     # Write log of proposed renames
-    write.csv(x=df_log, file = paste0(idat_dir_path, '/idat_rename_log.csv'))
+    utils::write.csv(x=df_log, file = paste0(idat_dir_path, '/idat_rename_log.csv'))
 
     # Rename files
     file.rename(from = df_log$old_name, to = df_log$new_name)

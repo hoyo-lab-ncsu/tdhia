@@ -268,7 +268,7 @@ analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol
   dfs_corr$example_formula <- test_run$Formula[1]
 
   # Print out results of analysis
-  summarize_study(dfs_corr, varname = "imp_site", max_p_val, print_sites = FALSE,
+  summarize_study(dfs_corr, varnames = "imp_site", max_p_val, print_sites = FALSE,
                   print_confounders = FALSE)
 
 
