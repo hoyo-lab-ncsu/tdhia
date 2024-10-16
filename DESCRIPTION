@@ -4,9 +4,7 @@ Title: Analyze TruDx Version 1 Custom Human imprintome Array
 Version: 0.1.0
 Author: Dereje Jima, Bruce Corliss
 Maintainer: Dereje Jima <ddjima2014@gmail.com>, Bruce Corliss <bacorli2@ncsu.edu>
-Description: It loads the iScan data, normalizes it, and fits multiple 
-             regressions to find the difference between cases and control 
-             per the user phenotypic data definition.
+Description: A set of functions that analyze methylation data from the True Diagnostic Imprintome methylation array.
 Depends: R (>= 4.3)
 License: MIT + file LICENSE
 Encoding: UTF-8
@@ -16,9 +14,9 @@ RoxygenNote: 7.3.2
 Roxygen: list(markdown = TRUE)
 biocViews:
 Imports: 
-	stringr (>=	1.5.1),
-	sesame (>= 1.20.0),
-	sesameData (>= 1.20.0),
+	stringr,
+	sesame,
+	sesameData,
 	dplyr,
 	preprocessCore,
 	magrittr,
