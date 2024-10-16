@@ -1,10 +1,10 @@
 
 #' summarize_study
 #'
-#' @description
-#'  Prints out results of a study analysis.
+#' @description Prints out results of a study analysis from analyze_association.
 #' @param dfs a list of dataframes that give model output results for each
 #' variable in model.
+#' @param varnames vector of strings specifying which variables to cummarize.
 #' @param max_p_val maximum p-value threshold for reported results. Both
 #' adjusted and unadjusted p-values are reported.
 #' @param print_sites boolean, when true, will print all cpg/icr sites that are

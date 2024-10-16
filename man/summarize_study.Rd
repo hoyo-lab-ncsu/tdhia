@@ -16,6 +16,8 @@ summarize_study(
 \item{dfs}{a list of dataframes that give model output results for each
 variable in model.}
 
+\item{varnames}{vector of strings specifying which variables to cummarize.}
+
 \item{max_p_val}{maximum p-value threshold for reported results. Both
 adjusted and unadjusted p-values are reported.}
 
@@ -26,5 +28,5 @@ statistically significant (adjust p-value)}
 summary of confoudner variables}
 }
 \description{
-Prints out results of a study analysis.
+Prints out results of a study analysis from analyze_association.
 }

@@ -34,9 +34,8 @@ Imports:
 	doSNOW,
 	snow,
 	mice,
-	here,
-	devtools
 Suggests: 
     knitr,
-    rmarkdown
+    rmarkdown,
+	here
 VignetteBuilder: knitr

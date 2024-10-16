@@ -1,6 +1,6 @@
 
 
-#' study_imprint
+#' analyze_association
 #'
 #' @description fits a series of general linear models with parallel processing
 #' using response variable(s) R, predictor variable(s) R and confouding
@@ -40,13 +40,17 @@
 #' @param rm.na.R flag to remove NA values in R prior to imputation.
 #' @param rm.na.P flag to remove NA values in P prior to imputation.
 #' @param rm.na.Pe flag to remove NA values in Pe prior to imputation.
+#' @param rm.na.all TODO
+#' @param print_confounders TODO
+#' @param verbose TODO
+#' @param icr_mapping TODO
 #'
 #' @importFrom magrittr %>%
 #' @importFrom foreach %dopar%
 #' @importFrom rlang .data
 #'
 #' @return results with fitted coefficients from the glm, sorted by p-value
-study_imprint <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol(P))),
+analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol(P))),
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
                            db_flag = FALSE, rm.na.R = FALSE, rm.na.P = FALSE,
                            rm.na.Pe = FALSE, rm.na.all = FALSE,

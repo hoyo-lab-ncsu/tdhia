@@ -5,14 +5,14 @@
 #' copy_idat_files
 #'
 #' @description
-#'  Given a input folder path, and a list of idat basenames, copys the red and
-#'  green IDAT files to the export file direcotry. Useful for subsetting the
-#'  IDAT files.
+#' Given a input folder path, and a list of idat basenames, copys the red and
+#' green IDAT files to the export file direcotry. Useful for subsetting the
+#' IDAT files.
 #'
-#'  @param idat_basenames list of basenames for the IDAT files to be copied
-#'  @param idat_dir_paths full system path to IDAT files
-#'  @param export_file_dir output path to copy IDAT files.
-#'
+#' @param idat_basenames list of basenames for the IDAT files to be copied
+#' @param idat_dir_paths full system path to IDAT files
+#' @param export_file_dir output path to copy IDAT files.
+#' @export
 copy_idat_files <- function(idat_basenames, idat_dir_paths, export_file_dir) {
 
 
