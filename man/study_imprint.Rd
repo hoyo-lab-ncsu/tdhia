@@ -8,7 +8,6 @@ study_imprint(
   R,
   P,
   Pe,
-  C,
   family,
   n_p_adj = max(c(ncol(R), ncol(P))),
   max_p_val = 0.05,
@@ -18,7 +17,6 @@ study_imprint(
   rm.na.R = FALSE,
   rm.na.P = FALSE,
   rm.na.Pe = FALSE,
-  rm.na.C = FALSE,
   rm.na.all = FALSE,
   print_confounders = FALSE,
   verbose = TRUE,
@@ -30,15 +28,12 @@ study_imprint(
 (columns) could either be beta values for cpg or ICR sites, or
 study metadata.}
 
-\item{P}{parallelized predictor variable(s) data frame that is patients
+\item{P}{parallelized predictor variable(s)- data frame that is patients
 (rows) x variables (columns), could either be beta values for cpg or ICR
 sites. For study metadata, use Pe input argument.}
 
 \item{Pe}{extra predictor variables that are not parallelized (incuded in all
 fitted models).}
-
-\item{C}{predictor variable(s) data frame that is patients (rows) x variables
-(columns).}
 
 \item{family}{string for family model argument for glm(). (ex. 'binomial', 'gaussian')}
 
@@ -62,8 +57,6 @@ and set to max cores detected minus 1.}
 \item{rm.na.P}{flag to remove NA values in P prior to imputation.}
 
 \item{rm.na.Pe}{flag to remove NA values in Pe prior to imputation.}
-
-\item{rm.na.C}{flag to remove NA values in C prior to imputation.}
 }
 \value{
 results with fitted coefficients from the glm, sorted by p-value
@@ -73,13 +66,13 @@ fits a series of general linear models with parallel processing
 using response variable(s) R, predictor variable(s) R and confouding
 variable(s) C. The model formula takes on the form:
 
-If R has many variables/ columns and P has one, models are parallelized over R:
+If R has many columns and P has one, models are parallelized over R:
 
-R[,i] ~ P[,1] + C[,1] + C[,2] + C[,3] ...
+R[,i] ~ Pe[,1] + Pe[,2] + Pe[,3] ...
 
 If P has many variables/ columns and R has one, models are parallelized over P:
 
-R[,1] ~ P[,i] + C[,1] + C[,2] + C[,3] ...
+R[,1] ~ P[,i] + Pe[,1] + Pe[,2] + Pe[,3] ...
 
 This designed that either R or P are the CpG beta values or the ICR beta
 values. The code handles either case. Note that R and P cannot both be

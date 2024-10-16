@@ -9,20 +9,22 @@
 #' This function processes the signal for all probes in the array, with no
 #' filtering performed.
 #'
-#' @param idat_dir_paths input idat files that can be in two forms: (1) the full
-#' filesystem path to directory containing the idat files to be processed,
-#' formatted as a string or a vector of strings. (2) a vector of sigset objects
-#' (idat files once they are imported into memory, this option is used for
-#' simualted idat files since we don't save them to disk).
+#' @param idat_dir_paths the full filesystem path to directory containing the idat
+#' files to be processed, formatted as a string or a vector of strings (untested).
+#'
 #' @param platform string for the platform that the array belongs to, as specified
 #' within the SeSame package with openSesame(). default: "TruDx_imprintome"
+#'
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
+#'
 #' @param multicore boolean flag, when true the max number of cores minus 1 is
 #' used for the current system.
+#'
 #' @param sesame_prep string of number/ letters to control sesame normalization
 #' steps. Default is 0CDB.
+#'
 #' @param idat_basenames a character vector or dataframe.
 #' If idat_basenames is a character vector, then the elements are the
 #' idat_basenames to be processed. An idat basename is the filename without the
@@ -33,14 +35,19 @@
 #' If idat_basenames is a dataframe, then it contains two columns: idat_basename
 #' and id. idat_basename is a character vector of idat basenames. id is a numeric
 #'  or string vector for what each idat basename should be renamed to.
+#'
 #' @param quantile_norm a boolean flag, when set to TRUE, applies quantile
 #' normalization between the columns in the probe_beta dataframe (default = FALSE).
+#'
 #' @param mask a boolean flag specified in opensesame() in the Sesame package,
 #' when TRUE excludes some probes due to issues of inter-dependence of measurements
 #' (default = FALSE).
+#'
 #' @param db_flag boolean when true exports function workspace to disk.
+#'
 #' @param enforce_req_idats check that all idat files requested in idat_basenames
 #'  are found on disk. Throws error if this is not the case.
+#'
 #' @returns a named list with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
@@ -59,9 +66,16 @@ load_idata_to_probes <-
     # load(file = "load_idata_to_probes.RData")
 
 
+
+
+
     if (!is(idat_dir_paths[[1]],"data.frame")) {
       # Get list of IDAT files in target path
       obs_idat_fullnames <- dir(path = idat_dir_paths, pattern = "/*.idat", full.names = TRUE, ignore.case = TRUE)
+
+
+      # verify that IDAT files are properly named, raise error if not
+      correct_idat_names(obs_idat_fullnames, rename = FALSE, failcheck_error = TRUE)
 
       # Find full path and basename of observed IDAT files
       #   Removes _Grn.idat and _Red.idat from file names (case insensitive)
@@ -129,10 +143,13 @@ load_idata_to_probes <-
   if (.Platform$OS.type == "windows" && multicore) {
     multicore_arg <- BiocParallel::SnowParam(default_ncores)
   } else if (multicore) {
-    multicore_arg <- BiocParallel::MulticoreParam(default_ncores,progressbar = TRUE)
+    multicore_arg <- BiocParallel::MulticoreParam(default_ncores)
   } else {
     multicore_arg = NULL
   }
+
+
+
 
 
   # Load each of the IDAT file pairs, process with standard SeSame pipeline
@@ -140,10 +157,22 @@ load_idata_to_probes <-
   if (!is.null(multicore_arg)) {
     cat(sprintf(" (Using %i/%i cores.)...", default_ncores, parallel::detectCores()))
   }
+  probe_beta_matrix <-
+    sesame::openSesame(unq_obs_idat_basenames,
+                       platform = platform, manifest = mft, prep = sesame_prep,
+                       BPPARAM = multicore_arg, fun = sesame::getBetas)
 
-  idat.out <- process_IDATS(unq_obs_idat_basenames, platform, mft, multicore_arg)
-  probe_beta_matrix = idat.out$betas
-  probe_pval_matrix = idat.out$pvals
+
+  probe_pval_matrix <-
+    sesame::openSesame(unq_obs_idat_basenames,
+                       platform = platform, manifest = mft, prep = sesame_prep,
+                       BPPARAM = multicore_arg, fun = sesame::pOOBAH,
+                       return.pval  =TRUE)
+
+  # Debugging: saving output from sesame pipeline
+  # Todo: pipeline is currently run twice to get beta and p-values, recode to run once
+  # save(list = ls(all.names = TRUE), file = "load_idata_debug.RData")
+  # load(file = "load_idata_debug.RData")
 
 
   # Convert matrix to dataframe for easier manipulation
@@ -182,6 +211,13 @@ load_idata_to_probes <-
     probe_beta_df <- norm_probe_df
   }
 
+  # # Add probe_id as a first column and remove row names
+  # probe_beta_df<-cbind(data.frame(Probe_ID = rownames(probe_beta_df)),probe_beta_df)
+  # rownames(probe_beta_df) <- NULL
+  # probe_pval_df<-cbind(data.frame(Probe_ID = rownames(probe_pval_df)),probe_pval_df)
+  # rownames(probe_pval_df) <- NULL
+
+
 
   probe_beta <- list(probe_beta_df = probe_beta_df,
                       probe_pval_df = probe_pval_df,
@@ -192,53 +228,3 @@ load_idata_to_probes <-
 }
 
 
-
-#' process_idats
-#'
-#' Processes idat files
-#'
-#' beta = M/(M+U)
-#'
-#' This function processes the signal for all probes in the array, with no
-#' filtering performed.
-#'
-#' @param unq_obs_idat_basenames list of idat basenames, or list of imported
-#' sigsets, which is SeSame's class for imported IDAT files
-#' @param platform string for the platform that the array belongs to, as specified
-#' within the SeSame package with openSesame(). default: "TruDx_imprintome"
-#' @param mft manifest file for particular imprintome array used in data collection.
-#' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
-#' See ?manifest_v1A2 for more info.
-#' @param multicore boolean flag, when true the max number of cores minus 1 is
-#' used for the current system.
-#'
-#' @returns a named list with the following fields:
-#'  - betas: matrix of methylation beta values, probes x patients
-#'  - pvals: matrix of signal p-values, probes x patients
-#'
-process_IDATS <- function(unq_obs_idat_basenames, platform, mft, multicore_arg) {
-
-
-  if (is.character(unq_obs_idat_basenames)) {
-  ss = BiocParallel::bplapply(
-    unq_obs_idat_basenames, function(pfx) {
-      sesame::readIDATpair(pfx,  platform = "", manifest = mft)}, BPPARAM = multicore_arg)
-  } else {
-  ss = unq_obs_idat_basenames
-}
-
-  betas = do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
-    sesame::getBetas(
-      sdf =  sesame::noob(
-        sdf = sesame::dyeBiasNL(
-          sdf = sesame::inferInfiniumIChannel(ss))))},
-    BPPARAM = multicore_arg))
-
-  pvals <- do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
-    sesame::pOOBAH(return.pval = TRUE,
-                   sdf =  sesame::dyeBiasNL(
-                     sdf =  sesame::inferInfiniumIChannel(ss)))},
-    BPPARAM = multicore_arg))
-
-  return(list(betas = betas, pvals = pvals))
-}

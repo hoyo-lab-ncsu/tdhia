@@ -10,7 +10,6 @@ GLM_parallel(
   P = NULL,
   Pind = 1,
   Pe = NULL,
-  C = NULL,
   family = "binomial",
   verbose = FALSE,
   impute_na = TRUE,
@@ -29,8 +28,6 @@ Default for Rind is 1 for single column dataframe.}
 Default for Pind is 1 for single column dataframe.}
 
 \item{Pe}{dataframe of extra predictor variables to be included in all models.}
-
-\item{C}{dataframe of confounder variable(s) to be including in model}
 
 \item{family}{string denoting GLM family}
 
@@ -56,14 +53,13 @@ possible forms:
 Response ~ Parallel_Predictor + Predictors + Confounders
 Parallel_Response ~ Predictors + Confounders
 
-\code{R\[,Rind] ~ P\[,Pind] + Pe\[,1] + Pe\[,...] + C\[, 1] + C\[, ...]}
+\code{R\[,Rind] ~ P\[,Pind] + Pe\[,1] + Pe\[,...]}
 
 R[,Rind]: Either a single response variable, or several response variables
 where a separate model is fitted for each (parallelized).
 P[,Pind]: A series of predictors where a separate model is fitted for each
 (parallelized). Note only R or P can be parallelized, but not both.
 Pe: Extra predictors, to be included in all models.
-C: confounder variables, to be included in all models.
 
 One predictor and one response variable (column) is assumed. If fitting a
 series of models for several R's or P's, this function can be called in
