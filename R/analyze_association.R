@@ -50,6 +50,7 @@
 #' @importFrom rlang .data
 #'
 #' @return results with fitted coefficients from the glm, sorted by p-value
+#' @export
 analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol(P))),
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
                            db_flag = FALSE, rm.na.R = FALSE, rm.na.P = FALSE,

@@ -9,7 +9,7 @@
 #' @param n of comparisons.
 #'
 #' @importFrom stats p.adjust
-#'
+#' @export
 custom_p.adjust <- function (p, method = stats::p.adjust.methods, n = length(p))
 {
   method <- match.arg(method)

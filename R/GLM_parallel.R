@@ -41,7 +41,7 @@
 #'
 #'
 #' @importFrom magrittr %>%
-#'
+#' @export
 GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
                         family = "binomial", verbose = FALSE, impute_na = TRUE,
                         db_flag = TRUE) {

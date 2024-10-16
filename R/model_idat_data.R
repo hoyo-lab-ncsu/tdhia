@@ -2,13 +2,13 @@
 
 #' model_idat_data
 #'
-#' Produces a rough model to simualte IDAT data from a reference IDAT file. 
-#' Can be used to tast pipelines or vignettes for the package. Simulated idat 
-#' files can be produced with the returned data object and calling: 
-#' 
+#' Produces a rough model to simualte IDAT data from a reference IDAT file.
+#' Can be used to tast pipelines or vignettes for the package. Simulated idat
+#' files can be produced with the returned data object and calling:
+#'
 #' simulate_idat_data().
-#' 
-#' Data is stored as a simple ecfd, later versions should switch to a smoothed 
+#'
+#' Data is stored as a simple ecfd, later versions should switch to a smoothed
 #' pdf of the flourescent values.
 #'
 #' @param ref_idat_path full path to idat file, including prefix of idat.
@@ -18,12 +18,12 @@
 #'    sigset_template: a dataframe that is copied from the reference idat data,
 #'       with all the numerical data cleared.
 #'    sigset_mask: a boolean mask specifying what rows of data columns were NA.
-#'    sigset_ecdfs: a set of empirical distribution functions for each data 
+#'    sigset_ecdfs: a set of empirical distribution functions for each data
 #'       column.
-#' 
-model_idat_data <- function(ref_idat_path, model_save_path = NA, data_colnames = 
+#' @export
+model_idat_data <- function(ref_idat_path, model_save_path = NA, data_colnames =
                               c("MG", "MR", "UG", "UR")) {
-  
+
 # Load IDAT data
 ref_sigset <- sesame::readIDATpair(ref_idat_path, platform = "TDHIA",
   manifest = tdhia::manifest_v1A2, controls = NULL, verbose = FALSE)
@@ -43,7 +43,7 @@ sigset_model$sigset_mask <- as.data.frame(
 # Create an empirical distribution function for each column
 sigset_ecdfs = list()
 for (n in seq_along(data_colnames)) {
-  sigset_model$sigset_values[[data_colnames[n]]] = 
+  sigset_model$sigset_values[[data_colnames[n]]] =
     sort(na.omit(ref_sigset[,data_colnames[n]]))
 }
 

@@ -13,8 +13,8 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE, root.dir = here::i_am("README.md"), 
                       collapse = TRUE, comment = "#>")
 
-here::i_am("README.md")
-devtools::load_all()
+# here::i_am("README.md")
+# devtools::load_all()
 ```
 
 Here we will demonstrate how to process IDAT files from the True Diagnostic Human
@@ -26,7 +26,7 @@ We begin by first generating simulated data. Sesame imports IDAT files into a Si
 
 
 ```{r}
-ss <- simulate_idat_data(10)
+ss <- tdhia::simulate_idat_data(10)
 ```
 
 We can now load this data into tdhia and calculate the beta values and signal 
@@ -42,7 +42,7 @@ detection p-values. This is returned in a named list, with the following fields:
 # 1) Load IDATS and convert to probe beta matrix
 # Output: rows: probe_id     x     columns: patient
 probe_beta <-
-    load_idata_to_probes(idat_dir_paths = ss, multicore = 2, 
+    tdhia::load_idata_to_probes(idat_dir_paths = ss, multicore = 2, 
                          quantile_norm = FALSE, db_flag = FALSE)
 ```
   
@@ -61,7 +61,7 @@ returns a named list with the same format as *probe_beta* above.
 # 2) Filter probes that are not mapped and discard poor signal
 # Output: rows: probe_id     x     columns: patient
 filt_probe_beta <-
-  filter_probes(probe_beta = probe_beta, discard_unmapped_probes = TRUE ,
+  tdhia::filter_probes(probe_beta = probe_beta, discard_unmapped_probes = TRUE ,
                 max_sig_pval = 0.2, set_failed_betas_na = FALSE, 
                 max_probe_fail_rate = 0.25,
                 discard_failed_probes = TRUE, db_flag = TRUE)
@@ -87,7 +87,7 @@ Probe beta values that belong to the same cpg site for a given patient are avera
 ```{r}
 #3  Convert probe beta matrix to a cpg beta matrix
 # Output: rows: cpg_id     x     columns: patient
-cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE, 
+cpg_beta <- tdhia::convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE, 
                                    db_flag = TRUE, smooth_adj_cpgs = TRUE)
 ```
 
@@ -113,7 +113,7 @@ Probe beta values that belong to the same cpg site for a given patient are avera
 
 #4  Convert probe beta matrix to an icr beta matrix
 # Output: rows: icr_id     x     columns: patient
-icr_beta <- convert_cpgs_to_icrs(cpg_beta, max_icr_fail_rate = 0.2)
+icr_beta <- tdhia::convert_cpgs_to_icrs(cpg_beta, max_icr_fail_rate = 0.2)
 
 ```
 

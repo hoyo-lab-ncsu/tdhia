@@ -45,7 +45,7 @@
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
 #'  - platform: string that describes platform for methylation array
 #'  - manifest: dataframe of the manifest file used for SeSame processing
-#'
+#' @export
 load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
            mft = NULL, multicore = TRUE, sesame_prep = "0CDB",
@@ -134,6 +134,7 @@ load_idata_to_probes <-
   } else {
     default_ncores <- max(c(parallel::detectCores()-1,1))
   }
+
   if (.Platform$OS.type == "windows" && multicore) {
     multicore_arg <- BiocParallel::SnowParam(default_ncores)
   } else if (multicore) {
@@ -204,13 +205,6 @@ load_idata_to_probes <-
     colnames(norm_probe_df) <- colnames(probe_beta_df)
     probe_beta_df <- norm_probe_df
   }
-
-  # # Add probe_id as a first column and remove row names
-  # probe_beta_df<-cbind(data.frame(Probe_ID = rownames(probe_beta_df)),probe_beta_df)
-  # rownames(probe_beta_df) <- NULL
-  # probe_pval_df<-cbind(data.frame(Probe_ID = rownames(probe_pval_df)),probe_pval_df)
-  # rownames(probe_pval_df) <- NULL
-
 
 
   probe_beta <- list(probe_beta_df = probe_beta_df,

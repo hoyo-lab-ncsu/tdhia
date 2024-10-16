@@ -10,7 +10,7 @@
 #' @param ... arguments to carry over to parLapply and mclapply
 #'
 #' @return a list of the same length as X and named by X
-#'
+#' @export
 parallel_lapply <- function(X, FUN, mc.cores, ...) {
 
 

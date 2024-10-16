@@ -11,6 +11,7 @@
 #' statistically significant (adjust p-value)
 #' @param print_confounders boolean, when true, will print out statistical
 #' summary of confoudner variables
+#' @export
 summarize_study <- function(dfs, varnames = NULL, max_p_val = 0.05,
                             print_sites = TRUE, print_confounders = FALSE) {
   cat(sprintf("Formula: %s \n", dfs$example_formula))

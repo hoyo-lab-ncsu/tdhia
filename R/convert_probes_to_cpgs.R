@@ -35,7 +35,7 @@
 #'  - manifest: dataframe of the manifest file used for SeSame processing
 #'  - cpg_n_probes: number of probes for each cpg site.
 #'
-#'
+#' @export
 convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
                                    discard_unmapped_cpgs = TRUE,
                                    discard_non_icr_cpgs = TRUE,
@@ -98,14 +98,14 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
     discard_non_icr <- cpg_beta_df %>%
       tibble::rownames_to_column("CpG_id") %>%
       dplyr::left_join(y = dplyr::select(icr_mapping, c("CpG_id", "ICR_id")),
-                              by = "CpG_id",unmatched = "drop",
-                multiple = "first") %>%
+                       by = "CpG_id",unmatched = "drop",
+                       multiple = "first") %>%
       dplyr::pull("ICR_id") %>% base::is.na()
     # Remove non-icr cpgs
     cpg_beta_df <- cpg_beta_df[!discard_non_icr,]
 
     cat(sprintf("CpG filter: discarded %.0f%% of CpG sites (%i/ %i) because they
-      do not map to an ICR. %i CpG sites remain.\n",
+    do not map to an ICR. %i CpG sites remain.\n",
                 100*sum(discard_non_icr)/nrow(cpg_beta_df), sum(discard_non_icr),
                 nrow(cpg_beta_df), nrow(cpg_beta_df)))
   }
@@ -146,7 +146,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   if (sort_cpgs) {
     cat("Cpg Filter: Sorting CpGs by ICR and genomic index.\n")
     cpg_beta_df <-  dplyr::select(cpg_sort_fun(cpg_beta_df),-c("CpG_id", "ICR_id",
-                                                          "CpG_start"))
+                                                               "CpG_start"))
   }
 
 
@@ -164,23 +164,25 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
     cl <- parallel::makeCluster(n.cores)
     doParallel::registerDoParallel(cl)
 
+
     # Grab all cpgs for each ICR, do column wise smoothing
+    n=NULL # Prevent a devtools::check() warning
     sm_cpg_df <- foreach::foreach(n = seq_along(unq_icr_ids), .combine = 'rbind',
                                   .packages = c("dplyr","zoo")) %dopar% {
-      ix <- unq_icr_ids[n]==cpg_mappings$ICR_id
-      cpg_sub <- cpg_mappings[unq_icr_ids[n]==cpg_mappings$ICR_id,] %>%
-        dplyr::select(-c("CpG_id", "ICR_id", "CpG_start"))
-      rownames(cpg_sub)
+                                    ix <- unq_icr_ids[n]==cpg_mappings$ICR_id
+                                    cpg_sub <- cpg_mappings[unq_icr_ids[n]==cpg_mappings$ICR_id,] %>%
+                                      dplyr::select(-c("CpG_id", "ICR_id", "CpG_start"))
+                                    rownames(cpg_sub)
 
-      sm_cpg_sub <-
-        zoo::rollapply(cpg_sub, width=3, FUN = function(x) mean(x, na.rm = TRUE),
-                       by = 1, by.column = TRUE, fill = NA, align ="center",
-                       partial = TRUE)
-      rownames(sm_cpg_sub)  <- cpg_mappings$CpG_id[unq_icr_ids[n] == cpg_mappings$ICR_id]
-      sm_cpg_sub <- as.data.frame(sm_cpg_sub)
+                                    sm_cpg_sub <-
+                                      zoo::rollapply(cpg_sub, width=3, FUN = function(x) mean(x, na.rm = TRUE),
+                                                     by = 1, by.column = TRUE, fill = NA, align ="center",
+                                                     partial = TRUE)
+                                    rownames(sm_cpg_sub)  <- cpg_mappings$CpG_id[unq_icr_ids[n] == cpg_mappings$ICR_id]
+                                    sm_cpg_sub <- as.data.frame(sm_cpg_sub)
 
-      sm_cpg_sub
-    }
+                                    sm_cpg_sub
+                                  }
     #stop cluster
     parallel::stopCluster(cl)
 

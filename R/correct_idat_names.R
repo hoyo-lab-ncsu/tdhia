@@ -13,6 +13,7 @@
 #' checked, otherwise a warning is raised.
 #'
 #' @return results with fitted coefficients from the glm, sorted by p-value
+#' @export
 correct_idat_names <- function (idat_dir_path, rename = TRUE, failcheck_error = TRUE) {
 
   if (length(idat_dir_path)==1) {

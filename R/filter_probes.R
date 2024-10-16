@@ -31,6 +31,7 @@
 #' specified by idat_remappings).
 #'
 #' @importFrom rlang .data
+#' @export
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                           max_sig_pval = 0.2, set_failed_betas_na = TRUE,
                           max_probe_fail_rate = 0.5, min_probe_score = 0.2,

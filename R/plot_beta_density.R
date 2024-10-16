@@ -30,6 +30,7 @@
 #'                                  show_legend = TRUE,
 #'                                  legend_position = "right")
 #' print(density_plot)
+#' @export
 plot_beta_density <- function(subdata, remove_na = TRUE, show_legend = TRUE, legend_position = "right") {
 
     # Melt the data frame

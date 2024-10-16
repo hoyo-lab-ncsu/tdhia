@@ -23,7 +23,7 @@
 #' are either (1) the basenames of the idat files or (2) some other mapping
 #' specified when the data was loaded in \code{load_idat}.
 #'
-#'
+#' @export
 convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
                                  max_icr_fail_rate = 0.20, quantile_norm = FALSE,
                                  db_flag = FALSE) {
