@@ -24,7 +24,7 @@ Imprintome Array (TDHIA) with the tdhia package.
 We begin by first generating simulated data. Sesame imports IDAT files into a SigSet data object. We are going to artificially generate SigSet files. Let's do a dataset of 10 SigSets (IDATS).
 
 
-```{r}
+```{r simulate, include = FALSE}
 ss <- tdhia::simulate_idat_data(10)
 ```
 
@@ -37,16 +37,14 @@ detection p-values. This is returned in a named list, with the following fields:
   
 
 
-```{r,  cache = TRUE}
-# 1) Load IDATS and convert to probe beta matrix
-# Output: rows: probe_id     x     columns: patient
+```{r probes, include = FALSE}
 probe_beta <-
-    tdhia::load_idata_to_probes(idat_dir_paths = ss, multicore = 2, 
-                         quantile_norm = FALSE, db_flag = FALSE)
+    tdhia::load_idata_to_probes(idat_dir_paths = ss, n.cores = 1, 
+                         quantile_norm = FALSE, db_flag = TRUE)
 ```
   
 You can access the probe beta matrix with the **probe_beta_df** field.
-```{r,  cache = TRUE}
+```{r visualize, include = FALSE}
 # Access probe beta matrix
 head(probe_beta$probe_beta_df)
 ```
@@ -56,18 +54,18 @@ We can filter out low quality probes with the filt_probe_beta(). This function
 returns a named list with the same format as *probe_beta* above.  
 
 
-```{r}
+```{r filter, include = FALSE}
 # 2) Filter probes that are not mapped and discard poor signal
 # Output: rows: probe_id     x     columns: patient
 filt_probe_beta <-
   tdhia::filter_probes(probe_beta = probe_beta, discard_unmapped_probes = TRUE ,
                 max_sig_pval = 0.2, set_failed_betas_na = FALSE, 
                 max_probe_fail_rate = 0.25,
-                discard_failed_probes = TRUE, db_flag = TRUE)
+                discard_failed_probes = TRUE, db_flag = FALSE)
 ```
 
 You can access the filtered probe beta matrix with the **probe_beta_df** field.
-```{r,  cache = TRUE}
+```{r filter_visualize, include = FALSE}
 # Access filtered probe beta matrix
 head(filt_probe_beta$probe_beta_df)
 ```
@@ -83,15 +81,15 @@ matrix, stored in a named list of the form:
   
 Probe beta values that belong to the same cpg site for a given patient are averaged.  
 
-```{r}
+```{r cpg, include = FALSE}
 #3  Convert probe beta matrix to a cpg beta matrix
 # Output: rows: cpg_id     x     columns: patient
 cpg_beta <- tdhia::convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE, 
-                                   db_flag = TRUE, smooth_adj_cpgs = TRUE)
+                                   db_flag = TRUE, smooth_adj_cpgs = TRUE,n.cores=1)
 ```
 
 You can access the filtered probe beta matrix with the **cpg_beta_df** field.
-```{r,  cache = TRUE}
+```{r, include = FALSE}
 # Access filtered probe beta matrix
 head(cpg_beta$cpg_beta_df)
 ```
@@ -108,7 +106,7 @@ returned in a named list of the form:
 Probe beta values that belong to the same cpg site for a given patient are averaged.  
 
 
-```{r}
+```{r icr, include = FALSE}
 
 #4  Convert probe beta matrix to an icr beta matrix
 # Output: rows: icr_id     x     columns: patient
@@ -117,7 +115,7 @@ icr_beta <- tdhia::convert_cpgs_to_icrs(cpg_beta, max_icr_fail_rate = 0.2)
 ```
 
 You can access the filtered probe beta matrix with the **probe_beta_df** field.
-```{r,  cache = TRUE}
+```{r,  include = FALSE}
 # Access filtered probe beta matrix
 head(icr_beta$icr_beta_df)
 ```

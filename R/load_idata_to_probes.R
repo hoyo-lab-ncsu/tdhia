@@ -19,7 +19,7 @@
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
-#' @param multicore boolean flag or integer, when true the max number of cores minus 1 is
+#' @param n.cores boolean flag or integer, when true the max number of cores minus 1 is
 #' used for the current system, FALSE sets to single core operation, any integer
 #' greater than zero sets to the specified number of cores.
 #' @param sesame_prep string of number/ letters to control sesame normalization
@@ -52,7 +52,7 @@
 #' @export
 load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
-           mft = NULL, multicore = TRUE, sesame_prep = "0CDB",
+           mft = NULL, n.cores = 1, sesame_prep = "0CDB",
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
            db_flag = FALSE, enforce_req_idats = FALSE, enforce_idat_names = TRUE) {
     # Load manifest file if platform is true diagnostic imprintome array
@@ -135,28 +135,30 @@ load_idata_to_probes <-
     sesameData::sesameDataCache()
     cat("Done.\n")
 
-    # Set Multicore parameter depending on operating system
-    if (multicore > 1) {
-      default_ncores <- multicore
-    } else {
-      default_ncores <- max(c(parallel::detectCores()-1,1))
+    # Set n.cores parameter depending on operating system
+    if (is.logical(n.cores) && n.cores) {
+      n.cores <- max(c(parallel::detectCores()-1,1))
     }
-    if (.Platform$OS.type == "windows" && multicore) {
-      multicore_arg <- BiocParallel::SnowParam(default_ncores)
-    } else if (multicore) {
-      multicore_arg <- BiocParallel::MulticoreParam(default_ncores,progressbar = TRUE)
-    } else {
-      multicore_arg = NULL
+
+    if (!n.cores || n.cores==1) {
+      core_params <- BiocParallel::SerialParam()
+    } else if (.Platform$OS.type == "windows") {
+      core_params <- BiocParallel::SnowParam(n.cores)
+    }  else {
+      core_params <- BiocParallel::MulticoreParam(n.cores, progressbar = TRUE)
     }
+
 
 
     # Load each of the IDAT file pairs, process with standard SeSame pipeline
     cat(sprintf("Processing %.0f IDAT Files...", length(unq_obs_idat_basenames)))
-    if (!is.null(multicore_arg)) {
-      cat(sprintf(" (Using %i/%i cores.)...", default_ncores, parallel::detectCores()))
+    if (!is.null(core_params)) {
+      cat(sprintf(" (Using %i/%i cores.)...", core_params$workers, parallel::detectCores()))
     }
 
-    idat.out <- process_IDATS(unq_obs_idat_basenames, platform, mft, multicore_arg)
+    idat.out <- process_IDATS(unq_obs_idat_basenames, platform = platform,
+                              mft = mft, core_params = core_params,
+                              db_flag = db_flag)
     probe_beta_matrix = idat.out$betas
     probe_pval_matrix = idat.out$pvals
 
@@ -224,20 +226,24 @@ load_idata_to_probes <-
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
-#' @param multicore_arg boolean flag, when true the max number of cores minus 1 is
+#' @param core_params boolean flag, when true the max number of cores minus 1 is
 #' used for the current system.
-#'
+#' @param db_flag todo
 #' @returns a named list with the following fields:
 #'  - betas: matrix of methylation beta values, probes x patients
 #'  - pvals: matrix of signal p-values, probes x patients
 #'
-process_IDATS <- function(unq_obs_idat_basenames, platform, mft, multicore_arg) {
+process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params, db_flag = FALSE) {
+
+  if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
+  # load(file = "process_IDATS.RData")
 
 
   if (is.character(unq_obs_idat_basenames)) {
     ss = BiocParallel::bplapply(
       unq_obs_idat_basenames, function(pfx) {
-        sesame::readIDATpair(pfx,  platform = "", manifest = mft)}, BPPARAM = multicore_arg)
+        sesame::readIDATpair(pfx,  platform = "", manifest = mft)},
+      BPPARAM = BiocParallel::SerialParam())
   } else {
     ss = unq_obs_idat_basenames
   }
@@ -247,13 +253,13 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, multicore_arg) 
       sdf =  sesame::noob(
         sdf = sesame::dyeBiasNL(
           sdf = sesame::inferInfiniumIChannel(ss))))},
-    BPPARAM = multicore_arg))
+    BPPARAM = BiocParallel::SerialParam()))
 
   pvals <- do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
     sesame::pOOBAH(return.pval = TRUE,
                    sdf =  sesame::dyeBiasNL(
                      sdf =  sesame::inferInfiniumIChannel(ss)))},
-    BPPARAM = multicore_arg))
+    BPPARAM = BiocParallel::SerialParam()))
 
   return(list(betas = betas, pvals = pvals))
 }

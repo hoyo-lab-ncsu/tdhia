@@ -4,7 +4,13 @@
 \alias{process_IDATS}
 \title{process_idats}
 \usage{
-process_IDATS(unq_obs_idat_basenames, platform, mft, multicore_arg)
+process_IDATS(
+  unq_obs_idat_basenames,
+  platform,
+  mft,
+  core_params,
+  db_flag = FALSE
+)
 }
 \arguments{
 \item{unq_obs_idat_basenames}{list of idat basenames, or list of imported
@@ -17,8 +23,10 @@ within the SeSame package with openSesame(). default: "TruDx_imprintome"}
 A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 See ?manifest_v1A2 for more info.}
 
-\item{multicore_arg}{boolean flag, when true the max number of cores minus 1 is
+\item{core_params}{boolean flag, when true the max number of cores minus 1 is
 used for the current system.}
+
+\item{db_flag}{todo}
 }
 \value{
 a named list with the following fields:

@@ -37,5 +37,6 @@ Imports:
 	methods
 Suggests: 
     knitr,
-    rmarkdown
+    rmarkdown,
+	here
 VignetteBuilder: knitr

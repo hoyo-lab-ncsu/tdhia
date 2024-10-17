@@ -6,7 +6,7 @@
 #'
 #' @param idat_dir_paths a vector of strings specifying full directory paths
 #' where IDAT files are located.
-#' @param multicore boolean, when true uses multicore processing in sesame.
+#' @param n.cores boolean, when true uses n.cores processing in sesame.
 #' @param idat_basenames rename idat_basenames to a patient/ study id
 #' @param sesame_prep sesame prep
 #' @param discard_unmapped_probes boolean, when true, probe_ids
@@ -27,7 +27,7 @@
 #'
 #' @return named list with all of the output from each of the pipeline steps.
 #'
-tdhia_pipeline <- function(idat_dir_paths = NULL, multicore = TRUE,
+tdhia_pipeline <- function(idat_dir_paths = NULL, n.cores = TRUE,
                            idat_basenames = NULL, sesame_prep = "0CDB",
                            discard_unmapped_probes = TRUE , max_sig_pval = 0.2,
                            set_failed_betas_na = FALSE, max_probe_fail_rate = 0.25,
@@ -41,7 +41,7 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, multicore = TRUE,
   # 1) Load IDATS and convert to probe beta matrix
   # Output: probe_id(row) x patient(col)
     probe_beta <-
-      load_idata_to_probes(idat_dir_paths = idat_dir_paths, multicore = multicore,
+      load_idata_to_probes(idat_dir_paths = idat_dir_paths, n.cores = n.cores,
                            idat_basenames = idat_basenames,
                            quantile_norm = FALSE, sesame_prep = sesame_prep)
 
