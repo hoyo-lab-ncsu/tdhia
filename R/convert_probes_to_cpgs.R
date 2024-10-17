@@ -23,7 +23,7 @@
 #' @param sort_cpgs boolean when true sorts cpgs by ICR id and then genomic
 #'  position.
 #' @param db_flag boolean when true export workspace to disk for debugging.
-#' @param n.cores number of cores for parallel processing.
+#' @param multicore number of cores for parallel processing.
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #'
@@ -41,7 +41,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
                                    discard_non_icr_cpgs = TRUE,
                                    smooth_adj_cpgs = FALSE,
                                    sort_cpgs = FALSE, db_flag = FALSE,
-                                   n.cores = max(c(parallel::detectCores()-2,1))) {
+                                   multicore = max(c(parallel::detectCores()-2,1))) {
   # Get manifest data
   mft = probe_beta$manifest
   icr_mapping = tdhia::mapping_cpg_icr_ids
@@ -161,7 +161,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
     unq_icr_ids <- unique(cpg_mappings$ICR_id)
 
     # Parallel processing
-    cl <- parallel::makeCluster(n.cores)
+    cl <- parallel::makeCluster(multicore)
     doParallel::registerDoParallel(cl)
 
 

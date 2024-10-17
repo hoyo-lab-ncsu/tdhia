@@ -6,7 +6,7 @@
 \usage{
 tdhia_pipeline(
   idat_dir_paths = NULL,
-  n.cores = TRUE,
+  multicore = TRUE,
   idat_basenames = NULL,
   sesame_prep = "0CDB",
   discard_unmapped_probes = TRUE,
@@ -23,7 +23,7 @@ tdhia_pipeline(
 \item{idat_dir_paths}{a vector of strings specifying full directory paths
 where IDAT files are located.}
 
-\item{n.cores}{boolean, when true uses n.cores processing in sesame.}
+\item{multicore}{boolean, when true uses n.cores processing in sesame.}
 
 \item{idat_basenames}{rename idat_basenames to a patient/ study id}
 

@@ -19,7 +19,7 @@
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
-#' @param n.cores boolean flag or integer, when true the max number of cores minus 1 is
+#' @param multicore boolean flag or integer, when true the max number of cores minus 1 is
 #' used for the current system, FALSE sets to single core operation, any integer
 #' greater than zero sets to the specified number of cores.
 #' @param sesame_prep string of number/ letters to control sesame normalization
@@ -52,7 +52,7 @@
 #' @export
 load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
-           mft = NULL, n.cores = 1, sesame_prep = "0CDB",
+           mft = NULL, multicore = 1, sesame_prep = "0CDB",
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
            db_flag = FALSE, enforce_req_idats = FALSE, enforce_idat_names = TRUE) {
     # Load manifest file if platform is true diagnostic imprintome array
@@ -135,17 +135,17 @@ load_idata_to_probes <-
     sesameData::sesameDataCache()
     cat("Done.\n")
 
-    # Set n.cores parameter depending on operating system
-    if (is.logical(n.cores) && n.cores) {
-      n.cores <- max(c(parallel::detectCores()-1,1))
+    # Set multicore parameter depending on operating system
+    if (is.logical(multicore) && multicore) {
+      multicore <- max(c(parallel::detectCores()-1,1))
     }
 
-    if (!n.cores || n.cores==1) {
+    if (!multicore || multicore==1) {
       core_params <- BiocParallel::SerialParam()
     } else if (.Platform$OS.type == "windows") {
-      core_params <- BiocParallel::SnowParam(n.cores)
+      core_params <- BiocParallel::SnowParam(multicore)
     }  else {
-      core_params <- BiocParallel::MulticoreParam(n.cores, progressbar = TRUE)
+      core_params <- BiocParallel::MulticoreParam(multicore, progressbar = TRUE)
     }
 
 

@@ -12,7 +12,7 @@ convert_probes_to_cpgs(
   smooth_adj_cpgs = FALSE,
   sort_cpgs = FALSE,
   db_flag = FALSE,
-  n.cores = max(c(parallel::detectCores() - 2, 1))
+  multicore = max(c(parallel::detectCores() - 2, 1))
 )
 }
 \arguments{
@@ -40,7 +40,7 @@ position.}
 
 \item{db_flag}{boolean when true export workspace to disk for debugging.}
 
-\item{n.cores}{number of cores for parallel processing.}
+\item{multicore}{number of cores for parallel processing.}
 }
 \value{
 a dataframe containing beta values where rows are cpg sites and columns
