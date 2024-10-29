@@ -56,7 +56,7 @@ load_idata_to_probes <-
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
            db_flag = FALSE, enforce_req_idats = FALSE, enforce_idat_names = TRUE) {
     # Load manifest file if platform is true diagnostic imprintome array
-    if (base::is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2}
+    if (base::is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2_design_scores}
 
     if(db_flag) save(list = ls(all.names = TRUE), file = "load_idata_to_probes.RData")
     # load(file = "load_idata_to_probes.RData")

@@ -124,3 +124,21 @@
 "sigset_model"
 
 
+
+
+
+#' Manifest V1A2, probe design scores included
+#'
+#' manifest table for custom imprintome array with illumina design scores added.
+#'
+#' @format none
+#' \describe{
+#'   \item{sigset_template}{   }
+#'   \item{sigset_mask}{   }
+#'   \item{sigset_values}{   }
+#' }
+#' @source none
+"manifest_v1A2_design_scores"
+
+
+

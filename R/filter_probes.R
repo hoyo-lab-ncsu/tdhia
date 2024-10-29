@@ -21,7 +21,9 @@
 #' are set to NA.
 #' @param discard_failed_probes boolean flag, when TRUE any probes that have NA
 #' values across all samples are discarded (default = TRUE)
-#' @param min_probe_score discard probes below this design score threshold.
+#' @param min_design_score discard probes below this design score threshold.
+#' Default: NA (don't discard any probes by design score). Design scores vary
+#' from 0-1, with a higher value being a better designed probe.
 #' @param verbose boolean flag, when TRUE prints the results of each filtering
 #' step (default = TRUE).
 #' @param db_flag boolean when true export workspace to disk for debugging.
@@ -34,9 +36,8 @@
 #' @export
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                           max_sig_pval = 0.2, set_failed_betas_na = TRUE,
-                          max_probe_fail_rate = 0.5, min_probe_score = 0.2,
-                          discard_failed_probes = TRUE, verbose = TRUE,
-                          db_flag = FALSE) {
+                          max_probe_fail_rate = 0.5, discard_failed_probes = TRUE,
+                          min_design_score = NA, verbose = TRUE, db_flag = FALSE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")}
   # load(file = "filter_probes_debug.RData")
 
@@ -47,14 +48,14 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   if (!is.null(probe_beta$manifest)) {
   cat("Loading manifest from probe_beta data\n");  mft = probe_beta$manifest
   } else {
-  cat("Loading manifest from internal data\n"); mft = tdhia::manifest_v1A2
+  cat("Loading manifest from internal data\n"); mft = tdhia::manifest_v1A2_design_scores
   }
   verbosecat(sprintf("Probe manifest: manifest file has a total of %.0f probes.\n\n",
               nrow(mft)))
 
 
-  # Discard probe_ids(s) that do not map uniquely to genomic location and CpG
-  #----------------------------------------------------------------------------
+  # Discard probe_ids(s) that do not map uniquely to genomic location and CpG ####
+  #_____________________________________________________________________________
   #   (Defined in manifest file where MAPINFO == (0 or NA))
   #   Data is copied over to filter_* probe_beta and probe_ pval matrices.
   if (discard_unmapped_probes) {
@@ -63,7 +64,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                                  function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Probe_ID)[1]]))
 
     # Find probes that target a cg site
-    cpg_ids <- grepl("^cg",rownames(probe_beta$probe_beta_df))
+    cpg_ids <- grepl("^cg[0-9]",rownames(probe_beta$probe_beta_df))
     # For reference probe_id stars with either:
     # ctl: control, cg: CPG, ch: CHG, mu: multi-unique,
     # rp: repetitive element, or rs: SNP probe
@@ -87,8 +88,8 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   }
 
 
-  # Set individual probe_beta values to NA if the p-value is above max threshold
-  #-----------------------------------------------------------------------------
+  # Set individual probe_beta values to NA if the p-value is above max threshold ####
+  #_____________________________________________________________________________
   sig_pval_pass <- filt_probe_pval_df < max_sig_pval
   if ((!is.null(max_sig_pval)) && set_failed_betas_na) {
     filt_probe_beta_df[!sig_pval_pass] <- NA
@@ -114,8 +115,8 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #      xlab = "Fraction passed probes")
 
 
-  # Set entire row of probe measures to NA if not enough pass p-value check above
-  #-----------------------------------------------------------------------------
+  # Set entire row of probe measures to NA if not enough pass p-value check ####
+  #_____________________________________________________________________________
   if(!is.null(max_probe_fail_rate)) {
     # Binary index of rows, TRUE means row failed QC
     probe_fail_rate_df <- data.frame(cpg_id = rownames(filt_probe_beta_df),
@@ -136,81 +137,61 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #      xlab = "Fraction passed probes")
 
 
-  # Discard probes/rows where all samples have a NA for the beta value
-  #-----------------------------------------------------------------------------
+  # Discard probes/rows where all samples have a NA for the beta value   ######
+  #_____________________________________________________________________________
   if(discard_failed_probes) {
     # Binary index of rows, TRUE means row failed QC
-    row_all_na_ind <- rowSums(is.na(filt_probe_beta_df)) == ncol(filt_probe_beta_df)
+    na_keep_ind <- rowSums(is.na(filt_probe_beta_df)) != ncol(filt_probe_beta_df)
     # Set rows to NA
-    filt_probe_beta_df2 <- filt_probe_beta_df[!row_all_na_ind,]
-    filt_probe_pval_df2 <- filt_probe_pval_df[!row_all_na_ind,]
-  } else {
-    filt_probe_beta_df2 <- filt_probe_beta_df
-    filt_probe_pval_df2 <- filt_probe_pval_df
-  }
-  verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) because all measurements are now NA.
+    filt_probe_beta_df <- filt_probe_beta_df[na_keep_ind, ]
+    filt_probe_pval_df <- filt_probe_pval_df[na_keep_ind, ]
+    verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) because all measurements are now NA.
               %i probes now remain. \n\n",
-      100*(nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2))/nrow(filt_probe_beta_df),
-      nrow(filt_probe_beta_df) - nrow(filt_probe_beta_df2),
-      nrow(filt_probe_beta_df),
-      nrow(filt_probe_beta_df2)))
+                       100*sum(na_keep_ind==FALSE)/length(na_keep_ind),
+                       sum(na_keep_ind==FALSE),
+                       length(na_keep_ind),
+                       sum(na_keep_ind==TRUE)))
+  }
 
 
-  # Discard probes with low design scores
-  # df_design_score <- rbind(tdhia::design_scores$Pass_Score_Threshold,
-  #                          tdhia::design_scores$Fail_Score_Threshold)
-  # df_design_score <- tdhia::design_scores$Pass_Score_Threshold
-  #
-  # temp_filt_probe <- filt_probe_beta_df2 %>% tibble::rownames_to_column(var = "probe_id") %>%
-  #   dplyr::mutate(probe_id = substr(.data$probe_id, 1, nchar(.data$probe_id)-1)) %>%
-  # base::merge(y=dplyr::select(df_design_score, c("Assay_Design_Id", "Design_Score")),
-  #       by.x = "probe_id", by.y = "Assay_Design_Id", all.x= TRUE, all.y= FALSE,
-  #       no.dups = TRUE, sort = FALSE)
-  #
-  #
-  # temp_filt_probe <- filt_probe_beta_df2 %>% tibble::rownames_to_column(var = "probe_id") %>%
-  #   dplyr::left_join(y=dplyr::select(df_design_score, c("Assay_Design_Id", "Design_Score")),
-  #         by =  dplyr::join_by(probe_id==Assay_Design_Id),
-  #         keep = FALSE, na_matches = "never", #unmatched = "error",
-  #         relationship = "one-to-one")
 
+  # Filter probes with low design scores              ##########################
+  #_____________________________________________________________________________
 
-  # # Get design score for the remaining probes
-  # a <-  filt_probe_beta_df2 %>% rownames_to_column(var = "probe_id") %>% select("probe_id")
-  # a$probe_id <- substr(a$probe_id, 1, nchar(a$probe_id)-1)
-  # b <- select(df_design_score, c("Assay_Design_Id", "Design_Score"))
-  # c <- intersect(a$probe_id,b$Assay_Design_Id)
-  #
-  #
-  # # get design score for all probes
-  # a <-  tdhia::manifest_v1A2 %>% select("Probe_ID")
-  # a$probe_id <- substr(a$Probe_ID, 1, nchar(a$Probe_ID)-1)
-  # b <- select(df_design_score, c("Assay_Design_Id", "Design_Score"))
-  # c <- intersect(a$probe_id,b$Assay_Design_Id)
+    design_score_df <- dplyr::left_join(x = data.frame(Probe_ID = rownames(filt_probe_beta_df)),
+                                 y = dplyr::select(mft, c("Probe_ID", "Design.Score")), by = "Probe_ID",
+                                 keep = FALSE, multiple = "first", na_matches = "never",
+                                 unmatched = "drop", relationship = "many-to-one")
+    design_score_keep_flag = design_score_df$Design.Score > min_design_score
 
+  if (!is.na(min_design_score)) {
+    filt_probe_beta_df <- filt_probe_beta_df[design_score_keep_flag, ]
+    filt_probe_pval_df <- filt_probe_pval_df[design_score_keep_flag, ]
+    design_score_df <- design_score_df[design_score_keep_flag, ]
 
-  # keep_index <- temp_filt_probe$Design_Score >= min_probe_score
-  # filt_probe_beta_df3 <- filt_probe_beta_df2[keep_index,]
-  # filt_probe_pval_df3 <- filt_probe_pval_df2[keep_index,]
-  # filt_design_scores3 <- temp_filt_probe$Design_Score[keep_index]
-  # verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) b/c of
-  #                    low design score < %.2f.\n\n",
-  #                    100*sum(!keep_index)/nrow(filt_probe_beta_df3),
-  #                    sum(!keep_index), nrow(filt_probe_beta_df3),
-  #                    nrow(filt_probe_beta_df3)))
-
-  # df_design_score$Assay_Design_Id
-
+    verbosecat(sprintf("Probe filter: discarding %.2f%% probes ( %i/ %i) because of low design score.
+              %i probes now remain. \n\n",
+                       100*sum(design_score_keep_flag==FALSE)/length(design_score_keep_flag),
+                       sum(design_score_keep_flag==FALSE),
+                       length(design_score_keep_flag),
+                       sum(design_score_keep_flag==TRUE)))
+  }
 
   # Report how many missing measurements at end of all filtering steps.
-  verbosecat(sprintf("Probe filter: After all pruning and filtering, %.0f%% probes measurments ( %i/ %i) are now NA.\n\n",
-                     100*sum(is.na(filt_probe_beta_df2)) / prod(dim(filt_probe_beta_df2)),
-                     sum(is.na(filt_probe_beta_df2)),
-                     prod(dim(filt_probe_beta_df2))))
+  verbosecat(sprintf("Probe filter: After all filtering, %.0f%% probes measurments ( %i/ %i) are now NA.\n\n",
+                     100*sum(is.na(filt_probe_beta_df)) / prod(dim(filt_probe_beta_df)),
+                     sum(is.na(filt_probe_beta_df)),
+                     prod(dim(filt_probe_beta_df))))
 
- probe_beta <- list(probe_beta_df = filt_probe_beta_df2,
-                    probe_pval_df = filt_probe_pval_df2,
-                    # design_scores = filt_design_scores3,
+  # Report how many missing measurements at end of all filtering steps.
+  verbosecat(sprintf("Probe filter: After all filtering, %.0f%% of probes ( %i/ %i) remain.\n\n",
+                     100*nrow(filt_probe_beta_df) / nrow(probe_beta$probe_beta_df),
+                     nrow(filt_probe_beta_df),
+                     nrow(probe_beta$probe_beta_df)))
+
+ probe_beta <- list(probe_beta_df = filt_probe_beta_df,
+                    probe_pval_df = filt_probe_pval_df,
+                    design_scores = design_score_df,
                     platform = probe_beta$platform,
                     manifest = probe_beta$manifest,
                     probe_fail_rate_df = probe_fail_rate_df

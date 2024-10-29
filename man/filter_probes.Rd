@@ -10,8 +10,8 @@ filter_probes(
   max_sig_pval = 0.2,
   set_failed_betas_na = TRUE,
   max_probe_fail_rate = 0.5,
-  min_probe_score = 0.2,
   discard_failed_probes = TRUE,
+  min_design_score = NA,
   verbose = TRUE,
   db_flag = FALSE
 )
@@ -37,10 +37,12 @@ max_sig_pval will be set to NA. When false, the beta value is left as is.}
 threshold above this proportion of the samples, all measurements from this probe
 are set to NA.}
 
-\item{min_probe_score}{discard probes below this design score threshold.}
-
 \item{discard_failed_probes}{boolean flag, when TRUE any probes that have NA
 values across all samples are discarded (default = TRUE)}
+
+\item{min_design_score}{discard probes below this design score threshold.
+Default: NA (don't discard any probes by design score). Design scores vary
+from 0-1, with a higher value being a better designed probe.}
 
 \item{verbose}{boolean flag, when TRUE prints the results of each filtering
 step (default = TRUE).}

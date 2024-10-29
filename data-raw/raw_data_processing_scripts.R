@@ -2,7 +2,7 @@
 
 
 # Set here path
-here::here("README.md")
+here::i_am("README.md")
 
 # Import true diagnostic imprintome designs
 design_scores = list()
@@ -11,6 +11,5 @@ design_scores$Pass_Score_Threshold <- read.csv(here::here("data-raw", "TruDx_All
 design_scores$Fail_Score_Threshold <- read.csv(here::here("data-raw", "TruDx_AllDesigns_Fail_Score_Threshold.csv"))
 design_scores$Failed_Designs <- read.csv(here::here("data-raw", "TruDx_AllDesigns_Failed_Designs.csv"))
 
-usethis::use_data(design_scores)
-
-save(design_scores, file = "design_scores.rda")
+# usethis::use_data(design_scores)
+# save(design_scores, file = "design_scores.rda")
