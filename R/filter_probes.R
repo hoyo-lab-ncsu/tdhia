@@ -204,3 +204,28 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 
 
 
+
+#' pbates
+#'
+#' Cumulative distribution function for the Bates distribution, which is the mean
+#' of n observations sampled from a uniform distribution between \[0,1]. Uses a
+#' simple Monte Carlo approach to model the null distribution. This can be used
+#' to calculate a new signal detection p-value across replicate probes that are
+#' found in the imprintome array. The random variable would be the mean p-value
+#' from replicate probes.
+#'
+#' @param obs_x_bar vector of observed means from a series of samples
+#' @param n number of observations per sample
+#' @param n_sims number of simulaations
+#'
+#' @export
+pbates = function(obs_x_bar, n, n_sims = 1e7) {
+
+  x_bar_ecdf <- ecdf(Matrix::rowSums(matrix(dqrng::dqrunif(n_sims, 0, 1),
+                                            ncol = n))/n)
+  p_vals <- x_bar_ecdf(obs_x_bar)
+  return(p_vals)
+}
+
+
+
