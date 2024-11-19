@@ -254,12 +254,14 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params, db
         sdf = sesame::dyeBiasNL(
           sdf = sesame::inferInfiniumIChannel(ss))))},
     BPPARAM = BiocParallel::SerialParam()))
+  colnames(betas) <- basename(unq_obs_idat_basenames)
 
   pvals <- do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
     sesame::pOOBAH(return.pval = TRUE,
                    sdf =  sesame::dyeBiasNL(
                      sdf =  sesame::inferInfiniumIChannel(ss)))},
     BPPARAM = BiocParallel::SerialParam()))
+  colnames(pvals) <- basename(unq_obs_idat_basenames)
 
   return(list(betas = betas, pvals = pvals))
 }

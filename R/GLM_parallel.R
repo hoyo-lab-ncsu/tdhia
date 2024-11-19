@@ -145,10 +145,10 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
 
   # Record whether variable is confounder
   # Get number of columns for P[,Pind] and Pe
-  n_pred <- max(c(0, length(Pind))) + max(c(0, ncol(Pe)))
+  n_pred <- max(c(0, length(Pind)))
   df_res$Confounder <- 0
   if (n_pred > 1) {
-      df_res$Confounder[(n_pred +1) : nrow(df_res)] <- rep(1, nrow(df_res) - n_pred)
+      df_res$Confounder[(n_pred) : nrow(df_res)] <- rep(1, nrow(df_res) - n_pred)
   }
 
   # Slot for adjusted p-value, calculated outside of this function
