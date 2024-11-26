@@ -9,6 +9,7 @@ filter_probes(
   discard_unmapped_probes = TRUE,
   max_sig_pval = 0.2,
   set_failed_betas_na = TRUE,
+  mft = NULL,
   max_probe_fail_rate = 0.5,
   discard_failed_probes = TRUE,
   min_design_score = NA,
@@ -32,6 +33,9 @@ values higher than this max are set to NA.}
 
 \item{set_failed_betas_na}{boolean flag, when TRUE beta measurements with pval >
 max_sig_pval will be set to NA. When false, the beta value is left as is.}
+
+\item{mft}{manifest dataframe for the array if nto specified, the default is
+loaded.}
 
 \item{max_probe_fail_rate}{proportion value (0-1), if a probe fails the p-value
 threshold above this proportion of the samples, all measurements from this probe

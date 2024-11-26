@@ -2,6 +2,7 @@
 
 export(GLM_parallel)
 export(analyze_association)
+export(analyze_case_control)
 export(convert_cpgs_to_icrs)
 export(convert_probes_to_cpgs)
 export(copy_idat_files)

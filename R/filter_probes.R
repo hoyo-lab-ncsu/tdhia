@@ -27,6 +27,8 @@
 #' @param verbose boolean flag, when TRUE prints the results of each filtering
 #' step (default = TRUE).
 #' @param db_flag boolean when true export workspace to disk for debugging.
+#' @param mft manifest dataframe for the array if nto specified, the default is
+#' loaded.
 #'
 #' @returns a dataframe containing beta values where rows are probe_ids and columns
 #' are the sample_ids (basenames of the IDAT files or some other mapping
@@ -35,7 +37,7 @@
 #' @importFrom rlang .data
 #' @export
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
-                          max_sig_pval = 0.2, set_failed_betas_na = TRUE,
+                          max_sig_pval = 0.2, set_failed_betas_na = TRUE, mft = NULL,
                           max_probe_fail_rate = 0.5, discard_failed_probes = TRUE,
                           min_design_score = NA, verbose = TRUE, db_flag = FALSE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")}
@@ -45,9 +47,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   verbosecat <-function(x) if (verbose) cat(x)
 
   # Extract manifest dataframe
-  if (!is.null(probe_beta$manifest)) {
-  cat("Loading manifest from probe_beta data\n");  mft = probe_beta$manifest
-  } else {
+  if (is.null(mft)) {
   cat("Loading manifest from internal data\n"); mft = tdhia::manifest_v1A2_design_scores
   }
   verbosecat(sprintf("Probe manifest: manifest file has a total of %.0f probes.\n\n",
@@ -221,7 +221,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 #' @export
 pbates = function(obs_x_bar, n, n_sims = 1e7) {
 
-  x_bar_ecdf <- ecdf(Matrix::rowSums(matrix(dqrng::dqrunif(n_sims, 0, 1),
+  x_bar_ecdf <- stats::ecdf(Matrix::rowSums(matrix(dqrng::dqrunif(n_sims, 0, 1),
                                             ncol = n))/n)
   p_vals <- x_bar_ecdf(obs_x_bar)
   return(p_vals)
