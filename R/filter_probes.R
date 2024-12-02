@@ -207,25 +207,47 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 
 #' pbates
 #'
-#' Cumulative distribution function for the Bates distribution, which is the mean
+#'  Cumulative distribution function for the Bates distribution, which is the mean
 #' of n observations sampled from a uniform distribution between \[0,1]. Uses a
 #' simple Monte Carlo approach to model the null distribution. This can be used
 #' to calculate a new signal detection p-value across replicate probes that are
 #' found in the imprintome array. The random variable would be the mean p-value
-#' from replicate probes.
+#' from replicate probes.This function is most efficient if all mean-p-values are
+#' processed at once because it pre-catches the ECDF from a bates distribution
+#' with different sample sizes.
 #'
-#' @param obs_x_bar vector of observed means from a series of samples
-#' @param n number of observations per sample
+#' @param mean_p_vals vector of observed means from a series of samples
+#' @param samples vector of the number of observations per sample
 #' @param n_sims number of simulaations
 #'
 #' @export
-pbates = function(obs_x_bar, n, n_sims = 1e7) {
+pbates <- function(mean_p_vals, samples, n_sims = 1e6) {
 
-  x_bar_ecdf <- stats::ecdf(Matrix::rowSums(matrix(dqrng::dqrunif(n_sims, 0, 1),
-                                            ncol = n))/n)
-  p_vals <- x_bar_ecdf(obs_x_bar)
+  # Vectorize(pbates_unvector,  vectorize.args = c("obs_pval_bar", "n"))
+  p_vals = rep(NA, length(mean_p_vals))
+
+
+  # Pre-generate ECDFs for bates dstribution with different sample counts
+  unq_n <- unique(samples)
+  unq_n <- unq_n[unq_n>1]
+  ecdfs <- list()
+  for (k in seq_along(unq_n)) {
+    ecdfs[[as.character(unq_n[k])]] = stats::ecdf(
+      Matrix::rowSums(matrix(dqrng::dqrunif(unq_n[k]*n_sims, 0, 1),
+                             ncol = unq_n[k]))/unq_n[k])
+  }
+
+  # Calculate bates p-values using the ECDF that has the same sample count
+  # For cases with only 1 sample, then return original p-value
+  for (k in seq_along(mean_p_vals)) {
+    if (samples[k]==1) {
+      p_vals[k] = mean_p_vals[k]
+    } else {
+      p_vals[k] = ecdfs[[as.character(samples[k])]](mean_p_vals[k])
+    }
+  }
+
   return(p_vals)
 }
-
 
 

@@ -9,6 +9,7 @@ process_IDATS(
   platform,
   mft,
   core_params,
+  merge_probe_replicats = TRUE,
   db_flag = FALSE
 )
 }

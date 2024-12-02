@@ -211,7 +211,7 @@ load_idata_to_probes <-
 
 
 #' process_idats
-#'
+#' @description
 #' Processes idat files
 #'
 #' beta = M/(M+U)
@@ -233,7 +233,8 @@ load_idata_to_probes <-
 #'  - betas: matrix of methylation beta values, probes x patients
 #'  - pvals: matrix of signal p-values, probes x patients
 #'
-process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params, db_flag = FALSE) {
+process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
+                          merge_probe_replicats = TRUE, db_flag = FALSE) {
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
   # load(file = "process_IDATS.RData")
@@ -248,20 +249,101 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params, db
     ss = unq_obs_idat_basenames
   }
 
-  betas = do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
-    sesame::getBetas(
-      sdf =  sesame::noob(
-        sdf = sesame::dyeBiasNL(
-          sdf = sesame::inferInfiniumIChannel(ss))))},
-    BPPARAM = BiocParallel::SerialParam()))
-  colnames(betas) <- basename(unq_obs_idat_basenames)
-
-  pvals <- do.call(cbind,BiocParallel::bplapply(ss, function(ss) {
+  # Calculate sesame p-values for individual probes
+  pvals <- do.call(cbind, BiocParallel::bplapply(ss, function(ss) {
     sesame::pOOBAH(return.pval = TRUE,
                    sdf =  sesame::dyeBiasNL(
                      sdf =  sesame::inferInfiniumIChannel(ss)))},
-    BPPARAM = BiocParallel::SerialParam()))
+    BPPARAM = core_params))
   colnames(pvals) <- basename(unq_obs_idat_basenames)
+
+  # Perform dye bias corection and background subtraction
+  ss_sig <- BiocParallel::bplapply(ss, function(ss) {
+    ss_sig =  sesame::noob(
+      sdf = sesame::dyeBiasNL(
+        sdf = sesame::inferInfiniumIChannel(ss)))},
+    BPPARAM = core_params)
+
+
+  ## Add pvals to sigset list
+  ss_sig <- lapply(1:length(ss_sig), function(x) ss_sig[[x]] %>%
+                     dplyr::mutate(p_val = pvals[,x]))
+
+  if (merge_probe_replicats) {
+    # Get list of non-unique CPG IDs to be merged
+    # probe_ids <- ss_sig[[1]]$Probe_ID
+    # cpg_ids <- stringr::str_replace(string = probe_ids, pattern = "_.{4}$", replacement = "")
+    #
+    # cpg_table <- table(cpg_ids)
+    # nunq_cpg <- names(cpg_table)[cpg_table > 1]
+
+    # Calculate merged betas for
+    ss_sig_merged <- BiocParallel::bplapply(
+      ss_sig, function(x) sigset_merge_replicates(x),
+      BPPARAM = core_params)
+
+
+    # Calculate beta values from merged sig sets
+    betas = do.call(cbind,BiocParallel::bplapply(ss_sig_merged, function(ss) {
+      sesame::getBetas(ss)},
+      BPPARAM = BiocParallel::SerialParam()))
+    colnames(betas) <- basename(unq_obs_idat_basenames)
+
+    pvals <- do.call(cbind, lapply(ss_sig_merged, function(x) x$merged_p_val))
+    colnames(pvals) <- basename(unq_obs_idat_basenames)
+
+  } else {
+    # Calculate beta values
+    betas = do.call(cbind,BiocParallel::bplapply(ss_sig, function(ss) {
+      sesame::getBetas(ss)},
+      BPPARAM = BiocParallel::SerialParam()))
+    colnames(betas) <- basename(unq_obs_idat_basenames)
+  }
+
+
 
   return(list(betas = betas, pvals = pvals))
 }
+
+
+
+#' sigset_merge_replicates
+#' @description
+#' merges the signal and p-values of probe replicates. signal is averaged by
+#' fluorescent channel individually, p-values are merged based on a bates distribution.
+#'
+#' @param sigset dataframe that is a sigset from the sesame package.
+#' @param db_flag boolean, when TRUE the workspace is saved to disk for debugging.
+#' @importFrom magrittr "%>%"
+#' @export
+sigset_merge_replicates <- function(sigset, db_flag = FALSE) {
+
+  if(db_flag) save(list = ls(all.names = TRUE), file = "sigset_merge_replicates.RData")
+  # load(file = "sigset_merge_replicates.RData")
+
+  cpg_ids <- Probe_ID <- MR <- MG <- UG <- UR <- mask <- p_val <- key <- NA
+
+  probe_ids <- sigset$Probe_ID
+  sigset$cpg_ids <- stringr::str_replace(string = probe_ids, pattern = "_.{4}$", replacement = "")
+  sigset$key = 1:nrow(sigset)
+
+  cpg_table <- table(sigset$cpg_ids)
+  # nunq_cpg <- names(cpg_table)[cpg_table > 1]
+
+
+  # Calcualte mean flourescent signal across
+  sigset_merge <- sigset %>% dplyr::group_by(cpg_ids) %>% dplyr::summarise(
+    Probe_ID = Probe_ID[1],
+    MG = mean(MG),  MR = mean(MR), UG = mean(UG), UR = mean(UR),
+    col = col[1],  mask = mask[1], mean_p_val = mean(p_val), n = length(MG), key = min(key),
+    n = length(p_val)) %>%
+    dplyr::arrange(key)
+
+
+  # Calculate merged p_vale
+  sigset_merge$merged_p_val = pbates(mean_p_vals = sigset_merge$mean_p_val, samples = sigset_merge$n)
+
+ return(sigset_merge)
+}
+
+

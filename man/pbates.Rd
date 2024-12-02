@@ -4,12 +4,12 @@
 \alias{pbates}
 \title{pbates}
 \usage{
-pbates(obs_x_bar, n, n_sims = 1e+07)
+pbates(mean_p_vals, samples, n_sims = 1e+06)
 }
 \arguments{
-\item{obs_x_bar}{vector of observed means from a series of samples}
+\item{mean_p_vals}{vector of observed means from a series of samples}
 
-\item{n}{number of observations per sample}
+\item{samples}{vector of the number of observations per sample}
 
 \item{n_sims}{number of simulaations}
 }
@@ -19,5 +19,7 @@ of n observations sampled from a uniform distribution between [0,1]. Uses a
 simple Monte Carlo approach to model the null distribution. This can be used
 to calculate a new signal detection p-value across replicate probes that are
 found in the imprintome array. The random variable would be the mean p-value
-from replicate probes.
+from replicate probes.This function is most efficient if all mean-p-values are
+processed at once because it pre-catches the ECDF from a bates distribution
+with different sample sizes.
 }
