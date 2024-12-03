@@ -143,7 +143,7 @@ load_idata_to_probes <-
     if (!multicore || multicore==1) {
       core_params <- BiocParallel::SerialParam()
     } else if (.Platform$OS.type == "windows") {
-      core_params <- BiocParallel::SnowParam(multicore)
+      core_params <- BiocParallel::SnowParam(multicore,)
     }  else {
       core_params <- BiocParallel::MulticoreParam(multicore, progressbar = TRUE)
     }
@@ -269,6 +269,9 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
   ss_sig <- lapply(1:length(ss_sig), function(x) ss_sig[[x]] %>%
                      dplyr::mutate(p_val = pvals[,x]))
 
+  if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
+  # load(file = "process_IDATS.RData")
+
   if (merge_probe_replicats) {
     # Get list of non-unique CPG IDs to be merged
     # probe_ids <- ss_sig[[1]]$Probe_ID
@@ -280,7 +283,7 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     # Calculate merged betas for
     ss_sig_merged <- BiocParallel::bplapply(
       ss_sig, function(x) sigset_merge_replicates(x),
-      BPPARAM = core_params)
+      BPPARAM = BiocParallel::SerialParam())
 
 
     # Calculate beta values from merged sig sets
