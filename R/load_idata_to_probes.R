@@ -44,6 +44,8 @@
 #'  are found on disk. Throws error if this is not the case.
 #' @param enforce_idat_names boolean when true raises error if input IDAT files
 #' do not follow proper capitalization pattern, if FALSE only issues warning.
+#' @param merge_probe_replicats boolean, when TRUE the replicate probes are
+#' merged
 #' @returns a named list with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
@@ -54,7 +56,8 @@ load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
            mft = NULL, multicore = 1, sesame_prep = "0CDB",
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
-           db_flag = FALSE, enforce_req_idats = FALSE, enforce_idat_names = TRUE) {
+           db_flag = FALSE, enforce_req_idats = FALSE, enforce_idat_names = TRUE,
+           merge_probe_replicats = TRUE) {
     # Load manifest file if platform is true diagnostic imprintome array
     if (base::is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2_design_scores}
 
@@ -158,7 +161,7 @@ load_idata_to_probes <-
 
     idat.out <- process_IDATS(unq_obs_idat_basenames, platform = platform,
                               mft = mft, core_params = core_params,
-                              db_flag = db_flag)
+                              db_flag = TRUE, merge_probe_replicats = FALSE)
     probe_beta_matrix = idat.out$betas
     probe_pval_matrix = idat.out$pvals
 
@@ -319,7 +322,7 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
 #' @param db_flag boolean, when TRUE the workspace is saved to disk for debugging.
 #' @importFrom magrittr "%>%"
 #' @export
-sigset_merge_replicates <- function(sigset, db_flag = FALSE) {
+sigset_merge_replicates <- function(sigset, db_flag = TRUE) {
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "sigset_merge_replicates.RData")
   # load(file = "sigset_merge_replicates.RData")
@@ -334,17 +337,48 @@ sigset_merge_replicates <- function(sigset, db_flag = FALSE) {
   # nunq_cpg <- names(cpg_table)[cpg_table > 1]
 
 
-  # Calcualte mean flourescent signal across
-  sigset_merge <- sigset %>% dplyr::group_by(cpg_ids) %>% dplyr::summarise(
-    Probe_ID = Probe_ID[1],
+  # Calculate mean flourescent signal across replicates, record original values also
+  sigset_merge <- sigset %>% dplyr::group_by(cpg_ids) %>% dplyr::summarize(
+    probe_id = stringr::str_replace(Probe_ID[1], "_.{4}$", "_merged"),
     MG = mean(MG),  MR = mean(MR), UG = mean(UG), UR = mean(UR),
-    col = col[1],  mask = mask[1], mean_p_val = mean(p_val), n = length(MG), key = min(key),
+    col = col[1],  mask = mask[1], mean_p_val = mean(p_val),
+    orig_probe_ids = paste(Probe_ID,collapse=" "),
+    orig_p_vals = paste(p_val,collapse=" "),
+    n = length(MG), key = min(key),
     n = length(p_val)) %>%
     dplyr::arrange(key)
 
 
+
   # Calculate merged p_vale
   sigset_merge$merged_p_val = pbates(mean_p_vals = sigset_merge$mean_p_val, samples = sigset_merge$n)
+
+  # Define column for final p_values
+  sigset_merge$p_val <- sigset_merge$merged_p_val
+
+  # For each entry that was merged, select merged p_value or one of the original probes
+  merged_ind <- which(sigset_merge$n>1)
+
+  for (k in seq_along(merged_ind)) {
+    ind = merged_ind[k]
+
+    p_vals <- c(sigset_merge$merged_p_val[ind], sapply(str_split(
+      sigset_merge$orig_p_vals[ind], pattern = " "), as.double))
+    probe_ids <-  c(sigset_merge$probe_id[ind], str_split(
+      sigset_merge$orig_probe_ids[ind], pattern = " ")[[1]])
+    mind <- which.min(p_vals)
+
+    # update final probe_id
+    sigset_merge$probe_id[ind] <- probe_ids[mind]
+    # update final p value
+    sigset_merge$p_val[ind] <- p_vals[mind]
+    # Update final n_count
+    if (mind!=1) sigset_merge$n[ind] <- 1
+
+  }
+
+
+
 
  return(sigset_merge)
 }
