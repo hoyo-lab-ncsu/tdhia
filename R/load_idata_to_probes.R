@@ -22,8 +22,6 @@
 #' @param multicore boolean flag or integer, when true the max number of cores minus 1 is
 #' used for the current system, FALSE sets to single core operation, any integer
 #' greater than zero sets to the specified number of cores.
-#' @param sesame_prep string of number/ letters to control sesame normalization
-#' steps. Default is 0CDB.
 #' @param idat_basenames a character vector or dataframe.
 #' If idat_basenames is a character vector, then the elements are the
 #' idat_basenames to be processed. An idat basename is the filename without the
@@ -44,8 +42,13 @@
 #'  are found on disk. Throws error if this is not the case.
 #' @param enforce_idat_names boolean when true raises error if input IDAT files
 #' do not follow proper capitalization pattern, if FALSE only issues warning.
-#' @param merge_probe_replicats boolean, when TRUE the replicate probes are
-#' merged
+#' @param merge_replicates string with the following possible values:
+#'  - NULL: the probe replicates are not merged (Default).
+#'  - pre_mean: beta value is calculated before replicates are merged and beta
+#'   values are averaged between replicates.
+#'  - post_mean: replicates are merged by averaging fluorescent signal from
+#'   each channel individually (after background subtraction and normalization).
+#'   Beta values are then calculated from these averaged values.
 #' @returns a named list with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
@@ -54,10 +57,10 @@
 #' @export
 load_idata_to_probes <-
   function(idat_dir_paths, platform = "TruDx_imprintome",
-           mft = NULL, multicore = 1, sesame_prep = "0CDB",
+           mft = NULL, multicore = 1,
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
            db_flag = FALSE, enforce_req_idats = FALSE, enforce_idat_names = TRUE,
-           merge_probe_replicats = TRUE) {
+           merge_replicates = NULL) {
     # Load manifest file if platform is true diagnostic imprintome array
     if (base::is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2_design_scores}
 
@@ -152,7 +155,6 @@ load_idata_to_probes <-
     }
 
 
-
     # Load each of the IDAT file pairs, process with standard SeSame pipeline
     cat(sprintf("Processing %.0f IDAT Files...", length(unq_obs_idat_basenames)))
     if (!is.null(core_params)) {
@@ -161,7 +163,7 @@ load_idata_to_probes <-
 
     idat.out <- process_IDATS(unq_obs_idat_basenames, platform = platform,
                               mft = mft, core_params = core_params,
-                              db_flag = TRUE, merge_probe_replicats = FALSE)
+                              db_flag = TRUE, merge_replicates = merge_replicates)
     probe_beta_matrix = idat.out$betas
     probe_pval_matrix = idat.out$pvals
 
@@ -221,7 +223,7 @@ load_idata_to_probes <-
 #'
 #' This function processes the signal for all probes in the array, with no
 #' filtering performed.
-#'
+#' Sesame prep code: 0CDB
 #' @param unq_obs_idat_basenames list of idat basenames, or list of imported
 #' sigsets, which is SeSame's class for imported IDAT files
 #' @param platform string for the platform that the array belongs to, as specified
@@ -237,7 +239,7 @@ load_idata_to_probes <-
 #'  - pvals: matrix of signal p-values, probes x patients
 #'
 process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
-                          merge_probe_replicats = TRUE, db_flag = FALSE) {
+                          merge_replicates = NULL, db_flag = FALSE) {
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
   # load(file = "process_IDATS.RData")
@@ -275,25 +277,27 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
   if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
   # load(file = "process_IDATS.RData")
 
-  if (merge_probe_replicats) {
+  if (!is.null(merge_replicates)) {
     # Get list of non-unique CPG IDs to be merged
     # Calculate merged beta (pre and post merge) for
-    ss_sig_merged <- BiocParallel::bplapply(
-      ss_sig, function(x) sigset_merge_replicates(x),
-      BPPARAM = BiocParallel::SerialParam())
+    # merged_data <- BiocParallel::bplapply(
+    #   ss_sig, function(x)
+    #     sigset_merge_replicates(x, merge_replicates = merge_replicates),
+    #   BPPARAM = BiocParallel::SerialParam())
 
+    merged_data = lapply(ss_sig, function(x)
+      sigset_merge_replicates(x, merge_replicates = merge_replicates))
 
     # Calculate beta values from merged sig sets
-    betas = do.call(cbind,BiocParallel::bplapply(ss_sig_merged, function(ss) {
-      sesame::getBetas(ss)},
-      BPPARAM = BiocParallel::SerialParam()))
-    colnames(betas) <- basename(unq_obs_idat_basenames)
+    betas = merged_data$betas
 
-    pvals <- do.call(cbind, lapply(ss_sig_merged, function(x) x$merged_p_val))
-    colnames(pvals) <- basename(unq_obs_idat_basenames)
+    betas = merged_data$p_vals
+    #
+    # colnames(pvals) <- basename(unq_obs_idat_basenames)
 
   } else {
-    # Calculate beta values for all probes, no merginng completed
+
+    # Calculate beta values for all probes (no merging or beta and p_val with probes)
     betas = do.call(cbind,BiocParallel::bplapply(ss_sig, function(ss) {
       sesame::getBetas(ss)},
       BPPARAM = BiocParallel::SerialParam()))
@@ -313,11 +317,14 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
 #' fluorescent channel individually, p-values are merged based on a bates distribution.
 #'
 #' @param sigset dataframe that is a sigset from the sesame package.
+#' @param merge_replicates
+#'  - pre_mean
+#'  - post_mean
 #' @param db_flag boolean, when TRUE the workspace is saved to disk for debugging.
 #' @importFrom magrittr "%>%"
 #' @importFrom rlang .data
 #' @export
-sigset_merge_replicates <- function(sigset, beta_calc = "post_merge", db_flag = TRUE) {
+sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_flag = TRUE) {
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "sigset_merge_replicates.RData")
   # load(file = "sigset_merge_replicates.RData")
@@ -335,57 +342,75 @@ sigset_merge_replicates <- function(sigset, beta_calc = "post_merge", db_flag = 
   # Calculate beta signal before any probe replicate averaging
   sigset$beta_orig <- sesame::getBetas(sigset)
 
+  # Probe renaming function for merged replicates
+  fProbe_ID <- function(x) {if (length(x)==1) {y=x[1]
+  } else {y=stringr::str_replace(x[1], "_.{4}$", "_merged")}; return(y)}
+
   # Calculate mean fluorescent signal across replicates, record original values also
   sigset_merge <- sigset %>% dplyr::group_by(cpg_ids) %>% dplyr::summarize(
-    Probe_ID = stringr::str_replace(Probe_ID[1], "_.{4}$", "_merged"),
+    Probe_ID = fProbe_ID(Probe_ID),
     MG = mean(MG),  MR = mean(MR), UG = mean(UG), UR = mean(UR),
-    col = col[1],  mask = mask[1], mean_beta_orig = mean(beta_orig),
+    col = col[1],  mask = mask[1], mean_orig_beta = mean(beta_orig),
     mean_p_val = mean(p_val),
     orig_probe_ids = paste(.data$Probe_ID,collapse=" "),
     orig_p_vals = paste(p_val,collapse=" "),
+    orig_betas = paste(beta_orig,collapse=" "),
     n = length(MG), key = min(key),
     n = length(p_val)) %>%
     dplyr::arrange(key)
 
   # Calculate beta values based on merged fluorescent values
-  sigset_merge$mean_beta_merged <- sesame::getBetas(sigset_merge)
+  sigset_merge$beta_merged <- sesame::getBetas(sigset_merge)
 
   # Calculate p-values of the merged signal between probes
   sigset_merge$merged_p_val = pbates(mean_p_vals = sigset_merge$mean_p_val, samples = sigset_merge$n)
 
-  # Define column for final p_values
-  sigset_merge$p_val <- sigset_merge$merged_p_val
+  # Fill in default values for final probe_id, beta, p_val, and n fields
+  if (merge_replicates == "pre_merge") {
+    sigset_merge$final_beta <- sigset_merge$mean_orig_beta
+  } else {sigset_merge$final_beta <- sigset_merge$beta_merged}
+  sigset_merge$final_Probe_ID <- sigset_merge$Probe_ID
+  sigset_merge$final_p_val <-  sigset_merge$merged_p_val
+  sigset_merge$final_n <- sigset_merge$n
 
-  # For each entry that was merged, select merged p_value or one of the original probes
-  merged_ind <- which(sigset_merge$n>1)
+  # Scan for merged probes
+  rep_ind <- which(sigset_merge$n > 1)
 
-  for (k in seq_along(merged_ind)) {
-    ind = merged_ind[k]
+  # For the merged probes select best measurement (merged or individual)
+  for (k in seq_along(rep_ind)) {
+    # For each row, assemble vectors of merged and individual betas,  p_vals, and probe_ids
+    rind = rep_ind[k]
+    # Assemble vector of merged and individual betas
+    if (merge_replicates == "pre_merge") {merged_beta <- sigset_merge$mean_orig_beta[rind]
+    } else {merged_beta <- sigset_merge$beta_merged[rind]}
+    betas <- c(merged_beta, sapply(stringr::str_split(
+      sigset_merge$orig_betas[rind], pattern = " "), as.double))
 
-    p_vals <- c(sigset_merge$merged_p_val[ind], sapply(str_split(
-      sigset_merge$orig_p_vals[ind], pattern = " "), as.double))
-    probe_ids <-  c(sigset_merge$Probe_ID[ind], str_split(
-      sigset_merge$orig_probe_ids[ind], pattern = " ")[[1]])
-    mind <- which.min(p_vals)
+    # Assemble vector of merged and individual p_values
+    p_vals <- c(sigset_merge$merged_p_val[rind], sapply(stringr::str_split(
+      sigset_merge$orig_p_vals[rind], pattern = " "), as.double))
+
+    # Assemble vector of merged and individual probe_ids
+    probe_ids <-  c(sigset_merge$Probe_ID[rind], stringr::str_split(
+      sigset_merge$orig_probe_ids[rind], pattern = " ")[[1]])
+
+    # Determine if merged probe or individual has best p_value
+    ind <- which.min(p_vals)
+    if (length(ind)==0) ind = length(p_vals)
+    # Select betas, p_vals, and probe_id using this index
 
     # Update final probe_id
-    sigset_merge$Probe_ID[ind] <- probe_ids[mind]
+    sigset_merge$final_Probe_ID[rind] <- probe_ids[ind]
+    # Update final betas
+    sigset_merge$final_beta[rind] <- betas[ind]
     # Update final p value
-    sigset_merge$p_val[ind] <- p_vals[mind]
+    sigset_merge$final_p_val[rind] <- p_vals[ind]
     # If one probe is used, change number of probes to 1
-    if (mind!=1) sigset_merge$n[ind] <- 1
-
-    # Finalize beta value
-    if (beta_calc == "pre_merge") {
-      betas[,k] = mean_beta_orig
-    } else if (beta_calc == "post_merge") {
-
-      betas[,k] = mean_beta_merged
-    } else {stop("beta_calc: must be ")}
-
-
+    if (ind!=1) sigset_merge$final_n[rind] <- 1
   }
- out <- list(betas = betas, p_vals = p_vals)
+
+ out <- list(betas = sigset_merge$final_beta,
+             p_vals = sigset_merge$final_p_val)
 
  return(out)
 }
