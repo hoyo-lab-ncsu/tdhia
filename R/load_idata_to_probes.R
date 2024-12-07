@@ -211,7 +211,7 @@ load_idata_to_probes <-
                        manifest = mft)
     return(probe_beta)
 
-  }
+}
 
 
 
@@ -285,13 +285,13 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     #     sigset_merge_replicates(x, merge_replicates = merge_replicates),
     #   BPPARAM = BiocParallel::SerialParam())
 
-    merged_data = lapply(ss_sig, function(x)
+    merged_data_list = lapply(ss_sig, function(x)
       sigset_merge_replicates(x, merge_replicates = merge_replicates))
 
     # Calculate beta values from merged sig sets
-    betas = merged_data$betas
+    betas = do.call(cbind, lapply(merged_data, FUN = function(x) x$betas))
+    p_vals = do.call(cbind, lapply(merged_data, FUN = function(x) x$p_vals))
 
-    betas = merged_data$p_vals
     #
     # colnames(pvals) <- basename(unq_obs_idat_basenames)
 
@@ -344,7 +344,7 @@ sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_
 
   # Probe renaming function for merged replicates
   fProbe_ID <- function(x) {if (length(x)==1) {y=x[1]
-  } else {y=stringr::str_replace(x[1], "_.{4}$", "_merged")}; return(y)}
+  } else {y=stringr::str_replace(x[1], "_.{4}$", "_MERG")}; return(y)}
 
   # Calculate mean fluorescent signal across replicates, record original values also
   sigset_merge <- sigset %>% dplyr::group_by(cpg_ids) %>% dplyr::summarize(
@@ -409,10 +409,14 @@ sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_
     if (ind!=1) sigset_merge$final_n[rind] <- 1
   }
 
- out <- list(betas = sigset_merge$final_beta,
-             p_vals = sigset_merge$final_p_val)
+  # Add probe_ids as rownames to beta and p_val values
+  names(sigset_merge$final_beta) <- sigset_merge$final_Probe_ID
+  names(sigset_merge$final_p_val) <- sigset_merge$final_Probe_ID
+  # Export beta and p_val
+  out <- list(betas = sigset_merge$final_beta,
+              p_vals = sigset_merge$final_p_val)
 
- return(out)
+  return(out)
 }
 
 
