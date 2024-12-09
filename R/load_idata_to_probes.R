@@ -165,7 +165,7 @@ load_idata_to_probes <-
                               mft = mft, core_params = core_params,
                               db_flag = TRUE, merge_replicates = merge_replicates)
     probe_beta_matrix = idat.out$betas
-    probe_pval_matrix = idat.out$pvals
+    probe_pval_matrix = idat.out$p_vals
 
 
     # Convert matrix to dataframe for easier manipulation
@@ -236,7 +236,7 @@ load_idata_to_probes <-
 #' @param db_flag todo
 #' @returns a named list with the following fields:
 #'  - betas: matrix of methylation beta values, probes x patients
-#'  - pvals: matrix of signal p-values, probes x patients
+#'  - p_vals: matrix of signal p-values, probes x patients
 #'
 process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
                           merge_replicates = NULL, db_flag = FALSE) {
@@ -255,12 +255,12 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
   }
 
   # Calculate sesame p-values for individual probes
-  pvals <- do.call(cbind, BiocParallel::bplapply(ss, function(ss) {
+  p_vals <- do.call(cbind, BiocParallel::bplapply(ss, function(ss) {
     sesame::pOOBAH(return.pval = TRUE,
                    sdf =  sesame::dyeBiasNL(
                      sdf =  sesame::inferInfiniumIChannel(ss)))},
     BPPARAM = core_params))
-  colnames(pvals) <- basename(unq_obs_idat_basenames)
+  colnames(p_vals) <- basename(unq_obs_idat_basenames)
 
   # Perform dye bias corection and background subtraction
   ss_sig <- BiocParallel::bplapply(ss, function(ss) {
@@ -270,9 +270,9 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     BPPARAM = core_params)
 
 
-  ## Add pvals to sigset list
+  ## Add p_vals to sigset list
   ss_sig <- lapply(1:length(ss_sig), function(x) ss_sig[[x]] %>%
-                     dplyr::mutate(p_val = pvals[,x]))
+                     dplyr::mutate(p_val = p_vals[,x]))
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
   # load(file = "process_IDATS.RData")
@@ -289,11 +289,11 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
       sigset_merge_replicates(x, merge_replicates = merge_replicates))
 
     # Calculate beta values from merged sig sets
-    betas = do.call(cbind, lapply(merged_data, FUN = function(x) x$betas))
-    p_vals = do.call(cbind, lapply(merged_data, FUN = function(x) x$p_vals))
+    betas = do.call(cbind, lapply(merged_data_list, FUN = function(x) x$betas))
+    p_vals = do.call(cbind, lapply(merged_data_list, FUN = function(x) x$p_vals))
 
     #
-    # colnames(pvals) <- basename(unq_obs_idat_basenames)
+    # colnames(p_vals) <- basename(unq_obs_idat_basenames)
 
   } else {
 
@@ -304,9 +304,9 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     colnames(betas) <- basename(unq_obs_idat_basenames)
   }
 
+  out <- list(betas = betas, p_vals = p_vals)
 
-
-  return(list(betas = betas, pvals = pvals))
+  return(out)
 }
 
 
