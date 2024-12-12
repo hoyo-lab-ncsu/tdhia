@@ -53,4 +53,4 @@ for (n in seq_along(bed_list)) {
 
 df_ratio <- do.call(cbind,df_ratio_list)
 
-
+alzheimer_study_wbgs_shared_cpg <- df_ratio

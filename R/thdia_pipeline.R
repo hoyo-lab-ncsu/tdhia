@@ -8,7 +8,6 @@
 #' where IDAT files are located.
 #' @param multicore boolean, when true uses n.cores processing in sesame.
 #' @param idat_basenames rename idat_basenames to a patient/ study id
-#' @param sesame_prep sesame prep
 #' @param discard_unmapped_probes boolean, when true, probe_ids
 #' @param max_sig_pval single numeric between (0-1), maximum sesame signal
 #' p-value that is allowed
@@ -28,7 +27,7 @@
 #' @return named list with all of the output from each of the pipeline steps.
 #'
 tdhia_pipeline <- function(idat_dir_paths = NULL, multicore = TRUE,
-                           idat_basenames = NULL, sesame_prep = "0CDB",
+                           idat_basenames = NULL,
                            discard_unmapped_probes = TRUE , max_sig_pval = 0.2,
                            set_failed_betas_na = FALSE, max_probe_fail_rate = 0.25,
                            discard_failed_probes = TRUE, smooth_adj_cpgs = FALSE,
@@ -43,7 +42,7 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, multicore = TRUE,
     probe_beta <-
       load_idata_to_probes(idat_dir_paths = idat_dir_paths, multicore = multicore,
                            idat_basenames = idat_basenames,
-                           quantile_norm = FALSE, sesame_prep = sesame_prep)
+                           quantile_norm = FALSE)
 
   # 2) Filter probes that are not mapped and discard poor signal
   # Output: probe_id(row) x patient(col)

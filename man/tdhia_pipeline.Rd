@@ -8,7 +8,6 @@ tdhia_pipeline(
   idat_dir_paths = NULL,
   multicore = TRUE,
   idat_basenames = NULL,
-  sesame_prep = "0CDB",
   discard_unmapped_probes = TRUE,
   max_sig_pval = 0.2,
   set_failed_betas_na = FALSE,
@@ -26,8 +25,6 @@ where IDAT files are located.}
 \item{multicore}{boolean, when true uses n.cores processing in sesame.}
 
 \item{idat_basenames}{rename idat_basenames to a patient/ study id}
-
-\item{sesame_prep}{sesame prep}
 
 \item{discard_unmapped_probes}{boolean, when true, probe_ids}
 

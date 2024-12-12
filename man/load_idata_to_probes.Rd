@@ -9,13 +9,13 @@ load_idata_to_probes(
   platform = "TruDx_imprintome",
   mft = NULL,
   multicore = 1,
-  sesame_prep = "0CDB",
   idat_basenames = NULL,
   quantile_norm = FALSE,
   mask = FALSE,
   db_flag = FALSE,
   enforce_req_idats = FALSE,
-  enforce_idat_names = TRUE
+  enforce_idat_names = TRUE,
+  merge_replicates = NULL
 )
 }
 \arguments{
@@ -35,9 +35,6 @@ See ?manifest_v1A2 for more info.}
 \item{multicore}{boolean flag or integer, when true the max number of cores minus 1 is
 used for the current system, FALSE sets to single core operation, any integer
 greater than zero sets to the specified number of cores.}
-
-\item{sesame_prep}{string of number/ letters to control sesame normalization
-steps. Default is 0CDB.}
 
 \item{idat_basenames}{a character vector or dataframe.
 If idat_basenames is a character vector, then the elements are the
@@ -66,6 +63,16 @@ are found on disk. Throws error if this is not the case.}
 
 \item{enforce_idat_names}{boolean when true raises error if input IDAT files
 do not follow proper capitalization pattern, if FALSE only issues warning.}
+
+\item{merge_replicates}{string with the following possible values:
+\itemize{
+\item NULL: the probe replicates are not merged (Default).
+\item pre_mean: beta value is calculated before replicates are merged and beta
+values are averaged between replicates.
+\item post_mean: replicates are merged by averaging fluorescent signal from
+each channel individually (after background subtraction and normalization).
+Beta values are then calculated from these averaged values.
+}}
 }
 \value{
 a named list with the following fields:

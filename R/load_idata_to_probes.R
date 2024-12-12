@@ -231,6 +231,15 @@ load_idata_to_probes <-
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
+#' @param merge_replicates string or empty that specifies how replicate probes
+#' are merged.
+#'  - pre_mean: replicates are merged before calculating the beta value (signal
+#'  from methylated and unmethylated channels are averaged individually). Merged
+#'  p-values are calculated with a bates distribution.
+#'  - post_mean: replicates are merged after calculating the beta value
+#'  (beta values are merged).
+#'  - NULL: no merging is done at this step (downstream they are eventually
+#'  merged at the cpg level if both probes pass p-value threshold.).
 #' @param core_params boolean flag, when true the max number of cores minus 1 is
 #' used for the current system.
 #' @param db_flag todo
@@ -317,9 +326,15 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
 #' fluorescent channel individually, p-values are merged based on a bates distribution.
 #'
 #' @param sigset dataframe that is a sigset from the sesame package.
-#' @param merge_replicates
-#'  - pre_mean
-#'  - post_mean
+#' @param merge_replicates string or empty that specifies how replicate probes
+#' are merged.
+#'  - pre_mean: replicates are merged before calculating the beta value (signal
+#'  from methylated and unmethylated channels are averaged individually). Merged
+#'  p-values are calculated with a bates distribution.
+#'  - post_mean: replicates are merged after calculating the beta value
+#'  (beta values are merged).
+#'  - NULL: no merging is done at this step (downstream they are eventually
+#'  merged at the cpg level if both probes pass p-value threshold.).
 #' @param db_flag boolean, when TRUE the workspace is saved to disk for debugging.
 #' @importFrom magrittr "%>%"
 #' @importFrom rlang .data

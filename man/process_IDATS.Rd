@@ -9,7 +9,7 @@ process_IDATS(
   platform,
   mft,
   core_params,
-  merge_probe_replicats = TRUE,
+  merge_replicates = NULL,
   db_flag = FALSE
 )
 }
@@ -27,21 +27,33 @@ See ?manifest_v1A2 for more info.}
 \item{core_params}{boolean flag, when true the max number of cores minus 1 is
 used for the current system.}
 
+\item{merge_replicates}{string or empty that specifies how replicate probes
+are merged.
+\itemize{
+\item pre_mean: replicates are merged before calculating the beta value (signal
+from methylated and unmethylated channels are averaged individually). Merged
+p-values are calculated with a bates distribution.
+\item post_mean: replicates are merged after calculating the beta value
+(beta values are merged).
+\item NULL: no merging is done at this step (downstream they are eventually
+merged at the cpg level if both probes pass p-value threshold.).
+}}
+
 \item{db_flag}{todo}
 }
 \value{
 a named list with the following fields:
 \itemize{
 \item betas: matrix of methylation beta values, probes x patients
-\item pvals: matrix of signal p-values, probes x patients
+\item p_vals: matrix of signal p-values, probes x patients
 }
 }
 \description{
 Processes idat files
-}
-\details{
+
 beta = M/(M+U)
 
 This function processes the signal for all probes in the array, with no
 filtering performed.
+Sesame prep code: 0CDB
 }
