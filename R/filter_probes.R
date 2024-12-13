@@ -53,23 +53,39 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   verbosecat(sprintf("Probe manifest: manifest file has a total of %.0f probes.\n\n",
               nrow(mft)))
 
+  # Report probes removed from previous steps                               ####
+  #_____________________________________________________________________________
+  verbosecat(sprintf("Probe filter: %.0f%% probes discarded ( %i/ %i) from previous steps
+                %.0f probes now remain.\n\n",
+                     100*(nrow(mft) - nrow(probe_beta$probe_beta_df))/nrow(mft),
+                     nrow(mft)- nrow(probe_beta$probe_beta_df),
+                     nrow(mft),
+                     nrow(probe_beta$probe_beta_df)))
 
   # Discard probe_ids(s) that do not map uniquely to genomic location and CpG ####
   #_____________________________________________________________________________
   #   (Defined in manifest file where MAPINFO == (0 or NA))
   #   Data is copied over to filter_* probe_beta and probe_ pval matrices.
   if (discard_unmapped_probes) {
+    # Returns true of probe is no genomic location
     f_unmmaped = function (x) is.na(x) | x==0;
-    unmapped_probe_ids <- sapply(mft$Probe_ID,
-                                 function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Probe_ID)[1]]))
+    f_match = function (x, probe_ids) { match_ind = which(x == mft$Probe_ID)
+      if(length(match_ind)==0) match_ind = which(stringr::str_replace(x, "_.{4}$","") ==
+                                                   mft$cpg_id)[1]
+      return(match_ind)
+    }
+    # unmapped_probe_ids <- sapply(mft$Probe_ID,
+    #                              function(x) f_unmmaped(mft$MAPINFO[f_match(x,mft$Probe_ID)[1]]))
 
 
+    # unmapped_probe_ids
+    mapped_probe_ids <- sapply(rownames(probe_beta$probe_beta_df),
+                                 function(x) !f_unmmaped(mft$MAPINFO[f_match(x,mft$Probe_ID)[1]]))
 
-
-
-    # rownames(probe_beta$probe_beta_df)
-
-
+    #
+    # probe_beta %>% select()
+    # left_join(x = data.frame(cpg_id = rownames(probe_beta$probe_beta_df)),
+    #           y = 1)
 
 
     # Find probes that target a cg site
@@ -79,8 +95,8 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     # rp: repetitive element, or rs: SNP probe
 
     # Keep probes that are mapped to a cpg site in the imprintome
-    filt_probe_beta_df <- probe_beta$probe_beta_df[!unmapped_probe_ids & cpg_ids,]
-    filt_probe_pval_df <- probe_beta$probe_pval_df[!unmapped_probe_ids & cpg_ids,]
+    filt_probe_beta_df <- probe_beta$probe_beta_df[mapped_probe_ids & cpg_ids,]
+    filt_probe_pval_df <- probe_beta$probe_pval_df[mapped_probe_ids & cpg_ids,]
 
     verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) in dataset b/c they don't
                 map uniquely to the genome or a CpG site.
@@ -167,11 +183,11 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   # Filter probes with low design scores              ##########################
   #_____________________________________________________________________________
 
-    design_score_df <- dplyr::left_join(x = data.frame(Probe_ID = rownames(filt_probe_beta_df)),
-                                 y = dplyr::select(mft, c("Probe_ID", "Design.Score")), by = "Probe_ID",
-                                 keep = FALSE, multiple = "first", na_matches = "never",
-                                 unmatched = "drop", relationship = "many-to-one")
-    design_score_keep_flag = design_score_df$Design.Score > min_design_score
+  design_score_df <- dplyr::left_join(
+    x = data.frame(Name =str_replace(rownames(filt_probe_beta_df),"_.{4}$","")),
+    y = dplyr::select(mft, c("Name", "Design.Score")), by = "Name",
+    unmatched = "drop", keep = FALSE, multiple = "first")
+  design_score_keep_flag = design_score_df$Design.Score > min_design_score
 
   if (!is.na(min_design_score)) {
     filt_probe_beta_df <- filt_probe_beta_df[design_score_keep_flag, ]
