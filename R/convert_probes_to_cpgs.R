@@ -51,14 +51,16 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
 
 
   # Match CpG site ID for each probe ID in probe_beta_df2
-  probe_beta_df2 <-
-    probe_beta$probe_beta_df %>%
-    tibble::rownames_to_column(var = "Probe_ID") %>%
-    dplyr::left_join(y = dplyr::select(mft, c("Probe_ID", "Name")),
-                     "Probe_ID",-"Probe_ID") %>%
-    dplyr::select(-c("Probe_ID")) %>%
-    dplyr::rename("CpG_ID" = "Name")
+  # probe_beta_df2 <-
+  #   probe_beta$probe_beta_df %>%
+  #   tibble::rownames_to_column(var = "Probe_ID") %>%
+  #   dplyr::left_join(y = dplyr::select(mft, c("Probe_ID", "Name")),
+  #                    "Probe_ID",-"Probe_ID") %>%
+  #   dplyr::select(-c("Probe_ID")) %>%
+  #   dplyr::rename("CpG_ID" = "Name")
 
+  probe_beta_df2 <- probe_beta$probe_beta_df
+  probe_beta_df2$CpG_ID = str_replace(rownames(probe_beta_df2),"_.{4}$","")
 
   # CpG Beta Matrix: average beta values between probe_id(s) that belong same CpG site
   cpg_beta_df <-

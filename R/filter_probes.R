@@ -184,7 +184,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #_____________________________________________________________________________
 
   design_score_df <- dplyr::left_join(
-    x = data.frame(Name =str_replace(rownames(filt_probe_beta_df),"_.{4}$","")),
+    x = data.frame(Name = str_replace(rownames(filt_probe_beta_df),"_.{4}$","")),
     y = dplyr::select(mft, c("Name", "Design.Score")), by = "Name",
     unmatched = "drop", keep = FALSE, multiple = "first")
   design_score_keep_flag = design_score_df$Design.Score > min_design_score
