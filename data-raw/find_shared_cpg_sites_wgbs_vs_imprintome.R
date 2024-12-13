@@ -51,6 +51,11 @@ for (n in seq_along(bed_list)) {
 }
 
 
-df_ratio <- do.call(cbind,df_ratio_list)
 
+base_names <- sapply(strsplit(bed_list, "_"), function(x) x[1])
 alzheimer_study_wbgs_shared_cpg <- df_ratio
+colnames(alzheimer_study_wbgs_shared_cpg) <- base_names
+
+#
+# devtools::load_all()
+

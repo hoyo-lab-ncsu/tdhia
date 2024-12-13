@@ -167,6 +167,8 @@ load_idata_to_probes <-
     probe_beta_matrix = idat.out$betas
     probe_pval_matrix = idat.out$p_vals
 
+    colnames(probe_beta_matrix) <- basename(unq_obs_idat_basenames)
+    colnames(probe_pval_matrix) <- basename(unq_obs_idat_basenames)
 
     # Convert matrix to dataframe for easier manipulation
     probe_beta_df <- as.data.frame(probe_beta_matrix)
@@ -295,7 +297,7 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     #   BPPARAM = BiocParallel::SerialParam())
 
     merged_data_list = lapply(ss_sig, function(x)
-      sigset_merge_replicates(x, merge_replicates = merge_replicates))
+      sigset_merge_replicates(x, merge_replicates = merge_replicates, db_flag = TRUE))
 
     # Calculate beta values from merged sig sets
     betas = do.call(cbind, lapply(merged_data_list, FUN = function(x) x$betas))
@@ -363,16 +365,18 @@ sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_
 
   # Calculate mean fluorescent signal across replicates, record original values also
   sigset_merge <- sigset %>% dplyr::group_by(cpg_ids) %>% dplyr::summarize(
-    Probe_ID = fProbe_ID(Probe_ID),
+    # Rename this column later, prevent wrong sub in
+    Probe_ID_ = fProbe_ID(.data$Probe_ID),
     MG = mean(MG),  MR = mean(MR), UG = mean(UG), UR = mean(UR),
     col = col[1],  mask = mask[1], mean_orig_beta = mean(beta_orig),
     mean_p_val = mean(p_val),
+    # Probe_ID_ renamed above to ensure this statement has correct scope
     orig_probe_ids = paste(.data$Probe_ID,collapse=" "),
     orig_p_vals = paste(p_val,collapse=" "),
     orig_betas = paste(beta_orig,collapse=" "),
     n = length(MG), key = min(key),
     n = length(p_val)) %>%
-    dplyr::arrange(key)
+    dplyr::arrange(key) %>% dplyr::rename(Probe_ID = Probe_ID_)
 
   # Calculate beta values based on merged fluorescent values
   sigset_merge$beta_merged <- sesame::getBetas(sigset_merge)
@@ -413,6 +417,7 @@ sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_
     ind <- which.min(p_vals)
     if (length(ind)==0) ind = length(p_vals)
     # Select betas, p_vals, and probe_id using this index
+
 
     # Update final probe_id
     sigset_merge$final_Probe_ID[rind] <- probe_ids[ind]

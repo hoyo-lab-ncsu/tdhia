@@ -63,6 +63,15 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     unmapped_probe_ids <- sapply(mft$Probe_ID,
                                  function(x) f_unmmaped(mft$MAPINFO[which(x==mft$Probe_ID)[1]]))
 
+
+
+
+
+    # rownames(probe_beta$probe_beta_df)
+
+
+
+
     # Find probes that target a cg site
     cpg_ids <- grepl("^cg[0-9]",rownames(probe_beta$probe_beta_df))
     # For reference probe_id stars with either:
