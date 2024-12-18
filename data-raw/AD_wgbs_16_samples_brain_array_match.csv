@@ -1,0 +1,18 @@
+﻿ID,FileName,Treatment,sampleID
+1,ADAA1381_sorted_dedup.bam.G.bed,black AD,1381
+2,ADAA1620_sorted_dedup.bam.G.bed,black AD,1620
+3,ADAA312_sorted_dedup.bam.G.bed,black AD,312
+4,ADAA411_sorted_dedup.bam.G.bed,black AD,411
+5,ADAA760_sorted_dedup.bam.G.bed,black AD,760
+6,ADCA1594_sorted_dedup.bam.G.bed,white AD,1594
+7,ADCA1665_sorted_dedup.bam.G.bed,white AD,1665
+8,ADCA1696_sorted_dedup.bam.G.bed,white AD,1595
+9,ADCA1705_sorted_dedup.bam.G.bed,white AD,1705
+10,CDAA158_sorted_dedup.bam.G.bed,black control,158
+11,CDAA328_sorted_dedup.bam.G.bed,black control,328
+12,CDAA591_sorted_dedup.bam.G.bed,black control,591
+13,CDAA94_sorted_dedup.bam.G.bed,black control,94
+14,CDCA1545_sorted_dedup.bam.G.bed,white control,1545
+15,CDCA1600_sorted_dedup.bam.G.bed,white control,1600
+16,CDCA1609_sorted_dedup.bam.G.bed,white control,1609
+17,CDCA1678_sorted_dedup.bam.G.bed,white control,1678
