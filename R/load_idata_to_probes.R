@@ -163,12 +163,18 @@ load_idata_to_probes <-
 
     idat.out <- process_IDATS(unq_obs_idat_basenames, platform = platform,
                               mft = mft, core_params = core_params,
-                              db_flag = TRUE, merge_replicates = merge_replicates)
+                              db_flag = db_flag, merge_replicates = merge_replicates)
     probe_beta_matrix = idat.out$betas
     probe_pval_matrix = idat.out$p_vals
 
-    colnames(probe_beta_matrix) <- basename(unq_obs_idat_basenames)
-    colnames(probe_pval_matrix) <- basename(unq_obs_idat_basenames)
+
+    # if (!is.character(unq_obs_idat_basenames)) {
+    #   sample_names <- paste0("Sample_", length(unq_obs_idat_basenames))
+    # } else {
+    #   sample_names <- basename(unq_obs_idat_basenames)
+    # }
+    # colnames(probe_beta_matrix) <- sample_names
+    # colnames(probe_pval_matrix) <- sample_names
 
     # Convert matrix to dataframe for easier manipulation
     probe_beta_df <- as.data.frame(probe_beta_matrix)
@@ -261,8 +267,10 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
       unq_obs_idat_basenames, function(pfx) {
         sesame::readIDATpair(pfx,  platform = "", manifest = mft)},
       BPPARAM = BiocParallel::SerialParam())
+    names(ss) <- basename(unq_obs_idat_basenames)
   } else {
     ss = unq_obs_idat_basenames
+    unq_obs_idat_basenames = paste0("Sample_", 1:length(unq_obs_idat_basenames))
   }
 
   # Calculate sesame p-values for individual probes
@@ -271,7 +279,8 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
                    sdf =  sesame::dyeBiasNL(
                      sdf =  sesame::inferInfiniumIChannel(ss)))},
     BPPARAM = core_params))
-  colnames(p_vals) <- basename(unq_obs_idat_basenames)
+
+  # colnames(p_vals) <- basename(unq_obs_idat_basenames)
 
   # Perform dye bias corection and background subtraction
   ss_sig <- BiocParallel::bplapply(ss, function(ss) {
@@ -284,6 +293,8 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
   ## Add p_vals to sigset list
   ss_sig <- lapply(1:length(ss_sig), function(x) ss_sig[[x]] %>%
                      dplyr::mutate(p_val = p_vals[,x]))
+  names(ss_sig) <- names(ss)
+
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
   # load(file = "process_IDATS.RData")
@@ -297,7 +308,7 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     #   BPPARAM = BiocParallel::SerialParam())
 
     merged_data_list = lapply(ss_sig, function(x)
-      sigset_merge_replicates(x, merge_replicates = merge_replicates, db_flag = TRUE))
+      sigset_merge_replicates(x, merge_replicates = merge_replicates, db_flag = db_flag))
 
     # Calculate beta values from merged sig sets
     betas = do.call(cbind, lapply(merged_data_list, FUN = function(x) x$betas))
