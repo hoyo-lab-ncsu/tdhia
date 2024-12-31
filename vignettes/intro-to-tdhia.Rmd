@@ -12,8 +12,9 @@ vignette: >
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>")
 
+library(dplyr)
 # here::i_am("README.md")
-# devtools::load_all()
+devtools::load_all()
 ```
 
 Here we will demonstrate how to process IDAT files from the True Diagnostic Human
@@ -25,7 +26,8 @@ We begin by first generating simulated data. Sesame imports IDAT files into a Si
 
 
 ```{r simulate}
-ss <- tdhia::simulate_idat_data(10)
+n_patients = 10
+ss <- tdhia::simulate_idat_data(n_patients)
 ```
 
 We can now load this data into tdhia and calculate the beta values and signal 
@@ -120,4 +122,53 @@ You can access the filtered probe beta matrix with the **probe_beta_df** field.
 head(icr_beta$icr_beta_df)
 ```
 
+Let's simulate a case control analysis, where we will test for differences in CpG methylation state between a control group and an treatment group.
 
+```{r}
+
+groud_id = c(rep(0,floor(n_patients/2)), rep(1,n_patients - floor(n_patients/2)))
+
+# Test for significant cpgs, corrected for number of ICRs
+df_res <- analyze_case_control(cpg_beta$cpg_beta_df, groud_id, n_adjust = nrow(icr_beta$icr_beta_df))
+sum(df_res$adj_sig)
+
+# Test for significant ICRs
+df_res <- analyze_case_control(icr_beta$icr_beta_df, groud_id)
+sum(df_res$adj_sig)
+
+```
+
+Now we can simulate a associate study, where we check if there is a correlation 
+between cpg methylation state and other patient variables.
+
+First, a data frame is created with patient information, including any response 
+variables or predictors. For actual analysis, this data is usually imported from
+a csv file or similiar format.
+
+```{r}
+
+df_study = data.frame(id = 1:n_patients)
+df_study$race <- as.factor(sample(c(0,1,2), 10, replace = TRUE))
+df_study$exposure<- runif(n = n_patients, min = 0, max= 10)
+df_study$smoked <- as.factor(sample(c(0,1), 10, replace = TRUE))
+df_study
+
+rownames(df_study) <- colnames(cpg_beta$cpg_beta_df)
+```
+
+
+
+
+
+```{r}
+
+n.cores <- max(c(parallel::detectCores()-2,1))
+
+df_complete <- analyze_association(R = select(df_study, exposure),
+                                   P = as.data.frame(t(cpg_beta$cpg_beta_df)),
+                                   Pe = select(df_study, -exposure),
+                                   family = "gaussian", n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,
+                                   rm.na.all = FALSE, verbose = TRUE, impute_na = TRUE,
+                                   max_p_val = 0.05, n.cores = n.cores)
+
+```
