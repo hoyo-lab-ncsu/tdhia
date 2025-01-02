@@ -42,13 +42,15 @@
 #'  are found on disk. Throws error if this is not the case.
 #' @param enforce_idat_names boolean when true raises error if input IDAT files
 #' do not follow proper capitalization pattern, if FALSE only issues warning.
-#' @param merge_replicates string with the following possible values:
-#'  - NULL: the probe replicates are not merged (Default).
-#'  - pre_mean: beta value is calculated before replicates are merged and beta
-#'   values are averaged between replicates.
-#'  - post_mean: replicates are merged by averaging fluorescent signal from
-#'   each channel individually (after background subtraction and normalization).
-#'   Beta values are then calculated from these averaged values.
+#' @param merge_replicates string with the following possible values that
+#' determines how replicate probes are handled.
+#'  - NULL: the probe replicates are not merged (default value).
+#'  - pre_beta: replicates are merged by averaging fluorescent signal from
+#'   each channel individually, beta values are then calculated from these
+#'   averaged values (pre_beta = merging done before beta calculation).
+#'  - post_beta: beta value is calculated before replicates are merged and beta
+#'   values are averaged between replicates (post_beta = merging done before
+#'   beta calculation).
 #' @returns a named list with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
@@ -239,15 +241,15 @@ load_idata_to_probes <-
 #' @param mft manifest file for particular imprintome array used in data collection.
 #' A dataframe with metadata mapping probe_ids to CpG sites and genome locations.
 #' See ?manifest_v1A2 for more info.
-#' @param merge_replicates string or empty that specifies how replicate probes
-#' are merged.
-#'  - pre_mean: replicates are merged before calculating the beta value (signal
-#'  from methylated and unmethylated channels are averaged individually). Merged
-#'  p-values are calculated with a bates distribution.
-#'  - post_mean: replicates are merged after calculating the beta value
-#'  (beta values are merged).
-#'  - NULL: no merging is done at this step (downstream they are eventually
-#'  merged at the cpg level if both probes pass p-value threshold.).
+#' @param merge_replicates string with the following possible values that
+#' determines how replicate probes are handled.
+#'  - NULL: the probe replicates are not merged (default value).
+#'  - pre_beta: replicates are merged by averaging fluorescent signal from
+#'   each channel individually, beta values are then calculated from these
+#'   averaged values (pre_beta = merging done before beta calculation).
+#'  - post_beta: beta value is calculated before replicates are merged and beta
+#'   values are averaged between replicates (post_beta = merging done before
+#'   beta calculation).
 #' @param core_params boolean flag, when true the max number of cores minus 1 is
 #' used for the current system.
 #' @param db_flag todo
@@ -339,15 +341,15 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
 #' fluorescent channel individually, p-values are merged based on a bates distribution.
 #'
 #' @param sigset dataframe that is a sigset from the sesame package.
-#' @param merge_replicates string or empty that specifies how replicate probes
-#' are merged.
-#'  - pre_mean: replicates are merged before calculating the beta value (signal
-#'  from methylated and unmethylated channels are averaged individually). Merged
-#'  p-values are calculated with a bates distribution.
-#'  - post_mean: replicates are merged after calculating the beta value
-#'  (beta values are merged).
-#'  - NULL: no merging is done at this step (downstream they are eventually
-#'  merged at the cpg level if both probes pass p-value threshold.).
+#' @param merge_replicates string with the following possible values that
+#' determines how replicate probes are handled.
+#'  - NULL: the probe replicates are not merged (default value).
+#'  - pre_beta: replicates are merged by averaging fluorescent signal from
+#'   each channel individually, beta values are then calculated from these
+#'   averaged values (pre_beta = merging done before beta calculation).
+#'  - post_beta: beta value is calculated before replicates are merged and beta
+#'   values are averaged between replicates (post_beta = merging done before
+#'   beta calculation).
 #' @param db_flag boolean, when TRUE the workspace is saved to disk for debugging.
 #' @importFrom magrittr "%>%"
 #' @importFrom rlang .data
@@ -356,6 +358,10 @@ sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "sigset_merge_replicates.RData")
   # load(file = "sigset_merge_replicates.RData")
+
+  if (!merge_replicates %in% c(NULL, "pre_beta", "post_beta")) {
+    stop("argument merge_replicates needs to be NULL, 'pre_beta','or 'post_beta'.")
+  }
 
   # Initialize variables to
   cpg_ids <- Probe_ID <- MR <- MG <- UG <- UR <- mask <- p_val <- key <- NA
