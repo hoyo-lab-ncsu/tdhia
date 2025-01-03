@@ -64,14 +64,16 @@ are found on disk. Throws error if this is not the case.}
 \item{enforce_idat_names}{boolean when true raises error if input IDAT files
 do not follow proper capitalization pattern, if FALSE only issues warning.}
 
-\item{merge_replicates}{string with the following possible values:
+\item{merge_replicates}{string with the following possible values that
+determines how replicate probes are handled.
 \itemize{
-\item NULL: the probe replicates are not merged (Default).
-\item pre_mean: beta value is calculated before replicates are merged and beta
-values are averaged between replicates.
-\item post_mean: replicates are merged by averaging fluorescent signal from
-each channel individually (after background subtraction and normalization).
-Beta values are then calculated from these averaged values.
+\item NULL: the probe replicates are not merged (default value).
+\item pre_beta: replicates are merged by averaging fluorescent signal from
+each channel individually, beta values are then calculated from these
+averaged values (pre_beta = merging done before beta calculation).
+\item post_beta: beta value is calculated before replicates are merged and beta
+values are averaged between replicates (post_beta = merging done before
+beta calculation).
 }}
 }
 \value{

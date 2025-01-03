@@ -1,0 +1,333 @@
+---
+title: "imprintome_vs_wgbs_methylation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{imprintome_vs_wgbs_methylation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+# devtools::load_all()
+# detach(name = "package:tdhia", unload=TRUE)
+# remove.packages("tdhia")
+# eblvm_path <- devtools::build(pkg = paste0(dirname(here::here()), "/eblvm"))
+# install.packages(eblvm_path, lib='eblvm',repos = NULL, type="source",clean = TRUE)
+```
+
+Load TDHIA and helper functions.
+
+```{r setup}
+library(tdhia)
+
+
+library(tidyverse)
+library(cowplot)
+
+#' group_by_patient
+#' @description For each patient, group beta/ methylation % values from a 
+#' specific imprintome pipeline, along with methylation from WGBS.
+#' 
+#' @param df_study dataframe of study data, contains data for each patient to 
+#' imprintome vs wgbs.
+#' @param df_cpg_imp methylation data from a particular imprintome pipeline
+#' @param df_cpg_wgbs methylation data from wgbs data
+#' @param col_label string column label, used to label name of pipeline
+#' 
+#' @return
+group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, col_label) {
+  
+  df_list <- list()
+  for (n in 1:nrow(df_study)) {
+    # colnames(df_cpg_imp == df_study$Patient.ID[n]
+    x = select(df_cpg_imp, one_of(df_study$Patient.ID[n])) %>% rownames_to_column("cpg_id")
+    y = select(df_cpg_wgbs, one_of(df_study$wgbs_base_names[n])) %>% rownames_to_column("cpg_id")
+    df_join <- left_join(x = x, y = y, by = "cpg_id", keep = FALSE, na_matches = "never",
+                         unmatched= "drop", relationship = "one-to-one")
+    colnames(df_join) <- c("cpg_id", "imp","wgbs")
+    df_join$sample_id <- df_study$wgbs_base_names[n]
+    df_join$name <- col_label
+    df_list[[n]] <- df_join
+  }
+  
+ 
+  df_comp  <- do.call(rbind, df_list)
+  return(df_comp)
+
+}
+
+#' group_by_group
+#' @description For study group, group mean beta/ methylation % values from a 
+#' specific imprintome pipeline, along with methylation from WGBS.
+#' 
+#' @param df_study dataframe of study data, contains data for each patient to 
+#' imprintome vs wgbs.
+#' @param df_cpg_imp methylation data from a particular imprintome pipeline
+#' @param df_cpg_wgbs methylation data from wgbs data
+#' @param col_label string column label, used to label name of pipeline
+#' 
+#' @return
+group_by_group <- function(df_study, df_cpg_imp, df_cpg_wgbs, col_label) {
+  
+  # Get unique study groups to average patients from each groups
+  unq_study_groups <- unique(df_study$study_groups)
+  
+  df_list <- list()
+  for (n in 1:length(unq_study_groups)) {
+    # Binary index of patients that match group
+    bind <- df_study$study_groups == unq_study_groups[n]
+    
+    
+    x <- data.frame(imp = rowMeans(select(df_cpg_imp, df_study$Patient.ID[bind]))) %>%
+      rownames_to_column("cpg_id")
+    y <- data.frame(wgbs = rowMeans(select(df_cpg_wgbs, df_study$wgbs_base_names[bind]))) %>% 
+      rownames_to_column("cpg_id")
+    
+    df_join <- left_join(x = x, y = y, by = "cpg_id", keep = FALSE, na_matches = "never",
+                         unmatched= "drop", relationship = "one-to-one")
+    df_join$sample_id <- unq_study_groups[n]
+    df_join$pipeline_name <- col_label
+    df_list[[n]] <- df_join
+  }
+  
+  df_comp  <- do.call(rbind, df_list)
+  return(df_comp)
+  
+}
+mft <- tdhia::manifest_v1A2_design_scores
+```
+
+
+
+```{r metadata, include = TRUE, cache = FALSE}
+# Define local variables
+idat_dir_path <- system.file("extdata", package = "tdhia")
+out_path = paste0(dirname(here::here()), "/data/tdhia_brain")
+# Loading AD study data 
+#_______________________________________________________________________________
+pdata_wgbs <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
+pdata_imprintome <- read.csv(file = paste0(idat_dir_path, "/Imprintome_NC_State_pData.csv"))
+# Filtering metadata rows
+pdata_imprintome <- pdata_imprintome[grepl(pattern = "[A-Z]{2}", x = pdata_imprintome$Sample),]
+pdata_imprintome$sampleID <- as.numeric(stringr::str_extract(pdata_imprintome$Sample, "[0-9]+$"))
+pdata_wgbs_full <- 
+  dplyr::left_join(x = pdata_wgbs, y = pdata_imprintome, by = "sampleID", keep = FALSE) %>% 
+  dplyr::filter(!is.na(Patient.ID))
+# Get basenames from wgbs file names
+pdata_wgbs_full$wgbs_base_names <- sapply(strsplit(pdata_wgbs_full$FileName, "_"),
+                                          function(x) x[1])
+# Get study groups
+pdata_wgbs_full$study_groups = stringr::str_replace(pdata_wgbs_full$wgbs_base_names, '[0-9]+$',"")
+
+```
+
+```{r processing, include = TRUE, cache = TRUE}
+
+
+# Store raw output (cpg beta matrix) of each pipeline (and gold standard reference) into a named list
+# to make downstream processing easier.
+raw_list <- list()
+
+# Pipeline 1: default                                                ###########
+#_______________________________________________________________________________
+# Standard base pipeline
+# 1) Load probe data and merge
+probe_beta <- 
+  load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
+                        merge_replicates = NULL, db_flag = TRUE)
+# 3) Filter probes results
+filt_probe_beta <-
+  filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
+                max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
+                set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .20)
+# 4) Merge probe measurement to cpg sites
+cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = TRUE)
+icr_beta <- convert_cpgs_to_icrs(cpg_beta)
+raw_list$default <- cpg_beta$cpg_beta_df
+
+
+# Pipeline 2: quant_norm                                                ###########
+#_______________________________________________________________________________
+# Standard pipeline, but performed quantile normalization (patient-wise) during 
+# cpg conversion step.
+#    Flags: convert_probes_to_cpgs:quantile_norm = TRUE
+cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE, quantile_norm = TRUE)
+raw_list$quant_norm <- cpg_beta$cpg_beta_df
+
+
+# Pipeline 3: cpg_smooth                                                ###########
+#_______________________________________________________________________________
+# Standard pipeline, but cpg smoothing is performed (moving average of beta values 
+# from adjacent sites within the same ICR) 
+#    Flags: convert_probes_to_cpgs:smooth_adj_cpgs = TRUE
+cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE, smooth_adj_cpgs = TRUE)
+raw_list$cpg_smooth <- cpg_beta$cpg_beta_df
+
+
+# Pipeline 4: oocyte support data                                    ###########
+#_______________________________________________________________________________
+# Standard pipeline, but only cpg's that have experiment-based oocyte support 
+# data are included (from 384 ICRs).
+# Load validation data
+df_valid <- as.data.frame(data.table::fread(here::here("data-raw","validated_ICRs_11152024.bed")))
+colnames(df_valid) <- c("chr", "start", "finish", "icr")
+# determine which rows in manifest have validated cpgs
+is_validated <- sapply(1:nrow(mft), function(x) {any((
+  mft[x,]$CHR==df_valid$chr) &
+    (mft[x,]$MAPINFO > df_valid$start &
+       mft[x,]$MAPINFO < df_valid$finish ))})
+validated_cpg_ids <- mft$Name[is_validated]
+# Subset of cpg sites with direct oocyte data supporting icr
+raw_list$oocyte <- cpg_beta$cpg_beta_df[rownames(cpg_beta$cpg_beta_df) %in%
+                                          validated_cpg_ids,]
+
+
+# Pipeline 5: low_p_val                                             ############
+#_______________________________________________________________________________
+# Standard pipeline, but using a strict p-value threshold of 0.05 for sesame 
+# signal detection p-value instead of the usual
+#    Flags: max_sig_pval = 0.05
+# 3) Filter probes results
+filt_probe_beta <-
+  filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
+                max_sig_pval = 0.05, max_probe_fail_rate = 0.1, db_flag = FALSE,
+                set_failed_betas_na = FALSE, discard_failed_probes = TRUE, 
+                min_design_score = .20)
+# 4) Merge probe measurement to cpg sites
+cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = TRUE)
+raw_list$low_p_val <- cpg_beta$cpg_beta_df
+
+
+# Pipeline 6: design_thresh                                         ###########
+#_______________________________________________________________________________
+# Standard pipeline, excluding probes with low design score (0.30) are excluded.
+#    Flags: min_design_score = .30
+# 3) Filter probes results
+filt_probe_beta <-
+  filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
+                max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
+                set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .30)
+# 4) Merge probe measurement to cpg sites
+cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
+raw_list$design_thresh <- cpg_beta$cpg_beta_df
+
+
+# Pipeline 7: pre_merge                                               ###########
+#_______________________________________________________________________________
+#  Standard pipeline, but replicate probes are averaged by methylation and
+# unmethylation score for each fluorescent channel individually. Merged probes 
+# are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame 
+# detection p-values are calculated with the bates distribution. 
+#  There is a procedure that determine whether to merge probes or only keep one 
+# probe based on which has the smallest detection p-value.
+# 1) Load probe data and merge
+probe_beta <- 
+  load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
+                       merge_replicates = "pre_beta", db_flag = TRUE)
+# 3) Filter probes results
+filt_probe_beta <-
+  filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
+                max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
+                set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .20)
+# 4) Cpg matrix
+cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
+raw_list$pre_merge <- cpg_beta$cpg_beta_df
+
+
+# Pipeline 8: post_merge                                              ###########
+#_______________________________________________________________________________
+#  Standard pipeline, but replicate probes are averaged after beta value calculated. Merged 
+# probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame 
+# detection p-values are calculated with the bates distribution. 
+#  There is a procedure that determine whether to merge probes or only keep one 
+# probe based on which option has the smallest detection p-value (merged probe, 
+# probe #1, probe #2).
+# 1) Load probe data and merge
+probe_beta <- 
+  load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
+                       merge_replicates = "post_beta", db_flag = FALSE)
+# 3) Filter probes results
+filt_probe_beta <-
+  filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
+                max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
+                set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .20)
+# 4) Cpg matrix
+cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
+raw_list$post_merge <- cpg_beta$cpg_beta_df
+
+
+# Pipeline reference (wgbs)                                          ###########
+#_______________________________________________________________________________
+# Methylation ratio calculated for the same cpg sites using wgbs data.
+raw_list$reference <- tdhia::alzheimer_study_wbgs_shared_cpg
+
+
+saveCache(raw_list)
+# pdata_wgbs_full
+# raw_list
+
+# saveCache(object, key=NULL, sources=NULL, suffix=".Rcache", comment=NULL, pathname=NULL,
+# dirs=NULL, compress=NULL, ...)
+save(raw_list, file = paste0(out_path, "/1_AD_load_data.RData"))
+# load(file = paste0(out_path, "/1_AD_load_data.RData"))
+# pdata_wgbs <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
+# pdata_imprintome
+```
+
+```{r, include = TRUE}
+
+# Grab and sort data from each technology, paired by patient
+df_grouped <- do.call(rbind, lapply(1:(length(names(raw_list))-1), 
+                                    function(x) group_by_group(df_study = pdata_wgbs_full, 
+                                                                 df_cpg_imp = raw_list[[x]],   
+                                                                 df_cpg_wgbs = raw_list$reference,
+                                                                 col_label = names(raw_list)[x])))
+
+# Show raw datapoints wgbs versus imprintome
+gg <- ggplot2::ggplot(data = subset(df_grouped,pipeline_name == "default"), 
+                      aes(x= wgbs, y = imp, color = pipeline_name)) +
+  geom_point(size = 0.5) + theme_classic() + facet_wrap(vars(sample_id))
+gg
+# save_plot(paste0(dirname(here::here()), "/data/tdhia_brain/", "mean_scatter.jpg"), gg,
+#           base_width = 7, base_height = 7)
+
+# Calculate summary of correlation to gold standard
+df_summary <- df_grouped %>% dplyr::group_by(sample_id, pipeline_name) %>% 
+  dplyr::summarize(rho = cor(imp, wgbs, use = "complete.obs"), .groups = "drop_last")
+
+# Plot rho values for output from each version of the pipeline
+gg <- ggplot2::ggplot(data = df_summary, aes(x= pipeline_name, y = rho, color = pipeline_name)) +
+  geom_point() + theme_classic()
+gg
+
+```
+
+```{r, include = TRUE}
+
+# Grab and sort data from each technology, paired by patient
+df_grouped <- do.call(rbind, lapply(1:(length(names(raw_list))-1), 
+       function(x) group_by_patient(df_study = pdata_wgbs_full, 
+                                    df_cpg_imp = raw_list[[x]],   
+                                    df_cpg_wgbs = raw_list$reference,
+                                    col_label = names(raw_list)[x])))
+
+
+# Calculate pearson rho between imprintome and wgbs for each patient
+df_summary <- df_grouped %>% group_by(sample_id, name) %>% summarize(rho = cor(
+  imp, wgbs, use = "complete.obs"), .groups = "drop_last")
+# df_summary <- summarize_patient_groups(df_grouped)
+
+
+
+# Plot rho values for output from each version of the pipeline
+gg <- ggplot2::ggplot(data = df_summary, aes(x= name, y = rho, color = name)) +
+  geom_boxplot() + theme_classic()
+gg
+
+```
+
+

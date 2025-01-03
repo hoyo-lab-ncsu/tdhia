@@ -233,3 +233,20 @@
 #' }
 #' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
 "alzheimer_study_wbgs_shared_cpg"
+
+
+
+#' WGBS ratio data from brain tissue from alzheimer study
+#'
+#' This dataframe contains sample_id information for wgbs files.
+#'
+#' @name alzheimer_study_wbgs_shared_cpg_metadata
+#' @docType data
+#' @keywords datasets
+#' @usage NULL
+#' @format A dataframe with sample ID for wgbs data
+#' \describe{
+#'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
+#' }
+#' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
+"alzheimer_study_wbgs_shared_cpg_metadata"

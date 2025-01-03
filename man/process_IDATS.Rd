@@ -27,16 +27,16 @@ See ?manifest_v1A2 for more info.}
 \item{core_params}{boolean flag, when true the max number of cores minus 1 is
 used for the current system.}
 
-\item{merge_replicates}{string or empty that specifies how replicate probes
-are merged.
+\item{merge_replicates}{string with the following possible values that
+determines how replicate probes are handled.
 \itemize{
-\item pre_mean: replicates are merged before calculating the beta value (signal
-from methylated and unmethylated channels are averaged individually). Merged
-p-values are calculated with a bates distribution.
-\item post_mean: replicates are merged after calculating the beta value
-(beta values are merged).
-\item NULL: no merging is done at this step (downstream they are eventually
-merged at the cpg level if both probes pass p-value threshold.).
+\item NULL: the probe replicates are not merged (default value).
+\item pre_beta: replicates are merged by averaging fluorescent signal from
+each channel individually, beta values are then calculated from these
+averaged values (pre_beta = merging done before beta calculation).
+\item post_beta: beta value is calculated before replicates are merged and beta
+values are averaged between replicates (post_beta = merging done before
+beta calculation).
 }}
 
 \item{db_flag}{todo}
