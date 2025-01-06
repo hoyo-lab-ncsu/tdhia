@@ -18,7 +18,7 @@ filter_probes(
 )
 }
 \arguments{
-\item{probe_beta}{a list object that a dataframe of beta values and pvalues.
+\item{probe_beta}{a list object with the following named fields
 $probe_beta_df: a dataframe of beta values, probe_id x sample_id
 $probe_pval_df: a dataframe of signal detection p-values, probe_id x sample_id}
 
@@ -59,5 +59,5 @@ are the sample_ids (basenames of the IDAT files or some other mapping
 specified by idat_remappings).
 }
 \description{
-Applies QC and filtering for a probe_beta matrix.
+Applies probe and measurement filtering for a probe_beta matrix.
 }

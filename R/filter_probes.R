@@ -2,9 +2,9 @@
 
 #' filter_probes
 #'
-#' Applies QC and filtering for a probe_beta matrix.
+#' Applies probe and measurement filtering for a probe_beta matrix.
 #'
-#' @param probe_beta a list object that a dataframe of beta values and pvalues.
+#' @param probe_beta a list object with the following named fields
 #'   $probe_beta_df: a dataframe of beta values, probe_id x sample_id
 #'   $probe_pval_df: a dataframe of signal detection p-values, probe_id x sample_id
 #' @param discard_unmapped_probes boolean flag, when TRUE probes that do not map
