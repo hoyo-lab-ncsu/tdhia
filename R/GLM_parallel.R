@@ -159,5 +159,7 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
   df_res$aic <- aic
   if (verbose) {print(cf)}
 
+
+
   return(df_res)
 }
