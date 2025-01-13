@@ -1,6 +1,14 @@
 ---
 title: "imprintome_vs_wgbs_methylation"
-output: rmarkdown::html_vignette
+output: 
+  html_document:
+    toc: true # table of content true
+    number_sections: true  ## if you want number sections at each table header
+    highlight: tango  # specifies the syntax highlighting style
+    theme: united 
+    toc_float: true
+    code_folding: hide
+    toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
 vignette: >
   %\VignetteIndexEntry{imprintome_vs_wgbs_methylation}
   %\VignetteEngine{knitr::rmarkdown}
@@ -17,6 +25,35 @@ devtools::load_all()
 # remove.packages("tdhia")
 # eblvm_path <- devtools::build(pkg = paste0(dirname(here::here()), "/eblvm"))
 # install.packages(eblvm_path, lib='eblvm',repos = NULL, type="source",clean = TRUE)
+
+```
+
+
+
+This vignette will demonstrate how to load and process the imprintome files from the True Diagnostic Human Imprintome Array, along with conducting several statistical analysis on the data. We will use a dataset from:
+
+
+> Carreras-Gallo N et al. Creation and Validation of the First Infinium DNA Methylation Array for the Human Imprintome. bioRxiv [Preprint]. 2024 Jan 16:2024.01.15.575646. doi: 10.1101/2024.01.15.575646. PMID: 38293193; PMCID: PMC10827131.
+
+
+Specifically, we will replicate and extend the results from Figure 4. The dataset is comprised of 16 patients, half of which have varying degrees of Alzheimer's disease (N=8), and the other half are controls (N=8). Each patient has their imprintome methylation status measured from whole blood with whole genome bisulfite sequencing (WGBS) and from whole blood and the imprintome array.
+
+
+# Load packages and helper functions
+
+We start by loading required packages
+
+1. tdhia: True Diagnostic Human Imprintome Array package.
+
+2. rappdirs: data storage path management.
+
+3. tidyverse: data processing and plotting. 
+
+4. cowplot: plotting and saving plots to disk.
+
+
+```{r setup}
+
 library(tdhia)
 library(rappdirs)
 library(tidyverse)
@@ -24,12 +61,15 @@ library(cowplot)
 ```
 
 
+We also load two user-defined helper functions for orgnaizing data to compare imprintome to wgbs data.
 
-This vignette will demonstrate how to load and process the imprintome files from the True Diagnostic Human imprintome array, along with conducting several statistical analysis on the data.
+1. *group_by_patient()*: For each patient, group beta/ methylation % values from a specific imprintome pipeline, along with methylation from WGBS.
 
-Load TDHIA and helper functions that organize and group methylation data from imprintome and wgbs datasets.
+2. *group_by_mean()*: For study group, group mean beta/ methylation % values from a specific imprintome pipeline, along with methylation from WGBS.
 
-```{r setup}
+
+```{r setup2}
+
 #' group_by_patient
 #' @description For each patient, group beta/ methylation % values from a 
 #' specific imprintome pipeline, along with methylation from WGBS.
@@ -55,14 +95,12 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, col_label) {
     df_join$name <- col_label
     df_list[[n]] <- df_join
   }
-  
- 
   df_comp  <- do.call(rbind, df_list)
   return(df_comp)
-
 }
 
-#' group_by_group
+
+#' group_by_mean
 #' @description For study group, group mean beta/ methylation % values from a 
 #' specific imprintome pipeline, along with methylation from WGBS.
 #' 
@@ -73,15 +111,15 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, col_label) {
 #' @param col_label string column label, used to label name of pipeline
 #' 
 #' @return
-group_by_group <- function(df_study, df_cpg_imp, df_cpg_wgbs, col_label) {
+group_by_mean <- function(df_study, df_cpg_imp, df_cpg_wgbs, col_label, patient_id = 0) {
   
   # Get unique study groups to average patients from each groups
-  unq_study_groups <- unique(df_study$study_groups)
+  unq_study_group <- unique(df_study$study_group)
   
   df_list <- list()
-  for (n in 1:length(unq_study_groups)) {
+  for (n in 1:length(unq_study_group)) {
     # Binary index of patients that match group
-    bind <- df_study$study_groups == unq_study_groups[n]
+    bind <- df_study$study_group == unq_study_group[n]
     
     
     x <- data.frame(imp = rowMeans(select(df_cpg_imp, df_study$Patient.ID[bind]))) %>%
@@ -91,22 +129,32 @@ group_by_group <- function(df_study, df_cpg_imp, df_cpg_wgbs, col_label) {
     
     df_join <- left_join(x = x, y = y, by = "cpg_id", keep = FALSE, na_matches = "never",
                          unmatched= "drop", relationship = "one-to-one")
-    df_join$sample_id <- unq_study_groups[n]
+    df_join$sample_id <- unq_study_group[n]
     df_join$pipeline_name <- col_label
+    df_join$patient_id <- patient_id 
     df_list[[n]] <- df_join
   }
-  
   df_comp  <- do.call(rbind, df_list)
   return(df_comp)
-  
 }
+
 mft <- tdhia::manifest_v1A2_design_scores
 ```
 
+# Load and clean study metadata
 
+Study metadata are read from several csv files that join together info several pieces of information.
+
+1. WGBS filnames to study_ids.
+
+2. Imprintome filenames to study_ids.
+
+3. Study_ids to demographical information about the study participant.
+
+All of this information is collected in the study_metadata dataframe.
 
 ```{r metadata, include = TRUE, cache = FALSE}
-# Define local variables
+# Define local path variables
 idat_dir_path <- system.file("extdata", package = "tdhia")
 out_path = paste0(dirname(getwd()), "/data/tdhia_brain")
 # Loading AD study data 
@@ -122,18 +170,54 @@ pdata_wgbs_full <-
 # Get basenames from wgbs file names
 pdata_wgbs_full$wgbs_base_names <- sapply(strsplit(pdata_wgbs_full$FileName, "_"),
                                           function(x) x[1])
-# Add race variable
-pdata_wgbs_full$race <- grepl(pattern = "black", x = pdata_wgbs_full$Treatment)
-pdata_wgbs_full$is_control <- grepl(pattern = "control", x = pdata_wgbs_full$Treatment)
-pdata_wgbs_full$disease <- !pdata_wgbs_full$is_control
-# Get study groups
-pdata_wgbs_full$study_groups = stringr::str_replace(pdata_wgbs_full$wgbs_base_names, '[0-9]+$',"")
+
 # Add patient id as rownames
 rownames(pdata_wgbs_full) <- pdata_wgbs_full$Patient.ID
 
+wgbs_complete <- read.csv(file = paste0(system.file("data-raw", package = "tdhia"), "/AD.WGBS.Brain.samples.TimeFrozen.csv"))
+
+# merge with additional study data
+study_metadata <- left_join(x = pdata_wgbs_full, y = wgbs_complete %>% dplyr::rename(
+  sampleID = Sample.ID), by = "sampleID", keep = FALSE, unmatched = "drop")
+
+study_metadata$Treatment <- factor(study_metadata$Treatment)
+study_metadata$AD.Case.Control <- factor(study_metadata$AD.Case.Control)
+study_metadata$Ethnicity <- factor(study_metadata$Ethnicity)
+study_metadata$Age <- as.numeric(str_replace(string = study_metadata$Age, pattern = ">", ""))
+study_metadata$Sex <- factor(study_metadata$Sex)
+rownames(study_metadata) <- study_metadata$Patient.ID
+
+
+# COnvert variables needed for statisticla analysis to factors or boolean variables
+study_metadata$race <-  study_metadata$Ethnicity
+study_metadata$is_control = study_metadata$AD.Case.Control == "Control"
+study_metadata$disease_state = study_metadata$AD.Case.Control != "Control"
+study_metadata$study_group <- study_metadata$Treatment
+
+
 ```
 
-```{r processing, include = TRUE, cache = TRUE}
+
+# Process Imprintome with Various Settings and Pair with WGBS data
+
+1. **default**: beta values from standard default pipeline. The SeSame R package is used for processing the methylation data. Raw IDAT files are loaded, the Infinuium probe type is inferred, flourescent signal is subtracted with Norm-Exp deconvolution that is parameterized with out-of-band probes, and a non-linear dye bias correction is applied.
+
+2. **quant_norm**: beta values from standard pipeline, but performed quantile normalization (patient-wise) during cpg conversion step.
+
+3. **cpg_smooth**: beta values from standard pipeline, but cpg smoothing is performed (moving average of beta values from adjacent sites within the same ICR).
+oocyte
+
+4. **low_p_val**: beta values from standard pipeline, but using a strict p-value threshold of 0.05 for sesame signal detection p-value instead of the usual.
+
+5. **design_thresh**: exclude probes that have an illumina probe design score below 0.5.
+
+6. **pre_merge**: beta values from standard pipeline, but replicate probes are averaged *before beta values are calculated*, meaning the averaged by methylation and unmethylation signal for each fluorescent channel individually. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.
+
+7. **post_merge**: beta values from standard pipeline, but replicate probes are averaged *after beta values calculated*. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.
+
+8. **reference**: methylation percent processed from whole genome bisulfate sequencing data.
+
+```{r processing, include = TRUE, cache = FALSE}
 
 # Using a persistent app directory to cache output for this code chunk
 user_data_path <- rappdirs::user_data_dir("tdhia")
@@ -223,7 +307,7 @@ if (!file.exists(data_filepath)) {
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
-                  set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .30)
+                  set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .5)
   # 4) Merge probe measurement to cpg sites
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   raw_list$design_thresh <- cpg_beta$cpg_beta_df
@@ -285,7 +369,9 @@ if (!file.exists(data_filepath)) {
 ```
 
 
-## Distirbution of beta values with and with quantile normalization
+## Visualize Distribution of beta values with and with quantile normalization
+
+One of the options within the pipeline is to perform quantile normalization on beta values across patients. This makes normalizes the distribution across samples and is often used to compare data across methylation chips. Below is are densities plots of the beta values with (left) and without (right) normalization applied.
 
 ```{r, include = TRUE}
 
@@ -296,36 +382,44 @@ cowplot::plot_grid(gg1, gg2)
 
 ```
 
-## Mean Correlation Imprintome Vs. WGBS
+# Mean Correlation Imprintome Vs. WGBS
+
+No we can compare the agreement of results between the imprintome array and WGBS. Beta values are first paired between the two technologies in a data frame that includes the union of all of the cpg sites found on the array. The WGBS dataset does not have coverage for all of these sites since it is a sequence based approach. On average the WGBS data has coverage for about 25% of the cpg sites found on the imprintome.
 
 ```{r, include = TRUE}
 
 # Grab and sort data from each technology, paired by patient
 df_grouped <- do.call(rbind, lapply(1:(length(names(raw_list))-1), function (x)
-  group_by_group(df_study = pdata_wgbs_full, df_cpg_imp = raw_list[[x]],
-                 df_cpg_wgbs = raw_list$reference, col_label = names(raw_list)[x])))
+  group_by_mean(df_study = study_metadata, df_cpg_imp = raw_list[[x]],
+                 df_cpg_wgbs = raw_list$reference, col_label = names(raw_list)[x],
+                patient_id = x)))
 
 
 ```
 
-### Comparison of Mean Pearson Correlation
+## Comparison of Mean Pearson Correlation
+To qualitatively visualize the agreement between these two technologies, we compare mean beta levels for the shared CPG sites between them. For the figure below, the beta values are calculated from a default pipeline and then averaged across all patients in a study group (black AD, black Control, white AD, white control).
 ```{r, include = TRUE}
 
 # Show raw datapoints wgbs versus imprintome
-gg <- ggplot2::ggplot(data = subset(df_grouped,pipeline_name == "default"), 
+gg <- ggplot2::ggplot(data = subset(df_grouped, pipeline_name == "default"), 
                       aes(x= wgbs, y = imp, color = pipeline_name)) +
-  geom_point(size = 0.5) + theme_classic() + facet_wrap(vars(sample_id))
+  geom_point(size = 0.5) + theme_classic() + facet_wrap(vars(sample_id)) + 
+  theme(legend.position ="none")
 gg
 
 ```
 
+## Comparison of Mean Pearson Correlation
 
-### Comparison of Mean Pearson Correlation
+We calculate the pearson correlation between the averaged beta measurements to a correlation coefficient for each of the study groups. Of the various imprintome pipelines tested, cpg smoothing and a design score threshold of > 0.5 increase the observed correlation coefficient with WGBS measurements.
+
 ```{r, include = TRUE}
 
 # Calculate summary of correlation to gold standard
 df_summary <- df_grouped %>% dplyr::group_by(sample_id, pipeline_name) %>% 
-  dplyr::summarize(rho = cor(imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last")
+  dplyr::summarize(rho = cor(imp, wgbs, use = "complete.obs", method = "pearson"), 
+                   .groups = "drop_last")
 
 # Plot rho values for output from each version of the pipeline
 gg <- ggplot2::ggplot(data = df_summary, aes(x= pipeline_name, y = rho, color = pipeline_name)) +
@@ -336,6 +430,8 @@ gg
 
 
 ## Per Patient Correlation of Imprintome vs WGBS
+
+Now we can examine the correlation between beta values from the imprintome versus WGBS within each patient (instead of mean correlation for each study group). The pearson correlation for each patient is calculated (cpg sites that are not included in the WGBS data are removed). Once again, cpg smoothing and design score thresholding increase the observed mean correlation on a patient levl as well.
 
 ```{r, include = TRUE}
 
@@ -349,9 +445,8 @@ df_grouped <- do.call(rbind, lapply(1:(length(names(raw_list))-1),
 
 # Calculate pearson rho between imprintome and wgbs for each patient
 df_summary <- df_grouped %>% group_by(sample_id, name) %>% summarize(rho = cor(
-  imp, wgbs, use = "complete.obs"), .groups = "drop_last")
+  imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last")
 # df_summary <- summarize_patient_groups(df_grouped)
-
 
 
 # Plot rho values for output from each version of the pipeline
@@ -359,41 +454,66 @@ gg <- ggplot2::ggplot(data = df_summary, aes(x= name, y = rho, color = name)) +
   geom_boxplot() + theme_classic()
 gg
 
+
 ```
 
-# Case-control analysis
+# Case-control analysis: Alzheimer Patient's 
+
+Now we can perform a simple case control analysis on the data to see if there is a difference in mean beta values in healthy patients versus those with Alzheimers. Patients are separated between these two study groups,  and then a t-test is performed between the measurments from each group. P-values are corrected with a FDR correction base on the number of ICRs measured by the probes that passed quality control filtering.
 
 ```{r, include = TRUE}
 
-case_control <- tdhia::analyze_case_control(raw_list$cpg_smooth, pdata_wgbs_full$is_control)
+case_control <- tdhia::analyze_case_control(raw_list$cpg_smooth, study_metadata$is_control, n_adjust = nrow(icr_beta$icr_beta_df))
 
 # sum(case_control)
 
-head(case_control[order(case_control$adj_pval, decreasing = TRUE),])
+head(case_control[order(case_control$adj_pval, decreasing = FALSE),])
+
+sum(case_control$adj_pval<0.05)
+
 ```
 
-# Association Study
+# Association Study: Imprintome Methylation Status and Alzheimer's
+
+We can also perform an association study the also probes for differences in methylation between study groups, by also makes use of demographic information of the participants. We fit a series of linear models of the form:
+
+disease_state ~ cpg_beta + Ethnicity + Age + Sex
+
+1. **disease_state**: binary, TRUE is alzheimer's
+
+2. **cpg_beta**: methylation beta value at a particular cpg site.
+
+3. **Ethnicity**: factor with two levels: non-hispanic black and non-hispanic white.
+
+4. **Age**: continuous variable, age of participant.
+
+5. **Sex**: factor with 2 levels, male/ female.
+
+Where disease_state is the response variable, and cpg_beta is the primary predictor, while also adjusting for ethnicity, age, and biological sex.
+
+
 
 ```{r, include = TRUE}
 
 n.cores <- max(c(parallel::detectCores()-2,1))
 df_alzheimer <- analyze_association(
-  R = select(pdata_wgbs_full, disease), P = as.data.frame(t(raw_list$cpg_smooth)),
-  Pe = select(pdata_wgbs_full, race), family = "gaussian", 
+  R = select(study_metadata, disease_state), P = as.data.frame(t(raw_list$cpg_smooth)),
+  Pe = select(study_metadata, c(Ethnicity, Age, Sex)), family = "gaussian", 
   n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
 
 ```
 
-Significant ICR/CpG sites
+## Significant ICR/CpG sites
 ```{r, include = TRUE}
 
+# add ICR ID to the cpg sites
 df_alzheimer$imp_site$icr_id <- match_cpg_id_to_icr_id(df_alzheimer$imp_site$Variable, AsNumeric = FALSE)
-
+# Export result to simpler structure
 df_res <- df_alzheimer$imp_site
-
+# Add gene metadata to each cpg site
 df_res_meta <- add_gene_metadata_to_icr(df_res)
-
+# 
 select(df_res_meta, c(icr_name, Variable, ADJ_P_VAL, is_icr_zinc, is_icr_highconf,
                       is_icr_medconf, is_icr_lowconf, Nearest.Transcript,
                       Distance.to.Nearest.Transcript))
