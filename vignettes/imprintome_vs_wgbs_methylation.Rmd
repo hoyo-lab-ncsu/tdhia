@@ -1,5 +1,7 @@
 ---
-title: "imprintome_vs_wgbs_methylation"
+title: "Comparison of Methylation Measurements between Imprintome and WGBS"
+author: "Bruce Corliss"
+date: "`r Sys.Date()`"
 output: 
   html_document:
     toc: true # table of content true
@@ -10,7 +12,7 @@ output:
     code_folding: hide
     toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
 vignette: >
-  %\VignetteIndexEntry{imprintome_vs_wgbs_methylation}
+  %\VignetteIndexEntry{Comparison of Methylation Measurements between Imprintome and WGBS}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -28,7 +30,7 @@ devtools::load_all()
 
 ```
 
-
+# Introduction
 
 This vignette will demonstrate how to load and process the imprintome files from the True Diagnostic Human Imprintome Array, along with conducting several statistical analysis on the data. We will use a dataset from:
 
@@ -36,20 +38,20 @@ This vignette will demonstrate how to load and process the imprintome files from
 > Carreras-Gallo N et al. Creation and Validation of the First Infinium DNA Methylation Array for the Human Imprintome. bioRxiv [Preprint]. 2024 Jan 16:2024.01.15.575646. doi: 10.1101/2024.01.15.575646. PMID: 38293193; PMCID: PMC10827131.
 
 
-Specifically, we will replicate and extend the results from Figure 4. The dataset is comprised of 16 patients, half of which have varying degrees of Alzheimer's disease (N=8), and the other half are controls (N=8). Each patient has their imprintome methylation status measured from whole blood with whole genome bisulfite sequencing (WGBS) and from whole blood and the imprintome array.
+First, we will replicate and extend the results from Figure 4 of this paper. The dataset is comprised of 16 patients, half of which have varying degrees of Alzheimer's disease (N=8), and the other half are controls (N=8). Each patient has their imprintome methylation status measured from whole blood with whole genome bisulfite sequencing (WGBS) and from whole blood and the imprintome array. We will examine the agreement between these two technologies by comparing methylation beta values for each of the shared cpg site at the patient level, and also the mean methylation beta value across several patients in a study group.
+
+Additionally, a case-control analysis will be performed with the imprintome dataset to test for changes in methylation between the Alzheimer patients and the control patients. A series of t-tests, one for each cpg site, will test for differences in the mean beta value between study groups.
+
+Finally, we will perform an association study by using additional patient study data to probe for relationships between imprintome CpG methylation beta values and the presence of Alzheimer disease.
 
 
 # Load packages and helper functions
 
-We start by loading required packages
-
-1. tdhia: True Diagnostic Human Imprintome Array package.
-
-2. rappdirs: data storage path management.
-
-3. tidyverse: data processing and plotting. 
-
-4. cowplot: plotting and saving plots to disk.
+We start by loading required packages for this vignette.  
+1. **tdhia**: True Diagnostic Human Imprintome Array package.  
+2. **rappdirs**: data storage path management.  
+3. **tidyverse**: data processing and plotting.  
+4. **cowplot**: plotting and saving plots to disk.  
 
 
 ```{r setup}
@@ -61,11 +63,9 @@ library(cowplot)
 ```
 
 
-We also load two user-defined helper functions for orgnaizing data to compare imprintome to wgbs data.
-
-1. *group_by_patient()*: For each patient, group beta/ methylation % values from a specific imprintome pipeline, along with methylation from WGBS.
-
-2. *group_by_mean()*: For study group, group mean beta/ methylation % values from a specific imprintome pipeline, along with methylation from WGBS.
+We also load two user-defined helper functions for organizing data to for the comparative analysis.  
+1. **group_by_patient()**: For each patient, group individual beta values from a specific imprintome pipeline, along with beta values from WGBS.  
+2. **group_by_mean()**: For each study group, group mean beta values from a specific imprintome pipeline, along with beta values from WGBS.  
 
 
 ```{r setup2}
@@ -143,20 +143,16 @@ mft <- tdhia::manifest_v1A2_design_scores
 
 # Load and clean study metadata
 
-Study metadata are read from several csv files that join together info several pieces of information.
-
-1. WGBS filnames to study_ids.
-
-2. Imprintome filenames to study_ids.
-
-3. Study_ids to demographical information about the study participant.
-
-All of this information is collected in the study_metadata dataframe.
+Study metadata are read from several csv files that join together several pieces of information.  
+1. WGBS filnames to study_ids.  
+2. Imprintome filenames to study_ids.  
+3. Study_ids to demographic information about the study participant.  
+All of this information is collected in the study_metadata dataframe.  
 
 ```{r metadata, include = TRUE, cache = FALSE}
 # Define local path variables
 idat_dir_path <- system.file("extdata", package = "tdhia")
-out_path = paste0(dirname(getwd()), "/data/tdhia_brain")
+
 # Loading AD study data 
 #_______________________________________________________________________________
 pdata_wgbs <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
@@ -200,22 +196,16 @@ study_metadata$study_group <- study_metadata$Treatment
 
 # Process Imprintome with Various Settings and Pair with WGBS data
 
-1. **default**: beta values from standard default pipeline. The SeSame R package is used for processing the methylation data. Raw IDAT files are loaded, the Infinuium probe type is inferred, flourescent signal is subtracted with Norm-Exp deconvolution that is parameterized with out-of-band probes, and a non-linear dye bias correction is applied.
-
-2. **quant_norm**: beta values from standard pipeline, but performed quantile normalization (patient-wise) during cpg conversion step.
-
-3. **cpg_smooth**: beta values from standard pipeline, but cpg smoothing is performed (moving average of beta values from adjacent sites within the same ICR).
-oocyte
-
-4. **low_p_val**: beta values from standard pipeline, but using a strict p-value threshold of 0.05 for sesame signal detection p-value instead of the usual.
-
-5. **design_thresh**: exclude probes that have an illumina probe design score below 0.5.
-
-6. **pre_merge**: beta values from standard pipeline, but replicate probes are averaged *before beta values are calculated*, meaning the averaged by methylation and unmethylation signal for each fluorescent channel individually. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.
-
-7. **post_merge**: beta values from standard pipeline, but replicate probes are averaged *after beta values calculated*. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.
-
-8. **reference**: methylation percent processed from whole genome bisulfate sequencing data.
+There are various options within the TDHIA pipeline for processing imprintome data. We illustrate some of the primary options by processing the imprintome data with many deviations from the default settings for the pipeline. We can compare how well these different versions agree with results from WGBS data.
+1. **default**: beta values from standard default pipeline. The SeSame R package is used for processing the methylation data. Raw IDAT files are loaded, the Infinuium probe type is inferred, fluorescent signal is subtracted with Norm-Exp de-convolution that is parameterized with out-of-band probes, and a non-linear dye bias correction is applied.  
+2. **quant_norm**: beta values from standard pipeline, but performed quantile normalization (patient-wise) during cpg conversion step.  
+3. **cpg_smooth**: beta values from standard pipeline, but cpg smoothing is performed (moving average of beta values from adjacent sites within the same ICR).  
+4. **gametic**: filter the CpG sites by those that have complete experimental gametic evidence of 50% methylation status.
+5. **low_p_val**: beta values from standard pipeline, but using a strict p-value threshold of 0.05 for sesame signal detection p-value instead of the usual.  
+7. **design_thresh**: exclude probes that have an illumina probe design score below 0.5.  
+8. **pre_merge**: beta values from standard pipeline, but replicate probes are averaged *before beta values are calculated*, meaning the averaged by methylation and unmethylation signal for each fluorescent channel individually. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.  
+8. **post_merge**: beta values from standard pipeline, but replicate probes are averaged *after beta values calculated*. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.  
+9. **reference**: methylation percent processed from whole genome bisulfate sequencing data.  
 
 ```{r processing, include = TRUE, cache = FALSE}
 
@@ -265,9 +255,9 @@ if (!file.exists(data_filepath)) {
   raw_list$cpg_smooth <- cpg_beta$cpg_beta_df
   
   
-  # Pipeline 4: oocyte support data                                    ###########
+  # Pipeline 4: gametic support data                                    ###########
   #_______________________________________________________________________________
-  # Standard pipeline, but only cpg's that have experiment-based oocyte support 
+  # Standard pipeline, but only cpg's that have experiment-based gametic support 
   # data are included (from 384 ICRs).
   # Load validation data
   df_valid <- as.data.frame(data.table::fread(paste0(system.file("data-raw", package = "tdhia"), "/validated_ICRs_11152024.bed")))
@@ -278,8 +268,8 @@ if (!file.exists(data_filepath)) {
       (mft[x,]$MAPINFO > df_valid$start &
          mft[x,]$MAPINFO < df_valid$finish ))})
   validated_cpg_ids <- mft$Name[is_validated]
-  # Subset of cpg sites with direct oocyte data supporting icr
-  raw_list$oocyte <- cpg_beta$cpg_beta_df[rownames(cpg_beta$cpg_beta_df) %in%
+  # Subset of cpg sites with direct gametic data supporting icr
+  raw_list$gametic <- cpg_beta$cpg_beta_df[rownames(cpg_beta$cpg_beta_df) %in%
                                             validated_cpg_ids,]
   
   
@@ -371,7 +361,7 @@ if (!file.exists(data_filepath)) {
 
 ## Visualize Distribution of beta values with and with quantile normalization
 
-One of the options within the pipeline is to perform quantile normalization on beta values across patients. This makes normalizes the distribution across samples and is often used to compare data across methylation chips. Below is are densities plots of the beta values with (left) and without (right) normalization applied.
+One of the processing options within the pipeline is to perform quantile normalization on beta values across patients. This makes normalizes the distribution across samples and is often used to compare data across methylation chips. Below is are densities plots of the beta values with (left panel) and without (right panel) normalization applied.
 
 ```{r, include = TRUE}
 
@@ -384,7 +374,7 @@ cowplot::plot_grid(gg1, gg2)
 
 # Mean Correlation Imprintome Vs. WGBS
 
-No we can compare the agreement of results between the imprintome array and WGBS. Beta values are first paired between the two technologies in a data frame that includes the union of all of the cpg sites found on the array. The WGBS dataset does not have coverage for all of these sites since it is a sequence based approach. On average the WGBS data has coverage for about 25% of the cpg sites found on the imprintome.
+Now we can compare the agreement of results between the imprintome array and WGBS. Beta values are first paired between the two technologies in a data frame that includes all of the cpg sites found on the array. The WGBS dataset does not have coverage for all of these sites since it is a sequence based approach. On average the WGBS data has coverage for about 25% of the cpg sites found on the imprintome.
 
 ```{r, include = TRUE}
 
@@ -479,15 +469,11 @@ We can also perform an association study the also probes for differences in meth
 
 disease_state ~ cpg_beta + Ethnicity + Age + Sex
 
-1. **disease_state**: binary, TRUE is alzheimer's
-
-2. **cpg_beta**: methylation beta value at a particular cpg site.
-
-3. **Ethnicity**: factor with two levels: non-hispanic black and non-hispanic white.
-
-4. **Age**: continuous variable, age of participant.
-
-5. **Sex**: factor with 2 levels, male/ female.
+1. **disease_state**: binary, TRUE is Alzheimer's.  
+2. **cpg_beta**: methylation beta value at a particular cpg site.  
+3. **Ethnicity**: factor with two levels: non-hispanic black and non-hispanic white.  
+4. **Age**: continuous variable, age of participant.  
+5. **Sex**: factor with 2 levels, male/ female.  
 
 Where disease_state is the response variable, and cpg_beta is the primary predictor, while also adjusting for ethnicity, age, and biological sex.
 
@@ -505,6 +491,8 @@ df_alzheimer <- analyze_association(
 ```
 
 ## Significant ICR/CpG sites
+
+
 ```{r, include = TRUE}
 
 # add ICR ID to the cpg sites
