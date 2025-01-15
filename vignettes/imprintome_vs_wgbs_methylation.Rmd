@@ -27,8 +27,8 @@ knitr::opts_chunk$set(
 
 # detach(name = "package:tdhia", unload=TRUE)
 # remove.packages("tdhia")
-# eblvm_path <- devtools::build(pkg = paste0(dirname(here::here()), "/eblvm"))
-# install.packages(eblvm_path, lib='eblvm',repos = NULL, type="source",clean = TRUE)
+# tdhia_path <- devtools::build()
+# install.packages(tdhia_path, lib='tdhia',repos = NULL, type="source",clean = TRUE)
 
 ```
 
