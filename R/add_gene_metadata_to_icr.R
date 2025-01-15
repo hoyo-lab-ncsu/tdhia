@@ -25,7 +25,7 @@ add_gene_metadata_to_icr <- function(df_res, sort_adj_pval = TRUE) {
 
 
   # Read list of ICRs that overlap with nearby zing finger
-  df_zinc_finger <-utils::read.csv(paste0( system.file("data-raw", package = "tdhia"), "/ICR_ZincFinger_w-in_1000bp.csv"))
+  df_zinc_finger <- tdhia::imprintome_icr_zinc_finger
   df_zinc_finger$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",df_zinc_finger$icr))
   df_zinc_finger$near_zinf_finger <- rowSums(!df_zinc_finger[, 3:5] == "", na.rm = TRUE) > 0
   zinc_finger_icrs <- df_zinc_finger$icr_id[df_zinc_finger$near_zinf_finger]
@@ -33,7 +33,7 @@ add_gene_metadata_to_icr <- function(df_res, sort_adj_pval = TRUE) {
 
   # Load annotated list of whole imprintome
   # ICR_IDs that end with "#" are high confidence
-  imp_whole <- utils::read.csv(paste0(system.file("data-raw", package = "tdhia"), "/whole_imprintome_table.csv"))
+  imp_whole <- tdhia::imprintome_icr_nearest_transcripts
   imp_whole$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",imp_whole$ID))
   imp_whole$icr_name <- paste0("ICR ", imp_whole$icr_id)
   # Scan for previously published icrs
@@ -41,7 +41,7 @@ add_gene_metadata_to_icr <- function(df_res, sort_adj_pval = TRUE) {
 
   # Get list of ICRs that have evidence of gametic origin for methylation
   # Includes "high confidence" (lit validated ICRs)
-  imp_gamete <- read.csv(paste0(system.file("data-raw", package = "tdhia"), "/imprintome_icrs_gametic_methyl_origin.csv"))
+  imp_gamete <- tdhia::imprintome_icr_gametic_nearest_transcripts
   imp_gamete$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",imp_gamete$ID))
   med_conf_icrs <- imp_gamete$icr_id #setdiff(imp_gamete$icr_id, high_conf_icrs)
   low_conf_icrs <- setdiff(imp_whole$icr_id, union(med_conf_icrs, high_conf_icrs))

@@ -250,3 +250,52 @@
 #' }
 #' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
 "alzheimer_study_wbgs_shared_cpg_metadata"
+
+
+#' Zinc finger data for imprintome ICRs
+#'
+#' This dataframe lists any zinc finger sites close to each ICR
+#'
+#' @name imprintome_icr_zinc_finger
+#' @docType data
+#' @keywords datasets
+#' @usage NULL
+#' @format A dataframe with sample ID for wgbs data
+#' \describe{
+#'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
+#' }
+#' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
+"imprintome_icr_zinc_finger"
+
+#' WGBS ratio data from brain tissue from alzheimer study
+#'
+#' This dataframe lists nearest transcripts for all ICRs
+#'
+#' @name imprintome_icr_nearest_transcripts
+#' @docType data
+#' @keywords datasets
+#' @usage NULL
+#' @format A dataframe with sample ID for wgbs data
+#' \describe{
+#'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
+#' }
+#' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
+"imprintome_icr_nearest_transcripts"
+
+#' WGBS ratio data from brain tissue from alzheimer study
+#'
+#' This dataframe lists nearest transcripts for all ICRs
+#'
+#' @name imprintome_icr_gametic_nearest_transcripts
+#' @docType data
+#' @keywords datasets
+#' @usage NULL
+#' @format A dataframe with sample ID for wgbs data
+#' \describe{
+#'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
+#' }
+#' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
+"imprintome_icr_gametic_nearest_transcripts"
+
+
+

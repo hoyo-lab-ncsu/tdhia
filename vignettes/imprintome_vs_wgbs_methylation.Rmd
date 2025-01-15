@@ -22,7 +22,9 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+# Uncomment this next line if you want to knit this file on it's own, make sure working directory is set to tdhia repository base folder.
 # devtools::load_all()
+
 # detach(name = "package:tdhia", unload=TRUE)
 # remove.packages("tdhia")
 # eblvm_path <- devtools::build(pkg = paste0(dirname(here::here()), "/eblvm"))
@@ -498,10 +500,11 @@ df_alzheimer <- analyze_association(
 
 ## Significant ICR/CpG sites
 
+Now we can retrieve additional information for any CpG sites that are found to have an association, such as proximity to a zinc finger finger binding site, experimental evidence for it's associated ICR, and the nearest gene transcript.
 
 ```{r association_sig_icr, include = TRUE}
-# # add ICR ID to the cpg sites
-# df_alzheimer$imp_site$icr_id <- match_cpg_id_to_icr_id(df_alzheimer$imp_site$Variable, AsNumeric = FALSE)
+# add ICR ID to the cpg sites
+df_alzheimer$imp_site$icr_id <- match_cpg_id_to_icr_id(df_alzheimer$imp_site$Variable, AsNumeric = FALSE)
 # # Export result to simpler structure
 # df_res <- df_alzheimer$imp_site
 # # Add gene metadata to each cpg site
