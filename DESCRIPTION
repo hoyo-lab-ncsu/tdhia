@@ -40,5 +40,8 @@ Imports:
 Suggests: 
     knitr,
     rmarkdown,
-	here
+	here,
+	cowplot,
+	rappdirs,
+	data.table
 VignetteBuilder: knitr

@@ -385,7 +385,7 @@ sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_
     # Rename this column later, prevent wrong sub in
     Probe_ID_ = fProbe_ID(.data$Probe_ID),
     MG = mean(MG),  MR = mean(MR), UG = mean(UG), UR = mean(UR),
-    col = col[1],  mask = mask[1], mean_orig_beta = mean(beta_orig),
+    col = col[1],  mask = mask[1], mean_orig_beta = mean(.data$beta_orig),
     mean_p_val = mean(p_val),
     # Probe_ID_ renamed above to ensure this statement has correct scope
     orig_probe_ids = paste(.data$Probe_ID,collapse=" "),
@@ -393,7 +393,7 @@ sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_
     orig_betas = paste(beta_orig,collapse=" "),
     n = length(MG), key = min(key),
     n = length(p_val)) %>%
-    dplyr::arrange(key) %>% dplyr::rename(Probe_ID = Probe_ID_)
+    dplyr::arrange(key) %>% dplyr::rename(Probe_ID = .data$Probe_ID_)
 
   # Calculate beta values based on merged fluorescent values
   sigset_merge$beta_merged <- sesame::getBetas(sigset_merge)

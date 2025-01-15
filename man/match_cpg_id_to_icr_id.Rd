@@ -8,6 +8,8 @@ match_cpg_id_to_icr_id(cpg_ids, AsNumeric = FALSE)
 }
 \arguments{
 \item{cpg_ids}{vector of cpg_ids}
+
+\item{AsNumeric}{flag, when true, returns in numeric form}
 }
 \value{
 vector of ICR ids

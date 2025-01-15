@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
-devtools::load_all()
+# devtools::load_all()
 # detach(name = "package:tdhia", unload=TRUE)
 # remove.packages("tdhia")
 # eblvm_path <- devtools::build(pkg = paste0(dirname(here::here()), "/eblvm"))
@@ -58,8 +58,11 @@ We start by loading required packages for this vignette.
 
 library(tdhia)
 library(rappdirs)
-library(tidyverse)
+library(dplyr)
+library(tibble)
+library(ggplot2)
 library(cowplot)
+library(data.table)
 ```
 
 
@@ -151,45 +154,48 @@ All of this information is collected in the study_metadata dataframe.
 
 ```{r metadata, include = TRUE, cache = FALSE}
 # Define local path variables
-idat_dir_path <- system.file("extdata", package = "tdhia")
+# idat_dir_path <- system.file("extdata", "Imprintome_NC_State_pData.csv", package = "tdhia")
 
-# Loading AD study data 
-#_______________________________________________________________________________
-pdata_wgbs <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
-pdata_imprintome <- read.csv(file = paste0(idat_dir_path, "/Imprintome_NC_State_pData.csv"))
-# Filtering metadata rows
-pdata_imprintome <- pdata_imprintome[grepl(pattern = "[A-Z]{2}", x = pdata_imprintome$Sample),]
-pdata_imprintome$sampleID <- as.numeric(stringr::str_extract(pdata_imprintome$Sample, "[0-9]+$"))
-pdata_wgbs_full <- 
-  dplyr::left_join(x = pdata_wgbs, y = pdata_imprintome, by = "sampleID", keep = FALSE) %>% 
-  dplyr::filter(!is.na(Patient.ID))
-# Get basenames from wgbs file names
-pdata_wgbs_full$wgbs_base_names <- sapply(strsplit(pdata_wgbs_full$FileName, "_"),
-                                          function(x) x[1])
+# # Loading AD study data 
+# #_______________________________________________________________________________
+# pdata_wgbs <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
+# pdata_imprintome <- read.csv(file = system.file("extdata", "Imprintome_NC_State_pData.csv",
+#                                                 package = "tdhia"))
+# # Filtering metadata rows
+# pdata_imprintome <- pdata_imprintome[grepl(pattern = "[A-Z]{2}", x = pdata_imprintome$Sample),]
+# pdata_imprintome$sampleID <- as.numeric(stringr::str_extract(pdata_imprintome$Sample, "[0-9]+$"))
+# pdata_wgbs_full <- 
+#   dplyr::left_join(x = pdata_wgbs, y = pdata_imprintome, by = "sampleID", keep = FALSE) %>% 
+#   dplyr::filter(!is.na(Patient.ID))
+# # Get basenames from wgbs file names
+# pdata_wgbs_full$wgbs_base_names <- sapply(strsplit(pdata_wgbs_full$FileName, "_"),
+#                                           function(x) x[1])
+# 
+# # Add patient id as rownames
+# rownames(pdata_wgbs_full) <- pdata_wgbs_full$Patient.ID
+# 
+# wgbs_complete <- read.csv(file = system.file("data-raw", "AD.WGBS.Brain.samples.TimeFrozen.csv", package = "tdhia"))
+# 
+# # merge with additional study data
+# study_metadata <- left_join(x = pdata_wgbs_full, y = wgbs_complete %>% dplyr::rename(
+#   sampleID = Sample.ID), by = "sampleID", keep = FALSE, unmatched = "drop")
+# 
+# study_metadata$Treatment <- factor(study_metadata$Treatment)
+# study_metadata$AD.Case.Control <- factor(study_metadata$AD.Case.Control)
+# study_metadata$Ethnicity <- factor(study_metadata$Ethnicity)
+# study_metadata$Age <- as.numeric(str_replace(string = study_metadata$Age, pattern = ">", ""))
+# study_metadata$Sex <- factor(study_metadata$Sex)
+# rownames(study_metadata) <- study_metadata$Patient.ID
+# 
+# 
+# # COnvert variables needed for statisticla analysis to factors or boolean variables
+# study_metadata$race <-  study_metadata$Ethnicity
+# study_metadata$is_control = study_metadata$AD.Case.Control == "Control"
+# study_metadata$disease_state = study_metadata$AD.Case.Control != "Control"
+# study_metadata$study_group <- study_metadata$Treatment
 
-# Add patient id as rownames
-rownames(pdata_wgbs_full) <- pdata_wgbs_full$Patient.ID
 
-wgbs_complete <- read.csv(file = paste0(system.file("data-raw", package = "tdhia"), "/AD.WGBS.Brain.samples.TimeFrozen.csv"))
-
-# merge with additional study data
-study_metadata <- left_join(x = pdata_wgbs_full, y = wgbs_complete %>% dplyr::rename(
-  sampleID = Sample.ID), by = "sampleID", keep = FALSE, unmatched = "drop")
-
-study_metadata$Treatment <- factor(study_metadata$Treatment)
-study_metadata$AD.Case.Control <- factor(study_metadata$AD.Case.Control)
-study_metadata$Ethnicity <- factor(study_metadata$Ethnicity)
-study_metadata$Age <- as.numeric(str_replace(string = study_metadata$Age, pattern = ">", ""))
-study_metadata$Sex <- factor(study_metadata$Sex)
-rownames(study_metadata) <- study_metadata$Patient.ID
-
-
-# COnvert variables needed for statisticla analysis to factors or boolean variables
-study_metadata$race <-  study_metadata$Ethnicity
-study_metadata$is_control = study_metadata$AD.Case.Control == "Control"
-study_metadata$disease_state = study_metadata$AD.Case.Control != "Control"
-study_metadata$study_group <- study_metadata$Treatment
-
+study_metadata <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
 
 ```
 
@@ -212,7 +218,7 @@ There are various options within the TDHIA pipeline for processing imprintome da
 # Using a persistent app directory to cache output for this code chunk
 user_data_path <- rappdirs::user_data_dir("tdhia")
 data_filepath <- file.path(paste0(user_data_path, "/vignette_imprint_vs_wgbs_data.rds"))
-dir.create(data_filepath, showWarnings = FALSE, recursive = TRUE)
+dir.create(dirname(data_filepath), showWarnings = FALSE, recursive = TRUE)
 
 if (!file.exists(data_filepath)) {
   # Store raw output (cpg beta matrix) of each pipeline (and gold standard reference) into a named list
@@ -427,7 +433,7 @@ Now we can examine the correlation between beta values from the imprintome versu
 
 # Grab and sort data from each technology, paired by patient
 df_grouped <- do.call(rbind, lapply(1:(length(names(raw_list))-1), 
-       function(x) group_by_patient(df_study = pdata_wgbs_full, 
+       function(x) group_by_patient(df_study = study_metadata, 
                                     df_cpg_imp = raw_list[[x]],   
                                     df_cpg_wgbs = raw_list$reference,
                                     col_label = names(raw_list)[x])))
@@ -479,7 +485,7 @@ Where disease_state is the response variable, and cpg_beta is the primary predic
 
 
 
-```{r, include = TRUE}
+```{r association_study, include = TRUE}
 
 n.cores <- max(c(parallel::detectCores()-2,1))
 df_alzheimer <- analyze_association(
@@ -493,17 +499,16 @@ df_alzheimer <- analyze_association(
 ## Significant ICR/CpG sites
 
 
-```{r, include = TRUE}
-
-# add ICR ID to the cpg sites
-df_alzheimer$imp_site$icr_id <- match_cpg_id_to_icr_id(df_alzheimer$imp_site$Variable, AsNumeric = FALSE)
-# Export result to simpler structure
-df_res <- df_alzheimer$imp_site
-# Add gene metadata to each cpg site
-df_res_meta <- add_gene_metadata_to_icr(df_res)
-# 
-select(df_res_meta, c(icr_name, Variable, ADJ_P_VAL, is_icr_zinc, is_icr_highconf,
-                      is_icr_medconf, is_icr_lowconf, Nearest.Transcript,
-                      Distance.to.Nearest.Transcript))
+```{r association_sig_icr, include = TRUE}
+# # add ICR ID to the cpg sites
+# df_alzheimer$imp_site$icr_id <- match_cpg_id_to_icr_id(df_alzheimer$imp_site$Variable, AsNumeric = FALSE)
+# # Export result to simpler structure
+# df_res <- df_alzheimer$imp_site
+# # Add gene metadata to each cpg site
+# df_res_meta <- add_gene_metadata_to_icr(df_res)
+# # Output a subset of the table
+# dplyr::select(df_res_meta, c(icr_name, Variable, ADJ_P_VAL, is_icr_zinc, is_icr_highconf,
+#                       is_icr_medconf, is_icr_lowconf, Nearest.Transcript,
+#                       Distance.to.Nearest.Transcript))
 
 ```

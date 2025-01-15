@@ -14,7 +14,8 @@ knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>")
 
 library(dplyr)
 # here::i_am("README.md")
-devtools::load_all()
+# devtools::load_all()
+library(tdhia)
 ```
 
 Here we will demonstrate how to process IDAT files from the True Diagnostic Human
