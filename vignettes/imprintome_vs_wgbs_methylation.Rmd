@@ -221,6 +221,7 @@ There are various options within the TDHIA pipeline for processing imprintome da
 user_data_path <- rappdirs::user_data_dir("tdhia")
 data_filepath <- file.path(paste0(user_data_path, "/vignette_imprint_vs_wgbs_data.rds"))
 dir.create(dirname(data_filepath), showWarnings = FALSE, recursive = TRUE)
+idat_dir_path <- system.file("extdata", package="tdhia")
 
 if (!file.exists(data_filepath)) {
   # Store raw output (cpg beta matrix) of each pipeline (and gold standard reference) into a named list
@@ -238,7 +239,7 @@ if (!file.exists(data_filepath)) {
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
-                  set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .20)
+                  set_failed_betas_na = TRUE, discard_failed_probes = TRUE, min_design_score = .20)
   # 4) Merge probe measurement to cpg sites
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = TRUE)
   icr_beta <- convert_cpgs_to_icrs(cpg_beta)
@@ -327,7 +328,7 @@ if (!file.exists(data_filepath)) {
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
-                  set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .20)
+                  set_failed_betas_na = TRUE, discard_failed_probes = TRUE, min_design_score = .20)
   # 4) Cpg matrix
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   raw_list$pre_merge <- cpg_beta$cpg_beta_df
