@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 # Uncomment this next line if you want to knit this file on it's own, make sure working directory is set to tdhia repository base folder.
-# devtools::load_all()
+devtools::load_all()
 
 # detach(name = "package:tdhia", unload=TRUE)
 # remove.packages("tdhia")
@@ -473,7 +473,7 @@ sum(case_control$adj_pval<0.05)
 
 # Association Study: Imprintome Methylation Status and Alzheimer's
 
-We can also perform an association study the also probes for differences in methylation between study groups, by also makes use of demographic information of the participants. We fit a series of linear models of the form:
+We can also perform an association study the also probes for differences in methylation between study groups, by also makes use of demographic information of the participants. We fit a series of binomial model of the form:
 
 disease_state ~ cpg_beta + Ethnicity + Age + Sex
 
@@ -492,7 +492,7 @@ Where disease_state is the response variable, and cpg_beta is the primary predic
 n.cores <- max(c(parallel::detectCores()-2,1))
 df_alzheimer <- analyze_association(
   R = select(study_metadata, disease_state), P = as.data.frame(t(raw_list$cpg_smooth)),
-  Pe = select(study_metadata, c(Ethnicity, Age, Sex)), family = "gaussian", 
+  Pe = select(study_metadata, c(Ethnicity, Age, Sex)), family = "binomial", 
   n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
 
@@ -506,12 +506,12 @@ Now we can retrieve additional information for any CpG sites that are found to h
 # add ICR ID to the cpg sites
 df_alzheimer$imp_site$icr_id <- match_cpg_id_to_icr_id(df_alzheimer$imp_site$Variable, AsNumeric = FALSE)
 # # Export result to simpler structure
-# df_res <- df_alzheimer$imp_site
+df_res <- df_alzheimer$imp_site
 # # Add gene metadata to each cpg site
-# df_res_meta <- add_gene_metadata_to_icr(df_res)
+df_res_meta <- add_gene_metadata_to_icr(df_res)
 # # Output a subset of the table
-# dplyr::select(df_res_meta, c(icr_name, Variable, ADJ_P_VAL, is_icr_zinc, is_icr_highconf,
-#                       is_icr_medconf, is_icr_lowconf, Nearest.Transcript,
-#                       Distance.to.Nearest.Transcript))
+dplyr::select(df_res_meta, c(icr_name, Variable, ADJ_P_VAL, is_icr_zinc, is_icr_highconf,
+                      is_icr_medconf, is_icr_lowconf, Nearest.Transcript,
+                      Distance.to.Nearest.Transcript))
 
 ```
