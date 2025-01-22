@@ -316,9 +316,6 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     betas = do.call(cbind, lapply(merged_data_list, FUN = function(x) x$betas))
     p_vals = do.call(cbind, lapply(merged_data_list, FUN = function(x) x$p_vals))
 
-    #
-    # colnames(p_vals) <- basename(unq_obs_idat_basenames)
-
   } else {
 
     # Calculate beta values for all probes (no merging or beta and p_val with probes)

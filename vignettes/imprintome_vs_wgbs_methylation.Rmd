@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 # Uncomment this next line if you want to knit this file on it's own, make sure working directory is set to tdhia repository base folder.
-devtools::load_all()
+# devtools::load_all()
 
 # detach(name = "package:tdhia", unload=TRUE)
 # remove.packages("tdhia")
