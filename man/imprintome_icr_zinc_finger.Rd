@@ -5,13 +5,23 @@
 \alias{imprintome_icr_zinc_finger}
 \title{Zinc finger data for imprintome ICRs}
 \format{
-A dataframe with sample ID for wgbs data
+A data-frame that lists up to five of known zinc finger locations
+that is close to the genomic location of the ICR.
 \describe{
-\item{Column names}{Sample IDs corresponding to the IDAT files.}
+\item{icr}{ ICR ID (see 10.1080/15592294.2022.2091815).}
+\item{location}{ Genomic location of ICR (range of genomic coordinates).}
+\item{zf1}{ ID of zinc finger site, #1}
+\item{zf2}{ ID of zinc finger site, #2}
+\item{zf3}{ ID of zinc finger site, #3}
+\item{X}{   ID of zinc finger site, #4}
+\item{X.1}{ ID of zinc finger site, #5}
 }
 }
 \source{
 16 Alzheimer's brain samples with matching WGBS that used in array design paper
+}
+\usage{
+imprintome_icr_zinc_finger
 }
 \description{
 This dataframe lists any zinc finger sites close to each ICR

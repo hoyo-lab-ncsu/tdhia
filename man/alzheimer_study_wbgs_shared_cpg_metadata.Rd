@@ -7,7 +7,36 @@
 \format{
 A dataframe with sample ID for wgbs data
 \describe{
-\item{Column names}{Sample IDs corresponding to the IDAT files.}
+\item{ID}{ ICR ID (see 10.1080/15592294.2022.2091815).}
+\item{FileName}{Filename of WGBS outputfile.}
+\item{Treatment}{Factor that partitions patients based on race (black/white)
+and disease state (control/ AD).}
+\item{sampleID}{ Study ID of participant.}
+
+\item{X}{ Different study/sample ID (not sure what this is).}
+\item{Sample}{ Another sample ID that match sampleID with a character code
+that denotes the study the patient is from.}
+\item{Chip}{ ID of imprintome chip.}
+\item{Beadchip}{ ID of imprintome bead chip.}
+
+\item{Row_Col}{ Location of beadchip on the imprintome array.}
+\item{Notes}{ Misc Notes.}
+\item{Patient.ID}{ Patient ID for the imprintome raw data files (Each ent.}
+\item{wgbs_base_names}{Sample IDs corresponding to the IDAT files.}
+
+\item{AD.Case.Control}{ Factor that divides patients between control and disease group.}
+\item{Ethnicity}{ Ethnicity of patient, either non-hispanic black (NHB) or non-hispanic white (NHW).}
+\item{Age}{ Age of participant in years.}
+\item{Sex}{ Biological sex of participant.}
+
+\item{Brain.Region}{ Location of brain for tissue sample.}
+\item{Time}{ Timepoint (of sample?).}
+\item{AD.Neuropathologic.changes}{ Severity of alzheimer's disease (None, Low, Intermediate, High.}
+\item{race}{ Same as ethnicity.}
+
+\item{is_control}{ Boolean variable that indicates control patient.}
+\item{disease_state}{ Boolean variable, where true indicate presence of alzheimer.}
+\item{study_group}{ Same as treatment.}
 }
 }
 \source{

@@ -7,11 +7,18 @@
 \format{
 A dataframe with sample ID for wgbs data
 \describe{
-\item{Column names}{Sample IDs corresponding to the IDAT files.}
+\item{ID}{ ICR ID}
+\item{Genomic.Coordinates}{ Genomic location of ICR (range of genomic coordinates).}
+\item{Parental.Origin.of.Methylation}{ Indicates whether there is expeiremntal evidence of parental origin of methylation for that specific ICR (presence of "P")}
+\item{Nearest.Transcript}{ ID of nearest transcript to the geonimic location of the ICR (if one exists).}
+\item{Distance.to.Nearest.Transcript}{ Genomic distance of ICR to nearest transcript.}
 }
 }
 \source{
 16 Alzheimer's brain samples with matching WGBS that used in array design paper
+}
+\usage{
+imprintome_icr_nearest_transcripts
 }
 \description{
 This dataframe lists nearest transcripts for all ICRs

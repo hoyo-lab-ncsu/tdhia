@@ -239,14 +239,42 @@
 #' WGBS ratio data from brain tissue from alzheimer study
 #'
 #' This dataframe contains sample_id information for wgbs files.
-#'
 #' @name alzheimer_study_wbgs_shared_cpg_metadata
 #' @docType data
 #' @keywords datasets
 #' @usage NULL
 #' @format A dataframe with sample ID for wgbs data
 #' \describe{
-#'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
+#'   \item{ID}{ ICR ID (see 10.1080/15592294.2022.2091815).}
+#'   \item{FileName}{Filename of WGBS outputfile.}
+#'   \item{Treatment}{Factor that partitions patients based on race (black/white)
+#'    and disease state (control/ AD).}
+#'   \item{sampleID}{ Study ID of participant.}
+#'
+#'   \item{X}{ Different study/sample ID (not sure what this is).}
+#'   \item{Sample}{ Another sample ID that match sampleID with a character code
+#'   that denotes the study the patient is from.}
+#'   \item{Chip}{ ID of imprintome chip.}
+#'   \item{Beadchip}{ ID of imprintome bead chip.}
+#'
+#'   \item{Row_Col}{ Location of beadchip on the imprintome array.}
+#'   \item{Notes}{ Misc Notes.}
+#'   \item{Patient.ID}{ Patient ID for the imprintome raw data files (Each ent.}
+#'   \item{wgbs_base_names}{Sample IDs corresponding to the IDAT files.}
+#'
+#'   \item{AD.Case.Control}{ Factor that divides patients between control and disease group.}
+#'   \item{Ethnicity}{ Ethnicity of patient, either non-hispanic black (NHB) or non-hispanic white (NHW).}
+#'   \item{Age}{ Age of participant in years.}
+#'   \item{Sex}{ Biological sex of participant.}
+#'
+#'   \item{Brain.Region}{ Location of brain for tissue sample.}
+#'   \item{Time}{ Timepoint (of sample?).}
+#'   \item{AD.Neuropathologic.changes}{ Severity of alzheimer's disease (None, Low, Intermediate, High.}
+#'   \item{race}{ Same as ethnicity.}
+#'
+#'   \item{is_control}{ Boolean variable that indicates control patient.}
+#'   \item{disease_state}{ Boolean variable, where true indicate presence of alzheimer.}
+#'   \item{study_group}{ Same as treatment.}
 #' }
 #' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
 "alzheimer_study_wbgs_shared_cpg_metadata"
@@ -259,10 +287,16 @@
 #' @name imprintome_icr_zinc_finger
 #' @docType data
 #' @keywords datasets
-#' @usage NULL
-#' @format A dataframe with sample ID for wgbs data
+#' @format A data-frame that lists up to five of known zinc finger locations
+#' that is close to the genomic location of the ICR.
 #' \describe{
-#'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
+#'   \item{icr}{ ICR ID (see 10.1080/15592294.2022.2091815).}
+#'   \item{location}{ Genomic location of ICR (range of genomic coordinates).}
+#'   \item{zf1}{ ID of zinc finger site, #1}
+#'   \item{zf2}{ ID of zinc finger site, #2}
+#'   \item{zf3}{ ID of zinc finger site, #3}
+#'   \item{X}{   ID of zinc finger site, #4}
+#'   \item{X.1}{ ID of zinc finger site, #5}
 #' }
 #' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
 "imprintome_icr_zinc_finger"
@@ -270,29 +304,35 @@
 #' WGBS ratio data from brain tissue from alzheimer study
 #'
 #' This dataframe lists nearest transcripts for all ICRs
-#'
 #' @name imprintome_icr_nearest_transcripts
 #' @docType data
 #' @keywords datasets
-#' @usage NULL
 #' @format A dataframe with sample ID for wgbs data
 #' \describe{
-#'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
+#'   \item{ID}{ ICR ID}
+#'   \item{Genomic.Coordinates}{ Genomic location of ICR (range of genomic coordinates).}
+#'   \item{Parental.Origin.of.Methylation}{ Indicates whether there is expeiremntal evidence of parental origin of methylation for that specific ICR (presence of "P")}
+#'   \item{Nearest.Transcript}{ ID of nearest transcript to the geonimic location of the ICR (if one exists).}
+#'   \item{Distance.to.Nearest.Transcript}{ Genomic distance of ICR to nearest transcript.}
 #' }
 #' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
 "imprintome_icr_nearest_transcripts"
 
 #' WGBS ratio data from brain tissue from alzheimer study
 #'
-#' This dataframe lists nearest transcripts for all ICRs
+#' This dataframe lists nearest transcripts for ICRs that have experimental
+#' evidence of gametic origin of methylation
 #'
 #' @name imprintome_icr_gametic_nearest_transcripts
 #' @docType data
 #' @keywords datasets
-#' @usage NULL
 #' @format A dataframe with sample ID for wgbs data
 #' \describe{
-#'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
+#'   \item{ID}{ ICR ID}
+#'   \item{Genomic.Coordinates}{ Genomic location of ICR (range of genomic coordinates).}
+#'   \item{Parental.Origin.of.Methylation}{ Indicates whether there is expeiremntal evidence of parental origin of methylation for that specific ICR (presence of "P")}
+#'   \item{Nearest.Transcript}{ ID of nearest transcript to the geonimic location of the ICR (if one exists).}
+#'   \item{Distance.to.Nearest.Transcript}{ Genomic distance of ICR to nearest transcript.}
 #' }
 #' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
 "imprintome_icr_gametic_nearest_transcripts"
