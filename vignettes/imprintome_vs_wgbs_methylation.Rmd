@@ -205,15 +205,16 @@ study_metadata <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
 # Process Imprintome with Various Settings and Pair with WGBS data
 
 There are various options within the TDHIA pipeline for processing imprintome data. We illustrate some of the primary options by processing the imprintome data with many deviations from the default settings for the pipeline. We can compare how well these different versions agree with results from WGBS data.
-1. **default**: beta values from standard default pipeline. The SeSame R package is used for processing the methylation data. Raw IDAT files are loaded, the Infinuium probe type is inferred, fluorescent signal is subtracted with Norm-Exp de-convolution that is parameterized with out-of-band probes, and a non-linear dye bias correction is applied.  
-2. **quant_norm**: beta values from standard pipeline, but performed quantile normalization (patient-wise) during cpg conversion step.  
-3. **cpg_smooth**: beta values from standard pipeline, but cpg smoothing is performed (moving average of beta values from adjacent sites within the same ICR).  
-4. **gametic**: filter the CpG sites by those that have complete experimental gametic evidence of 50% methylation status.
-5. **low_p_val**: beta values from standard pipeline, but using a strict p-value threshold of 0.05 for sesame signal detection p-value instead of the usual.  
+1. **default**: beta values from standard default pipeline. The SeSame R package is used for processing the methylation data. Raw IDAT files are loaded, the Infinuium probe type is inferred, fluorescent signal is subtracted with Norm-Exp de-convolution that is parameterized with out-of-band probes, and a non-linear dye bias correction is applied. 
+2. **epic_v2**: shared cpg sites with Epiv V2 Illumina methylation array.  
+3. **quant_norm**: beta values from standard pipeline, but performed quantile normalization (patient-wise) during cpg conversion step.  
+4. **cpg_smooth**: beta values from standard pipeline, but cpg smoothing is performed (moving average of beta values from adjacent sites within the same ICR).  
+5. **gametic**: filter the CpG sites by those that have complete experimental gametic evidence of 50% methylation status.
+6. **low_p_val**: beta values from standard pipeline, but using a strict p-value threshold of 0.05 for sesame signal detection p-value instead of the usual.  
 7. **design_thresh**: exclude probes that have an illumina probe design score below 0.5.  
 8. **pre_merge**: beta values from standard pipeline, but replicate probes are averaged *before beta values are calculated*, meaning the averaged by methylation and unmethylation signal for each fluorescent channel individually. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.  
-8. **post_merge**: beta values from standard pipeline, but replicate probes are averaged *after beta values calculated*. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.  
-9. **reference**: methylation percent processed from whole genome bisulfate sequencing data.  
+9. **post_merge**: beta values from standard pipeline, but replicate probes are averaged *after beta values calculated*. Merged probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame detection p-values are calculated with the bates distribution.  
+10. **reference**: methylation percent processed from whole genome bisulfate sequencing data.  
 
 ```{r processing, include = TRUE, cache = FALSE}
 
@@ -245,8 +246,15 @@ if (!file.exists(data_filepath)) {
   icr_beta <- convert_cpgs_to_icrs(cpg_beta)
   raw_list$default <- cpg_beta$cpg_beta_df
   
+  # Pipeline 2: epicv2                                                 #########
+  #_______________________________________________________________________________
+  # Standard pipeline, but only including cpg sites that are shared with Illumina 
+  # epic version 2 array
+  raw_list$epicv2 <- cpg_beta$cpg_beta_df[rownames(cpg_beta$cpg_beta_df) %in%
+                                            tdhia::epicv2_shared_cpg_sites$Name,]
   
-  # Pipeline 2: quant_norm                                                ###########
+  
+  # Pipeline 3: quant_norm                                                ###########
   #_______________________________________________________________________________
   # Standard pipeline, but performed quantile normalization (patient-wise) during 
   # cpg conversion step.
@@ -255,7 +263,7 @@ if (!file.exists(data_filepath)) {
   raw_list$quant_norm <- cpg_beta$cpg_beta_df
   
   
-  # Pipeline 3: cpg_smooth                                                ###########
+  # Pipeline 4: cpg_smooth                                                ###########
   #_______________________________________________________________________________
   # Standard pipeline, but cpg smoothing is performed (moving average of beta values 
   # from adjacent sites within the same ICR) 
@@ -264,7 +272,7 @@ if (!file.exists(data_filepath)) {
   raw_list$cpg_smooth <- cpg_beta$cpg_beta_df
   
   
-  # Pipeline 4: gametic support data                                    ###########
+  # Pipeline 5: gametic support data                                    ###########
   #_______________________________________________________________________________
   # Standard pipeline, but only cpg's that have experiment-based gametic support 
   # data are included (from 384 ICRs).
@@ -282,7 +290,7 @@ if (!file.exists(data_filepath)) {
                                             validated_cpg_ids,]
   
   
-  # Pipeline 5: low_p_val                                             ############
+  # Pipeline 6: low_p_val                                             ############
   #_______________________________________________________________________________
   # Standard pipeline, but using a strict p-value threshold of 0.05 for sesame 
   # signal detection p-value instead of the usual
@@ -298,7 +306,7 @@ if (!file.exists(data_filepath)) {
   raw_list$low_p_val <- cpg_beta$cpg_beta_df
   
   
-  # Pipeline 6: design_thresh                                         ###########
+  # Pipeline 7: design_thresh                                         ###########
   #_______________________________________________________________________________
   # Standard pipeline, excluding probes with low design score (0.30) are excluded.
   #    Flags: min_design_score = .30
@@ -312,7 +320,7 @@ if (!file.exists(data_filepath)) {
   raw_list$design_thresh <- cpg_beta$cpg_beta_df
   
   
-  # Pipeline 7: pre_merge                                               ###########
+  # Pipeline 8: pre_merge                                               ###########
   #_______________________________________________________________________________
   #  Standard pipeline, but replicate probes are averaged by methylation and
   # unmethylation score for each fluorescent channel individually. Merged probes 
@@ -334,7 +342,7 @@ if (!file.exists(data_filepath)) {
   raw_list$pre_merge <- cpg_beta$cpg_beta_df
   
   
-  # Pipeline 8: post_merge                                              ###########
+  # Pipeline 9: post_merge                                              ###########
   #_______________________________________________________________________________
   #  Standard pipeline, but replicate probes are averaged after beta value calculated. Merged 
   # probes are labeled with [cpg_id]_MERG for the probe names. Merged probes' sesame 
@@ -355,6 +363,8 @@ if (!file.exists(data_filepath)) {
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   raw_list$post_merge <- cpg_beta$cpg_beta_df
   
+  
+
   
   # Pipeline reference (wgbs)                                          ###########
   #_______________________________________________________________________________
