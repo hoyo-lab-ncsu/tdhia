@@ -275,6 +275,9 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     unq_obs_idat_basenames = paste0("Sample_", 1:length(unq_obs_idat_basenames))
   }
 
+ 
+  
+  
   # Calculate sesame p-values for individual probes
   p_vals <- do.call(cbind, BiocParallel::bplapply(ss, function(ss) {
     sesame::pOOBAH(return.pval = TRUE,
@@ -290,7 +293,6 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
       sdf = sesame::dyeBiasNL(
         sdf = sesame::inferInfiniumIChannel(ss)))},
     BPPARAM = core_params)
-
 
   ## Add p_vals to sigset list
   ss_sig <- lapply(1:length(ss_sig), function(x) ss_sig[[x]] %>%
@@ -325,6 +327,13 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     colnames(betas) <- basename(unq_obs_idat_basenames)
   }
 
+  # Regression code to test for equivalent output to opensesame
+  #____________________________________________________________________________
+  # open_betas <-  sesame::openSesame(x = ss, platform = "",  manifest = mft)
+  # tdhia_betas <-  betas
+  # tdhia_betas[p_vals>0.05] = NA
+  # all(tdhia_betas==open_betas | is.na(tdhia_betas==open_betas))
+  
   out <- list(betas = betas, p_vals = p_vals)
 
   return(out)

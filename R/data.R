@@ -334,8 +334,37 @@
 #'   \item{Nearest.Transcript}{ ID of nearest transcript to the geonimic location of the ICR (if one exists).}
 #'   \item{Distance.to.Nearest.Transcript}{ Genomic distance of ICR to nearest transcript.}
 #' }
-#' @source 16 Alzheimer's brain samples with matching WGBS that used in array design paper
 "imprintome_icr_gametic_nearest_transcripts"
 
+
+
+#' This dataframe lists the ICRs with evidence of gametic origin of methylation
+#'
+#' @name imprintome_gametic_icrs
+#' @docType data
+#' @keywords datasets
+#' @format A dataframe with sample ID for wgbs data
+#' \describe{
+#'   \item{ch}{ Chromosome number.}
+#'   \item{start}{ genomic position start of ICR}
+#'   \item{end}{ genomic position end of ICR}
+#'   \item{icr_id}{ ICR identifier}
+#' }
+"imprintome_gametic_icrs"
+
+
+#' List of epicV2 cpg sites that are shared with imprintome
+#'
+#' @name epicv2_shared_cpg_sites
+#' @docType data
+#' @keywords datasets
+#' @format A dataframe with sample ID for wgbs data
+#' \describe{
+#'   \item{ch}{ Chromosome number.}
+#'   \item{start}{ genomic position start of ICR}
+#'   \item{end}{ genomic position end of ICR}
+#'   \item{icr_id}{ ICR identifier}
+#' }
+"epicv2_shared_cpg_sites"
 
 

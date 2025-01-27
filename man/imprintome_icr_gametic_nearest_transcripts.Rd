@@ -14,9 +14,6 @@ A dataframe with sample ID for wgbs data
 \item{Distance.to.Nearest.Transcript}{ Genomic distance of ICR to nearest transcript.}
 }
 }
-\source{
-16 Alzheimer's brain samples with matching WGBS that used in array design paper
-}
 \usage{
 imprintome_icr_gametic_nearest_transcripts
 }
