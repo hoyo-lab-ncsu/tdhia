@@ -198,14 +198,15 @@
 
 #' WGBS ratio data from brain tissue from alzheimer study
 #'
-#' This dataset contains ratio (methylation) values fro whole genome bisulfite sequencing.
+#' This dataset contains ratio (methylation) values from whole genome bisulfite sequencing.
 #'
 #' @name alzheimer_study_wbgs_shared_cpg
 #' @docType data
 #' @keywords datasets
 #' @usage NULL
-#' @format A matrix with rows as probes and columns as samples. The columns
-#' represents the samples, and each column contains the ratio values for that sample.
+#' @format  This dataframe contains a list with two dataframes, one containing 
+#' ratio data (ratio), and another dataframe with total reads for each cpg site for WGBS 
+#' results (count). Each column is a separate patient.
 #' \describe{
 #'   \item{Column names}{Sample IDs corresponding to the IDAT files.}
 #'   \item{Metadata}{

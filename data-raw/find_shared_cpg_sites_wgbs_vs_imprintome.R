@@ -24,7 +24,7 @@ unq_cpg_atlas <- dplyr::distinct(dplyr::select(cpg_atlas, -c(CpG_Probe,X)))
 #  imprintome manifest, and not based on the sites from each patient.
 
 
-df_ratio_list = list()
+df_ratio_list <- df_count_list <- list()
 for (n in seq_along(bed_list)) {
   cat(sprintf("Processing file %.0f/%.0f\n", n, length(bed_list)))
   # Read in BED file for WGBS data
@@ -41,21 +41,36 @@ for (n in seq_along(bed_list)) {
   #  IDs across patients
   merged_df_wgbs <-
     dplyr::left_join(x = dplyr::select(unq_cpg_atlas, c("chr_cpg_start", "CpG_id")),
-              y = dplyr::select(sub_df_wgbs, "chr_cpg_start", "start", "end", "ratio"), by = "chr_cpg_start",
+              y = dplyr::select(sub_df_wgbs, "chr_cpg_start", "start", "end", "ratio","totalC"), by = "chr_cpg_start",
               keep = FALSE, multiple = "first")
 
 
   # Extract the ratio data into a data.frame column (with rownames as cpg_id)
   df_ratio_list[[n]] <- data.frame("ratio"= merged_df_wgbs$ratio, row.names = merged_df_wgbs$CpG_id)
+  df_count_list[[n]] <- data.frame("totalC"= merged_df_wgbs$totalC, row.names = merged_df_wgbs$CpG_id)
 
 }
-
-
+df_ratio <- do.call(cbind, df_ratio_list)
+df_count <- do.call(cbind, df_count_list)
 
 base_names <- sapply(strsplit(bed_list, "_"), function(x) x[1])
-alzheimer_study_wbgs_shared_cpg <- df_ratio
-colnames(alzheimer_study_wbgs_shared_cpg) <- base_names
 
-#
+# alzheimer_study_wbgs_shared_cpg_ratio <- df_ratio
+# colnames(alzheimer_study_wbgs_shared_cpg_ratio) <- base_names
+# 
+# alzheimer_study_wbgs_shared_cpg_count <- df_count
+# colnames(alzheimer_study_wbgs_shared_cpg_count) <- base_names
+
+
+colnames(df_ratio) <- base_names
+colnames(df_count) <- base_names
+
+
+alzheimer_study_wbgs_shared_cpg = list()
+alzheimer_study_wbgs_shared_cpg$ratio <- df_ratio
+alzheimer_study_wbgs_shared_cpg$count <- df_count
+  
+
+usethis::use_data(alzheimer_study_wbgs_shared_cpg, overwrite = TRUE)
 # devtools::load_all()
 
