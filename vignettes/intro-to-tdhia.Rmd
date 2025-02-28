@@ -88,7 +88,7 @@ Probe beta values that belong to the same cpg site for a given patient are avera
 #3  Convert probe beta matrix to a cpg beta matrix
 # Output: rows: cpg_id     x     columns: patient
 cpg_beta <- tdhia::convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE, 
-                                   db_flag = TRUE, smooth_adj_cpgs = TRUE, multicore = 2)
+                                   db_flag = TRUE, smooth_adj_cpgs = FALSE, multicore = 2)
 ```
 
 You can access the filtered probe beta matrix with the **cpg_beta_df** field.

@@ -106,12 +106,14 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col
     
     # colnames(df_join) <- c("cpg_id", "imp","wgbs", "wgbs_count") 
     df_join$sample_id <- df_study$wgbs_base_names[n]
+    df_join$treatment <- df_study$Treatment[n]
     df_join$pipeline_name <- col_label
     df_list[[n]] <- df_join
   }
   df_comp  <- do.call(rbind, df_list)
   return(df_comp)
 }
+
 
 
 #' group_by_mean
@@ -126,10 +128,16 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col
 #' 
 #' @return
 group_by_mean <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, 
-                          col_label, db_flag = TRUE) {
+                          col_label, db_flag = TRUE, mean_max_na = 1) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "group_by_mean.RData")}
   # load(file = "vignettes/group_by_mean.RData")
   
+  # Helper function
+  nRowMeans <- function(x, max_na) {
+    row_mean <- rowMeans(x, na.rm = TRUE); n_na <- rowMeans(is.na(x))
+    row_mean[n_na > max_na] = NA; return(row_mean)
+  }
+
   # Get unique study groups to average patients from each groups
   unq_study_group <- unique(df_study$study_group)
   
@@ -139,11 +147,13 @@ group_by_mean <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts,
     bind <- df_study$study_group == unq_study_group[n]
     
     # Imprintome data, extract columns matching patients in group
-    x <- data.frame(mean_imp = rowMeans(select(df_cpg_imp, df_study$Patient.ID[bind]), na.rm = TRUE)) %>%
+    x <- data.frame(mean_imp = nRowMeans(select(df_cpg_imp, df_study$Patient.ID[bind]), max_na = mean_max_na)) %>%
       rownames_to_column("cpg_id")
     # WGBS data, extract columns matching patients in group
-    y <- data.frame(mean_wgbs = rowMeans(select(df_cpg_wgbs, df_study$wgbs_base_names[bind]), na.rm = TRUE),
-                    mean_wgbs_count = rowMeans(select(wgbs_counts, df_study$wgbs_base_names[bind]), na.rm = TRUE)) %>% 
+    y <- data.frame(mean_wgbs = nRowMeans(select(df_cpg_wgbs, df_study$wgbs_base_names[bind]),
+                                          max_na = mean_max_na),
+                    mean_wgbs_count = nRowMeans(select(wgbs_counts, df_study$wgbs_base_names[bind]), 
+                                               max_na = mean_max_na)) %>% 
       rownames_to_column("cpg_id")
     
     df_join <- left_join(x = x, y = y, by = "cpg_id", keep = FALSE, na_matches = "never",
@@ -196,6 +206,18 @@ user_data_path <- rappdirs::user_data_dir("tdhia")
 data_filepath <- file.path(paste0(user_data_path, "/vignette_imprint_vs_wgbs_data.rds"))
 dir.create(dirname(data_filepath), showWarnings = FALSE, recursive = TRUE)
 idat_dir_path <- system.file("extdata", package="tdhia")
+
+
+# Get whitelist of CpG sites that have gametic validation
+df_valid <- as.data.frame(data.table::fread(paste0(system.file("data-raw", package = "tdhia"), "/validated_ICRs_11152024.bed")))
+colnames(df_valid) <- c("chr", "start", "finish", "icr")
+# determine which rows in manifest have validated cpgs
+is_validated <- sapply(1:nrow(mft), function(x) {any((
+  mft[x,]$CHR==df_valid$chr) &
+    (mft[x,]$MAPINFO > df_valid$start &
+       mft[x,]$MAPINFO < df_valid$finish ))})
+gametic_cpg_ids <- mft$Name[is_validated]
+
 
 if (!file.exists(data_filepath)) {
   # Store raw output (cpg beta matrix) of each pipeline (and gold standard reference) into a named list
@@ -266,18 +288,9 @@ if (!file.exists(data_filepath)) {
   #_______________________________________________________________________________
   # Standard pipeline, but only cpg's that have experiment-based gametic support 
   # data are included (from 384 ICRs).
-  # Load validation data
-  df_valid <- as.data.frame(data.table::fread(paste0(system.file("data-raw", package = "tdhia"), "/validated_ICRs_11152024.bed")))
-  colnames(df_valid) <- c("chr", "start", "finish", "icr")
-  # determine which rows in manifest have validated cpgs
-  is_validated <- sapply(1:nrow(mft), function(x) {any((
-    mft[x,]$CHR==df_valid$chr) &
-      (mft[x,]$MAPINFO > df_valid$start &
-         mft[x,]$MAPINFO < df_valid$finish ))})
-  validated_cpg_ids <- mft$Name[is_validated]
   # Subset of cpg sites with direct gametic data supporting icr
   pipelines_out$gametic <- cpg_beta$cpg_beta_df[rownames(cpg_beta$cpg_beta_df) %in%
-                                            validated_cpg_ids,]
+                                            gametic_cpg_ids,]
   
   
   # Pipeline 6: low_p_val                                             ############
@@ -365,6 +378,7 @@ if (!file.exists(data_filepath)) {
 }
 
 
+
   
 ```
 
@@ -389,7 +403,7 @@ Now we can compare the agreement of results between the imprintome array and WGB
 df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1), function (x)
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_out[[x]],
                  df_cpg_wgbs = pipelines_out$reference, wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count, 
-                col_label = names(pipelines_out)[x])))
+                col_label = names(pipelines_out)[x], mean_max_na = 1)))
 
 ```
 
@@ -412,6 +426,12 @@ We calculate the pearson correlation between the averaged beta measurements to a
 ### Base Pipeline
 
 ```{r, include = TRUE, out.width="80%", align="center"}
+
+# Arrange beta values for plotting, both imprintome and wgbs, paired by patient
+df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1), function (x)
+  group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_out[[x]],
+                 df_cpg_wgbs = pipelines_out$reference, wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count, 
+                col_label = names(pipelines_out)[x], mean_max_na = 3,db_flag = TRUE)))
 # Calculate summary of correlation to gold standard
 df_mean_summary <- df_grouped %>% dplyr::filter(!is.na(mean_imp) & !is.na(mean_wgbs)) %>%
   dplyr::group_by(group_id, pipeline_name) %>% 
@@ -426,18 +446,64 @@ df_pipeline_summary <- df_mean_summary %>%  dplyr::group_by(pipeline_name) %>%
 gg1 <- ggplot2::ggplot(data = df_mean_summary, aes(x = pipeline_name, y = rho, color = group_id)) +
   geom_crossbar(data = df_pipeline_summary,
                 aes(ymin = min_rho, y = mean_rho, ymax = max_rho), color = "grey50") +
-  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") +
+  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.7)) +
   theme(legend.position = "right", axis.title.y=element_blank(), axis.text.y=element_blank())
 # gg
 gg2 <- ggplot2::ggplot(data = df_pipeline_summary, aes(x = pipeline_name, y = mean_n)) +
-  geom_bar(stat = "identity") + theme_classic() + xlab("") + ylab("TDHIA CpG Count") + coord_flip()
+  geom_bar(stat = "identity") + theme_classic() + xlab("") + ylab("Shared CpG Count") + 
+  coord_flip() + scale_y_continuous(breaks = scales::pretty_breaks(n = 3))
 # gg2
 ggf <- plot_grid(gg2, gg1, rel_widths = c(1, 2))
 ggf
 
 ```
+
+### Gametic Evidence Default
   
-### Design Score for all Pipelines
+```{r, include = TRUE, out.width="80%", align="center"}
+
+# Apply whitelist to all pipeline outputs and reference pipelines
+pipelines_gametic <- lapply(pipelines_out, function(x) x[rownames(x) %in% gametic_cpg_ids,])
+# Apply whitelist to wgbs count matrix also so both have same dimensions/ rows
+wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
+wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% gametic_cpg_ids,] 
+# all(rownames(wgbs_counts_ds) == rownames(pipelines_gametic$reference))
+
+# Arrange beta values for plotting, both imprintome and wgbs, paired by patient
+df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_gametic))-1), function (x)
+  group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_gametic[[x]],
+                 df_cpg_wgbs = pipelines_gametic$reference, 
+                wgbs_counts = wgbs_counts_ds, 
+                col_label = names(pipelines_gametic)[x], db_flag = TRUE)))
+
+# Calculate summary of correlation to gold standard
+df_mean_summary <- df_grouped %>% dplyr::filter(!is.na(mean_imp) & !is.na(mean_wgbs)) %>%
+  dplyr::group_by(group_id, pipeline_name) %>% 
+  dplyr::summarize(rho = cor(mean_imp, mean_wgbs, use = "complete.obs", method = "pearson"), 
+                   n = length(mean_imp),
+                   .groups = "drop_last")
+
+df_pipeline_summary <- df_mean_summary %>%  dplyr::group_by(pipeline_name) %>%  
+  dplyr::summarize(min_rho = min(rho), max_rho = max(rho), mean_rho = mean(rho), mean_n = mean(n))
+
+# Plot rho values for output from each version of the pipeline
+gg1 <- ggplot2::ggplot(data = df_mean_summary, aes(x = pipeline_name, y = rho, color = group_id)) +
+  geom_crossbar(data = df_pipeline_summary,
+                aes(ymin = min_rho, y = mean_rho, ymax = max_rho), color = "grey50") +
+  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.7)) +
+  theme(legend.position = "right", axis.title.y=element_blank(), axis.text.y=element_blank())
+# gg
+gg2 <- ggplot2::ggplot(data = df_pipeline_summary, aes(x = pipeline_name, y = mean_n)) +
+  geom_bar(stat = "identity") + theme_classic() + xlab("") + ylab("Shared CpG Count")  +
+  coord_flip() + scale_y_continuous(breaks = scales::pretty_breaks(n = 3))
+# gg2
+ggf <- plot_grid(gg2, gg1, rel_widths = c(1, 2))
+ggf
+
+```
+
+
+### Design Score Default
 
 ```{r, include = TRUE, out.width="80%", align="center"}
 
@@ -446,18 +512,18 @@ mft <- tdhia::manifest_v1A2_design_scores
 # Get white list of high design score cpg sites
 cpg_white_list <- mft$Name[(mft$Design.Score >= 0.5) & !is.na(mft$Design.Score)]
 # Apply whitelist to all pipeline outputs and reference pipelines
-pipelines_out_ds <- lapply(pipelines_out, function(x) x[rownames(x) %in% cpg_white_list,])
+pipelines_design <- lapply(pipelines_out, function(x) x[rownames(x) %in% cpg_white_list,])
 # Apply whitelist to wgbs count matrix also so both have same dimensions/ rows
 wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
 wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% cpg_white_list,] 
-# all(rownames(wgbs_counts_ds) == rownames(pipelines_out_ds$reference))
+# all(rownames(wgbs_counts_ds) == rownames(pipelines_design$reference))
 
 # Arrange beta values for plotting, both imprintome and wgbs, paired by patient
-df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_out_ds))-1), function (x)
-  group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_out_ds[[x]],
-                 df_cpg_wgbs = pipelines_out_ds$reference, 
+df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_design))-1), function (x)
+  group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_design[[x]],
+                 df_cpg_wgbs = pipelines_design$reference, 
                 wgbs_counts = wgbs_counts_ds, 
-                col_label = names(pipelines_out_ds)[x], db_flag = TRUE)))
+                col_label = names(pipelines_design)[x], db_flag = TRUE)))
 
 # Calculate summary of correlation to gold standard
 df_mean_summary <- df_grouped %>% dplyr::filter(!is.na(mean_imp) & !is.na(mean_wgbs)) %>%
@@ -473,11 +539,12 @@ df_pipeline_summary <- df_mean_summary %>%  dplyr::group_by(pipeline_name) %>%
 gg1 <- ggplot2::ggplot(data = df_mean_summary, aes(x = pipeline_name, y = rho, color = group_id)) +
   geom_crossbar(data = df_pipeline_summary,
                 aes(ymin = min_rho, y = mean_rho, ymax = max_rho), color = "grey50") +
-  geom_point() + theme_classic() + coord_flip() +  + ylab("Pearson Rho") +
+  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.7)) +
   theme(legend.position = "right", axis.title.y=element_blank(), axis.text.y=element_blank())
 # gg
 gg2 <- ggplot2::ggplot(data = df_pipeline_summary, aes(x = pipeline_name, y = mean_n)) +
-  geom_bar(stat = "identity") + theme_classic() + xlab("") + ylab("TDHIA CpG Count") + coord_flip()
+  geom_bar(stat = "identity") + theme_classic() + xlab("") + ylab("Shared CpG Count")  + 
+  coord_flip() + scale_y_continuous(breaks = scales::pretty_breaks(n = 3))
 # gg2
 ggf <- plot_grid(gg2, gg1, rel_widths = c(1, 2))
 ggf
@@ -500,24 +567,29 @@ df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1),
                                     df_cpg_wgbs = pipelines_out$reference,
                                     wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count,
                                     col_label = names(pipelines_out)[x])))
-
+df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$treatment),
+                             yes= "control", no =  "ad")
 # Calculate pearson rho between imprintome and wgbs for each patient
-df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name) %>% summarize(rho = cor(
+df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name, disease_state) %>% summarize(rho = cor(
   imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last", 
-  n_cpg = sum(!is.na(imp) & !is.na(wgbs)))
+  n_cpg = sum(!is.na(imp) & !is.na(wgbs))) %>% 
+  rbind(df_patients %>% group_by(sample_id, pipeline_name) %>% summarize(disease_state = "all", rho = cor(
+  imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last", 
+  n_cpg = sum(!is.na(imp) & !is.na(wgbs))))
+df_patients_rho$disease_state <- 
+  factor(df_patients_rho$disease_state, levels = c("control", "ad", "all"), ordered = TRUE)
+
 # Counts of probes that pass QC for each method
 df_patients_rho_summary <- df_patients_rho %>% group_by(pipeline_name) %>% summarize(mean_ncpg = mean(n_cpg))
-
 # Plot rho values for output from each version of the pipeline
 gg1 <- ggplot2::ggplot(data = df_patients_rho, aes(x= pipeline_name, y = rho)) +
-  geom_boxplot() + theme_classic() + coord_flip() + ylab("Pearson Rho") +
+  geom_boxplot() + facet_grid(cols = vars(disease_state)) + theme_classic() + coord_flip() +
+  ylab("Pearson Rho") + ylim(c(0.3,0.8)) +
   theme( axis.title.y=element_blank(), axis.text.y=element_blank())
-# gg1
 gg2 <- ggplot2::ggplot(data = df_patients_rho_summary, aes(x = pipeline_name, y = mean_ncpg)) +
    geom_bar(stat = "identity") + theme_classic() +
-   xlab("Pipeline") + ylab("TDHIA CpG Count") +
+   xlab("Pipeline") + ylab("Shared CpG Count") +
    coord_flip()
-# gg2
 ggf <- plot_grid(gg2, gg1, rel_widths = c(1, 1.6))
 ggf
 
@@ -525,37 +597,44 @@ ggf
   
 Figure: Per-patient correlation between Imprintome and WGBS. WGBS CpG sites included regardless of # of reads. (A) Bar chart of number of Imprintome probes for each pipeline. Pearson rho correlation coefficients for each pipeline (N = 16 patients).
 
-## WGBS (Counts > 5) 
+## WGBS > 5 
   
 ```{r, include = TRUE, out.width="80%", align="center"}
 # Apply a count threshold to the wgbs output beta values (reference)
 #_______________________________________________________________________________
-pipelines_out2 <- pipelines_out
-pipelines_out2$reference[tdhia::alzheimer_study_wbgs_shared_cpg$count<5]=NA
+pipelines_wgbs_thresh <- pipelines_out
+pipelines_wgbs_thresh$reference[tdhia::alzheimer_study_wbgs_shared_cpg$count<5]=NA
 
 # Grab and sort data from each technology, paired by patient
-df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_out2))-1), 
+df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_wgbs_thresh))-1), 
        function(x) group_by_patient(df_study = study_metadata, 
-                                    df_cpg_imp = pipelines_out2[[x]],   
-                                    df_cpg_wgbs = pipelines_out2$reference,
+                                    df_cpg_imp = pipelines_wgbs_thresh[[x]],   
+                                    df_cpg_wgbs = pipelines_wgbs_thresh$reference,
                                     wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count,
-                                    col_label = names(pipelines_out2)[x])))
-
+                                    col_label = names(pipelines_wgbs_thresh)[x])))
+df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$treatment),
+                             yes= "control", no =  "ad")
 # Calculate pearson rho between imprintome and wgbs for each patient
-df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name) %>% summarize(rho = cor(
+df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name, disease_state) %>% summarize(rho = cor(
   imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last", 
-  n_cpg = sum(!is.na(imp) & !is.na(wgbs)))
+  n_cpg = sum(!is.na(imp) & !is.na(wgbs))) %>% 
+  rbind(df_patients %>% group_by(sample_id, pipeline_name) %>% summarize(disease_state = "all", rho = cor(
+  imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last", 
+  n_cpg = sum(!is.na(imp) & !is.na(wgbs))))
+df_patients_rho$disease_state <- 
+  factor(df_patients_rho$disease_state, levels = c("control", "ad", "all"), ordered = TRUE)
+
 # Counts of probes that pass QC for each method
 df_patients_rho_summary <- df_patients_rho %>% group_by(pipeline_name) %>% summarize(mean_ncpg = mean(n_cpg))
-
 # Plot rho values for output from each version of the pipeline
 gg1 <- ggplot2::ggplot(data = df_patients_rho, aes(x= pipeline_name, y = rho)) +
-  geom_boxplot() + theme_classic() + coord_flip() + ylab("Pearson Rho") +
+  geom_boxplot() + facet_grid(cols = vars(disease_state)) + theme_classic() + 
+  coord_flip() + ylab("Pearson Rho") + ylim(c(0.3,0.8)) +
   theme( axis.title.y=element_blank(), axis.text.y=element_blank())
 # gg1
 gg2 <- ggplot2::ggplot(data = df_patients_rho_summary, aes(x = pipeline_name, y = mean_ncpg)) +
    geom_bar(stat = "identity") + theme_classic() +
-   xlab("Pipeline") + ylab("CpG Count TDHIA") +
+   xlab("Pipeline") + ylab("Shared CpG Count") +
    coord_flip()
 # gg2
 ggf <- plot_grid(gg2, gg1, rel_widths = c(1, 1.6))
@@ -565,55 +644,115 @@ ggf
   
 Figure: Per-patient correlation between Imprintome and WGBS. WGBS CpG sites filtered to those with > 5 reads. (A) Bar chart of number of Imprintome probes for each pipeline. Pearson rho correlation coefficients for each pipeline (N = 16 patients).
   
-## WGBS (Counts > 5), Imp (Design Score > 0.5) 
+  
+## WGBS > 5, Gametic Evidence
+
+```{r, include = TRUE, out.width="80%", align="center"}
+# Apply a count threshold to the wgbs output beta values (reference)
+#_______________________________________________________________________________
+pipelines_wgbs_thresh <- pipelines_out
+pipelines_wgbs_thresh$reference[tdhia::alzheimer_study_wbgs_shared_cpg$count<5]=NA
+
+
+# Apply whitelist to all pipeline outputs and reference pipelines, and wgbs count data
+pipelines_design <- lapply(pipelines_wgbs_thresh, function(x) x[rownames(x) %in% gametic_cpg_ids,])
+wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
+wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% gametic_cpg_ids,] 
+# all(rownames(wgbs_counts_ds) == rownames(pipelines_design$reference))
+
+
+# Grab and sort data from each technology, paired by patient
+df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_design))-1), 
+       function(x) group_by_patient(df_study = study_metadata, 
+                                    df_cpg_imp = pipelines_design[[x]],   
+                                    df_cpg_wgbs = pipelines_design$reference,
+                                    wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count,
+                                    col_label = names(pipelines_design)[x])))
+df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$treatment),
+                             yes= "control", no =  "ad")
+# Calculate pearson rho between imprintome and wgbs for each patient
+df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name, disease_state) %>% summarize(rho = cor(
+  imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last", 
+  n_cpg = sum(!is.na(imp) & !is.na(wgbs))) %>% 
+  rbind(df_patients %>% group_by(sample_id, pipeline_name) %>% summarize(disease_state = "all", rho = cor(
+  imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last", 
+  n_cpg = sum(!is.na(imp) & !is.na(wgbs))))
+df_patients_rho$disease_state <- 
+  factor(df_patients_rho$disease_state, levels = c("control", "ad", "all"), ordered = TRUE)
+
+# Counts of probes that pass QC for each method
+df_patients_rho_summary <- df_patients_rho %>% group_by(pipeline_name) %>% summarize(mean_ncpg = mean(n_cpg))
+# Plot rho values for output from each version of the pipeline
+gg1 <- ggplot2::ggplot(data = df_patients_rho, aes(x= pipeline_name, y = rho)) +
+  geom_boxplot()  + facet_grid(cols = vars(disease_state)) + theme_classic() + 
+  coord_flip() + ylab("Pearson Rho") + ylim(c(0.3,0.8)) +
+  theme( axis.title.y=element_blank(), axis.text.y=element_blank())
+gg2 <- ggplot2::ggplot(data = df_patients_rho_summary, aes(x = pipeline_name, y = mean_ncpg)) +
+   geom_bar(stat = "identity") + theme_classic() +
+   xlab("Pipeline") + ylab("Shared CpG Count") +
+   coord_flip()
+ggf <- plot_grid(gg2, gg1, rel_widths = c(1, 1.6))
+ggf
+
+```
+   
+Figure: Per-patient correlation between Imprintome and WGBS. WGBS CpG sites filtered to those with > 5 reads and gametic origin of methylation. (A) Bar chart of number of Imprintome probes for each pipeline. Pearson rho correlation coefficients for each pipeline (N = 16 patients).
+  
+  
+## WGBS > 5, Imp DS > 0.5 
   
 ```{r, include = TRUE, out.width="80%", align="center"}
 # Apply a count threshold to the wgbs output beta values (reference)
 #_______________________________________________________________________________
-pipelines_out2 <- pipelines_out
-pipelines_out2$reference[tdhia::alzheimer_study_wbgs_shared_cpg$count<5]=NA
+pipelines_wgbs_thresh <- pipelines_out
+pipelines_wgbs_thresh$reference[tdhia::alzheimer_study_wbgs_shared_cpg$count<5]=NA
 
 # Get white list of high design score cpg sites
 cpg_white_list <- mft$Name[(mft$Design.Score >= 0.5) & !is.na(mft$Design.Score)]
-# Apply whitelist to all pipeline outputs and reference pipelines
-pipelines_out2_ds <- lapply(pipelines_out2, function(x) x[rownames(x) %in% cpg_white_list,])
-# Apply whitelist to wgbs count matrix also so both have same dimensions/ rows
+# Apply whitelist to all pipeline outputs, reference pipelines, and wgbs count data
+pipelines_design <- lapply(pipelines_wgbs_thresh, function(x) x[rownames(x) %in% cpg_white_list,])
 wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
 wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% cpg_white_list,] 
-# all(rownames(wgbs_counts_ds) == rownames(pipelines_out_ds$reference))
-
+# all(rownames(wgbs_counts_ds) == rownames(pipelines_design$reference))
 
 # Grab and sort data from each technology, paired by patient
-df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_out2_ds))-1), 
+df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_design))-1), 
        function(x) group_by_patient(df_study = study_metadata, 
-                                    df_cpg_imp = pipelines_out2_ds[[x]],   
-                                    df_cpg_wgbs = pipelines_out2_ds$reference,
+                                    df_cpg_imp = pipelines_design[[x]],   
+                                    df_cpg_wgbs = pipelines_design$reference,
                                     wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count,
-                                    col_label = names(pipelines_out2_ds)[x])))
-
+                                    col_label = names(pipelines_design)[x])))
+df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$treatment),
+                             yes= "control", no =  "ad")
 # Calculate pearson rho between imprintome and wgbs for each patient
-df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name) %>% summarize(rho = cor(
+df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name, disease_state) %>% summarize(rho = cor(
   imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last", 
-  n_cpg = sum(!is.na(imp) & !is.na(wgbs)))
+  n_cpg = sum(!is.na(imp) & !is.na(wgbs))) %>% 
+  rbind(df_patients %>% group_by(sample_id, pipeline_name) %>% summarize(disease_state = "all", rho = cor(
+  imp, wgbs, use = "complete.obs", method = "pearson"), .groups = "drop_last", 
+  n_cpg = sum(!is.na(imp) & !is.na(wgbs))))
+df_patients_rho$disease_state <- 
+  factor(df_patients_rho$disease_state, levels = c("control", "ad", "all"), ordered = TRUE)
+
 # Counts of probes that pass QC for each method
 df_patients_rho_summary <- df_patients_rho %>% group_by(pipeline_name) %>% summarize(mean_ncpg = mean(n_cpg))
-
 # Plot rho values for output from each version of the pipeline
 gg1 <- ggplot2::ggplot(data = df_patients_rho, aes(x= pipeline_name, y = rho)) +
-  geom_boxplot() + theme_classic() + coord_flip() + ylab("Pearson Rho") +
+  geom_boxplot()  + facet_grid(cols = vars(disease_state)) + theme_classic() +
+  coord_flip() + ylab("Pearson Rho") + ylim(c(0.3,0.8)) +
   theme( axis.title.y=element_blank(), axis.text.y=element_blank())
-# gg1
 gg2 <- ggplot2::ggplot(data = df_patients_rho_summary, aes(x = pipeline_name, y = mean_ncpg)) +
    geom_bar(stat = "identity") + theme_classic() +
-   xlab("Pipeline") + ylab("CpG Count TDHIA") +
+   xlab("Pipeline") + ylab("Shared CpG Count") +
    coord_flip()
-# gg2
 ggf <- plot_grid(gg2, gg1, rel_widths = c(1, 1.6))
 ggf
 
 ```
 
 Figure: Per-patient correlation between Imprintome and WGBS. WGBS CpG sites filtered to those with > 5 reads and only high quality probes probes included from imprintome data (design score > 0.5). (A) Bar chart of number of Imprintome probes for each pipeline. Pearson rho correlation coefficients for each pipeline (N = 16 patients).
+
+
 
 
 # Case-control analysis: Alzheimer Patient's 
