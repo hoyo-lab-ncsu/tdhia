@@ -220,8 +220,9 @@ idat_dir_path <- system.file("extdata", package="tdhia")
 
 
 # Get whitelist of CpG sites that have gametic validation
-df_valid <- as.data.frame(data.table::fread(paste0(system.file("data-raw", package = "tdhia"), "/validated_ICRs_11152024.bed")))
-colnames(df_valid) <- c("chr", "start", "finish", "icr")
+# df_valid <- as.data.frame(data.table::fread(paste0(system.file("data-raw", package = "tdhia"), "/validated_ICRs_11152024.bed")))
+# colnames(df_valid) <- c("chr", "start", "finish", "icr")
+df_valid <- tdhia::df_gametic_icrs
 # determine which rows in manifest have validated cpgs
 is_validated <- sapply(1:nrow(mft), function(x) {any((
   mft[x,]$CHR==df_valid$chr) & (mft[x,]$MAPINFO > df_valid$start &

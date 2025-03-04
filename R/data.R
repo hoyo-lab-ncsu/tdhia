@@ -369,3 +369,19 @@
 "epicv2_shared_cpg_sites"
 
 
+#' Table of ICR's that were experimentally validated with differential gametic 
+#' methylation from sperm and oocyte samples.
+#'
+#' @name df_gametic_icrs
+#' @docType data
+#' @keywords datasets
+#' @format A dataframe with sample ID for wgbs data
+#' \describe{
+#'   \item{ch}{ Chromosome number.}
+#'   \item{start}{ genomic position start of ICR}
+#'   \item{finish}{ genomic position end of ICR}
+#'   \item{icr}{ ICR identifier}
+#' }
+"df_gametic_icrs"
+
+ 
