@@ -172,11 +172,20 @@ mft <- tdhia::manifest_v1A2_design_scores
 
 # Load and clean study metadata
 
-Study metadata are read from several csv files that join together several pieces of information.  
-1. WGBS filnames to study_ids.  
-2. Imprintome filenames to study_ids.  
-3. Study_ids to demographic information about the study participant.  
-All of this information is collected in the study_metadata dataframe.  
+Study metadata is read from a dataframe included in the package, with columns defined below. 
+
+0. *Rownames*: base file name for imprintome IDAT files.  
+1. **ID**: patient index within this table (not study ID). 
+2. **FileName**: filename of WGBS output files.  
+3. **Treatment**: factor seperating patients by race and disease state (black control, 
+white contro, black AD, white AD).  
+4. **sampleID**: NEST or SHIP study ID (?). 
+5. **X**: NEST or SHIP study ID (?).  
+6. **Sample Chip**: identifier for each sample in this study.  
+7. **Beadchip**: Index of True Diagnostic chip.  
+8. **Row_Col**: location on chip.  
+9. **is_control**: boolean, when true, denotes patinet is a healthy control patient.
+10. **disease_state**: boolean, when true, denotes patients is a diseased patient with AD.  
 
 ```{r metadata, include = TRUE, cache = FALSE}
 # Loading AD study data 
@@ -185,9 +194,9 @@ study_metadata <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
 ```
 
 
-# Process Imprintome with Various Settings and Pair with WGBS data
+# Process Imprintome and WGBS data with Various Settings
 
-There are various options within the TDHIA pipeline for processing imprintome data. We illustrate some of the primary options by processing the imprintome data with many deviations from the default settings for the pipeline. We can compare how well these different versions agree with results from WGBS data.
+There are various options within the TDHIA pipeline for processing imprintome data. We illustrate some of the primary options by processing the imprintome data with many deviations from the default settings for the pipeline. We can compare how well these different versions agree with results from WGBS data.  
 1. **default**: beta values from standard default pipeline. The SeSame R package is used for processing the methylation data. Raw IDAT files are loaded, the Infinuium probe type is inferred, fluorescent signal is subtracted with Norm-Exp de-convolution that is parameterized with out-of-band probes, and a non-linear dye bias correction is applied. 
 2. **epic_v2**: shared cpg sites with Epiv V2 Illumina methylation array.  
 3. **quant_norm**: beta values from standard pipeline, but performed quantile normalization (patient-wise) during cpg conversion step.  
@@ -213,10 +222,11 @@ df_valid <- as.data.frame(data.table::fread(paste0(system.file("data-raw", packa
 colnames(df_valid) <- c("chr", "start", "finish", "icr")
 # determine which rows in manifest have validated cpgs
 is_validated <- sapply(1:nrow(mft), function(x) {any((
-  mft[x,]$CHR==df_valid$chr) &
-    (mft[x,]$MAPINFO > df_valid$start &
+  mft[x,]$CHR==df_valid$chr) & (mft[x,]$MAPINFO > df_valid$start &
        mft[x,]$MAPINFO < df_valid$finish ))})
 gametic_cpg_ids <- mft$Name[is_validated]
+# Number of gametic evidence ICRs
+length(unique(mft$icr_id[is_validated]))
 
 
 if (!file.exists(data_filepath)) {
@@ -227,16 +237,16 @@ if (!file.exists(data_filepath)) {
   # Pipeline 1: default                                                ###########
   #_______________________________________________________________________________
   # Standard base pipeline
-  # 1) Load probe data and merge
+  # A) Load probe data and merge
   probe_beta <- 
     load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
                          merge_replicates = NULL, db_flag = TRUE)
-  # 3) Filter probes results
+  # B) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
                   set_failed_betas_na = TRUE, discard_failed_probes = TRUE, min_design_score = .20)
-  # 4) Merge probe measurement to cpg sites
+  # C) Merge probe measurement to cpg sites
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = TRUE)
   icr_beta <- convert_cpgs_to_icrs(cpg_beta)
   pipelines_out$default <- cpg_beta$cpg_beta_df
@@ -298,13 +308,13 @@ if (!file.exists(data_filepath)) {
   # Standard pipeline, but using a strict p-value threshold of 0.05 for sesame 
   # signal detection p-value instead of the usual
   #    Flags: max_sig_pval = 0.05
-  # 3) Filter probes results
+  # C) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.05, max_probe_fail_rate = 0.1, db_flag = FALSE,
                   set_failed_betas_na = FALSE, discard_failed_probes = TRUE, 
                   min_design_score = .20)
-  # 4) Merge probe measurement to cpg sites
+  # D) Merge probe measurement to cpg sites
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = TRUE)
   pipelines_out$low_p_val <- cpg_beta$cpg_beta_df
   
@@ -313,12 +323,12 @@ if (!file.exists(data_filepath)) {
   #_______________________________________________________________________________
   # Standard pipeline, excluding probes with low design score (0.30) are excluded.
   #    Flags: min_design_score = .30
-  # 3) Filter probes results
+  # C) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
                   set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .5)
-  # 4) Merge probe measurement to cpg sites
+  # D) Merge probe measurement to cpg sites
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   pipelines_out$design_thresh <- cpg_beta$cpg_beta_df
   
@@ -331,16 +341,16 @@ if (!file.exists(data_filepath)) {
   # detection p-values are calculated with the bates distribution. 
   #  There is a procedure that determine whether to merge probes or only keep one 
   # probe based on which has the smallest detection p-value.
-  # 1) Load probe data and merge
+  # A) Load probe data and merge
   probe_beta <- 
     load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
                          merge_replicates = "pre_beta", db_flag = TRUE)
-  # 3) Filter probes results
+  # B) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
                   set_failed_betas_na = TRUE, discard_failed_probes = TRUE, min_design_score = .20)
-  # 4) Cpg matrix
+  # C) Cpg matrix
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   pipelines_out$pre_merge <- cpg_beta$cpg_beta_df
   
@@ -353,16 +363,16 @@ if (!file.exists(data_filepath)) {
   #  There is a procedure that determine whether to merge probes or only keep one 
   # probe based on which option has the smallest detection p-value (merged probe, 
   # probe #1, probe #2).
-  # 1) Load probe data and merge
+  # A) Load probe data and merge
   probe_beta <- 
     load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
                          merge_replicates = "post_beta", db_flag = FALSE)
-  # 3) Filter probes results
+  # B) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
                   set_failed_betas_na = FALSE, discard_failed_probes = TRUE, min_design_score = .20)
-  # 4) Cpg matrix
+  # C) Cpg matrix
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   pipelines_out$post_merge <- cpg_beta$cpg_beta_df
   
@@ -403,12 +413,14 @@ Now we can compare the agreement of results between the imprintome array and WGB
 df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1), function (x)
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_out[[x]],
                  df_cpg_wgbs = pipelines_out$reference, wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count, 
-                col_label = names(pipelines_out)[x], mean_max_na = 1)))
+                col_label = names(pipelines_out)[x], mean_max_na = 3)))
 
 ```
 
 ## Comparison of Mean Pearson Correlation
-To qualitatively visualize the agreement between these two technologies, we compare mean beta levels for the shared CPG sites between them. For the figure below, the beta values are calculated from a default pipeline and then averaged across all patients in a study group (black AD, black Control, white AD, white control).
+
+To visualize the agreement between these two technologies, we compare mean beta levels for the shared CPG sites between them. For the figure below, the beta values are calculated from a default pipeline and then averaged across all patients in a study group (black AD, black Control, white AD, white control).
+
 ```{r, include = TRUE, out.width="70%"}
 # Show raw datapoints wgbs versus imprintome
 gg <- ggplot2::ggplot(data = subset(df_grouped, pipeline_name == "default"), 
@@ -421,9 +433,15 @@ gg
 
 ## Comparison of Mean Pearson Correlation {.tabset}
 
-We calculate the pearson correlation between the averaged beta measurements to a correlation coefficient for each of the study groups. Of the various imprintome pipelines tested, cpg smoothing and a design score threshold of > 0.5 increase the observed correlation coefficient with WGBS measurements.
+We calculate the pearson correlation of the averaged beta measurements (for each patient study group) between imprintome and WGBS measurements. The analysis is completed three times, with a different pipeline applied first before all other pipelines are applied:
 
-### Base Pipeline
+1. **Base Pipeline**: basic imprintome pipeline.
+2. **Gametic Evidence Default**: Only CpG sites with experimental evidence of 50% gametic methylation are included.
+3. **Design Score Default**: only probes with a design score (> 0.5) is included in the output.  
+  
+Across all analysis, only CpG sites are included if they have no missing data across all 4 samples within the group for either imprintome or WGBS data.
+
+### Default Pipeline
 
 ```{r, include = TRUE, out.width="80%", align="center"}
 
@@ -431,7 +449,7 @@ We calculate the pearson correlation between the averaged beta measurements to a
 df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1), function (x)
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_out[[x]],
                  df_cpg_wgbs = pipelines_out$reference, wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count, 
-                col_label = names(pipelines_out)[x], mean_max_na = 3,db_flag = TRUE)))
+                col_label = names(pipelines_out)[x], mean_max_na = 0, db_flag = TRUE)))
 # Calculate summary of correlation to gold standard
 df_mean_summary <- df_grouped %>% dplyr::filter(!is.na(mean_imp) & !is.na(mean_wgbs)) %>%
   dplyr::group_by(group_id, pipeline_name) %>% 
@@ -446,7 +464,7 @@ df_pipeline_summary <- df_mean_summary %>%  dplyr::group_by(pipeline_name) %>%
 gg1 <- ggplot2::ggplot(data = df_mean_summary, aes(x = pipeline_name, y = rho, color = group_id)) +
   geom_crossbar(data = df_pipeline_summary,
                 aes(ymin = min_rho, y = mean_rho, ymax = max_rho), color = "grey50") +
-  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.7)) +
+  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.75)) +
   theme(legend.position = "right", axis.title.y=element_blank(), axis.text.y=element_blank())
 # gg
 gg2 <- ggplot2::ggplot(data = df_pipeline_summary, aes(x = pipeline_name, y = mean_n)) +
@@ -473,7 +491,7 @@ wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% gametic_cpg_ids,]
 df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_gametic))-1), function (x)
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_gametic[[x]],
                  df_cpg_wgbs = pipelines_gametic$reference, 
-                wgbs_counts = wgbs_counts_ds, 
+                wgbs_counts = wgbs_counts_ds, mean_max_na = 0,
                 col_label = names(pipelines_gametic)[x], db_flag = TRUE)))
 
 # Calculate summary of correlation to gold standard
@@ -490,7 +508,7 @@ df_pipeline_summary <- df_mean_summary %>%  dplyr::group_by(pipeline_name) %>%
 gg1 <- ggplot2::ggplot(data = df_mean_summary, aes(x = pipeline_name, y = rho, color = group_id)) +
   geom_crossbar(data = df_pipeline_summary,
                 aes(ymin = min_rho, y = mean_rho, ymax = max_rho), color = "grey50") +
-  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.7)) +
+  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.75)) +
   theme(legend.position = "right", axis.title.y=element_blank(), axis.text.y=element_blank())
 # gg
 gg2 <- ggplot2::ggplot(data = df_pipeline_summary, aes(x = pipeline_name, y = mean_n)) +
@@ -522,7 +540,7 @@ wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% cpg_white_list,]
 df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_design))-1), function (x)
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_design[[x]],
                  df_cpg_wgbs = pipelines_design$reference, 
-                wgbs_counts = wgbs_counts_ds, 
+                wgbs_counts = wgbs_counts_ds, mean_max_na = 0,
                 col_label = names(pipelines_design)[x], db_flag = TRUE)))
 
 # Calculate summary of correlation to gold standard
@@ -539,7 +557,7 @@ df_pipeline_summary <- df_mean_summary %>%  dplyr::group_by(pipeline_name) %>%
 gg1 <- ggplot2::ggplot(data = df_mean_summary, aes(x = pipeline_name, y = rho, color = group_id)) +
   geom_crossbar(data = df_pipeline_summary,
                 aes(ymin = min_rho, y = mean_rho, ymax = max_rho), color = "grey50") +
-  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.7)) +
+  geom_point() + theme_classic() + coord_flip() + ylab("Pearson Rho") + ylim(c(0.4, 0.75)) +
   theme(legend.position = "right", axis.title.y=element_blank(), axis.text.y=element_blank())
 # gg
 gg2 <- ggplot2::ggplot(data = df_pipeline_summary, aes(x = pipeline_name, y = mean_n)) +
@@ -554,9 +572,14 @@ ggf
 
 # Per Patient Correlation of Imprintome vs WGBS {.tabset}
 
-Now we can examine the correlation between beta values from the imprintome versus WGBS within each patient (instead of mean correlation for each study group). The pearson correlation for each patient is calculated (cpg sites that are not included in the WGBS data are removed). Once again, cpg smoothing and design score thresholding increase the observed mean correlation on a patient levl as well.
+Now we can examine the correlation between beta values within each patient for the imprintome versus WGBS measurements (instead of mean correlation for each study group). The pearson correlation for each patient is calculated (cpg sites that are not included in the WGBS or imprintome data are removed). THis analysis is repeated multiple times, with different setting applied to the imprintome and WGBS data.  
+
+1. **Default**
+2. **WGBS > 5**: CpG sites included if > 5 reads from WGBS output.  
+3. **Gametic Evidence**: CpG sites with evidence of gametic origin of 50% methylation are included in the correlation comparison.  
+4. **Imp DS > 0.5**: imprintome probes included with a design score > 0.5.  
   
-## Standard
+## Default
   
 ```{r, include = TRUE, out.width="80%", align="center"}
 
@@ -754,14 +777,13 @@ Figure: Per-patient correlation between Imprintome and WGBS. WGBS CpG sites filt
 
 
 
-
 # Case-control analysis: Alzheimer Patient's 
 
 Now we can perform a simple case control analysis on the data to see if there is a difference in mean beta values in healthy patients versus those with Alzheimers. Patients are separated between these two study groups,  and then a t-test is performed between the measurments from each group. P-values are corrected with a FDR correction base on the number of ICRs measured by the probes that passed quality control filtering.
 
 ```{r, include = TRUE}
 
-case_control <- tdhia::analyze_case_control(pipelines_out$cpg_smooth, study_metadata$is_control, n_adjust = nrow(icr_beta$icr_beta_df))
+case_control <- tdhia::analyze_case_control(pipelines_out$pre_merge, study_metadata$is_control, n_adjust = nrow(icr_beta$icr_beta_df))
 
 # sum(case_control)
 
@@ -771,11 +793,13 @@ sum(case_control$adj_pval<0.05)
 
 ```
 
-# Association Study: Imprintome Methylation Status and Alzheimer's
+# Association Study: Imprintome Methylation Status and Alzheimer's {.tabset}
 
-We can also perform an association study the also probes for differences in methylation between study groups, by also makes use of demographic information of the participants. We fit a series of binomial model of the form:
+We can also perform an association study the also probes for differences in methylation between study groups, by also makes use of demographic information of the participants. We fit a series of binomial models that include all participants, and then partition them between Black and White patients:
 
-disease_state ~ cpg_beta + Ethnicity + Age + Sex
+**Model 1**: disease_state ~ cpg_beta + Age + Sex, All patients  
+**Model 2**: disease_state ~ cpg_beta + Age + Sex, Black patients  
+**Model 3**: disease_state ~ cpg_beta + Age + Sex, White patients  
 
 1. **disease_state**: binary, TRUE is Alzheimer's.  
 2. **cpg_beta**: methylation beta value at a particular cpg site.  
@@ -788,30 +812,79 @@ Where disease_state is the response variable, and cpg_beta is the primary predic
 
 
 ```{r association_study, include = TRUE}
-
 n.cores <- max(c(parallel::detectCores()-2,1))
-df_alzheimer <- analyze_association(
-  R = select(study_metadata, disease_state), P = as.data.frame(t(pipelines_out$cpg_smooth)),
-  Pe = select(study_metadata, c(Ethnicity, Age, Sex)), family = "binomial", 
+# r GLM, remove ethnicity as predictor, and try to analyze (1) all patients, (2) black only, (3) white only
+
+# Ethnicity
+
+# disease_state ~ cpg + Age + Sex, All patients
+df_all <- analyze_association(
+  R = select(study_metadata, disease_state), P = as.data.frame(t(pipelines_out$default)),
+  Pe = select(study_metadata, c(Age, Sex)), family = "binomial", 
+  n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = FALSE, 
+  verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
+
+# disease_state ~ cpg + Age + Sex, White only
+ix_white <- study_metadata$Ethnicity == "NHW"
+df_white <- analyze_association(
+  R = select(study_metadata[ix_white,], disease_state), 
+  P = as.data.frame(t(select(pipelines_out$pre_merge, study_metadata$Patient.ID[ix_white]))),
+  Pe = select(study_metadata[ix_white,], c(Age, Sex)), family = "binomial", 
   n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
 
+# disease_state ~ cpg + Age + Sex, Black patients
+ix_black <- study_metadata$Ethnicity == "NHB"
+df_black <- analyze_association(
+  R = select(study_metadata[ix_black,], disease_state), 
+  P = as.data.frame(t(select(pipelines_out$pre_merge, study_metadata$Patient.ID[ix_black]))),
+  Pe = select(study_metadata[ix_black,], c(Age, Sex)), family = "binomial", 
+  n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
+  verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
+
+
 ```
-
-## Significant ICR/CpG sites
-
+  
+**Significant CpG sites**
+  
 Now we can retrieve additional information for any CpG sites that are found to have an association, such as proximity to a zinc finger finger binding site, experimental evidence for it's associated ICR, and the nearest gene transcript.
 
 ```{r association_sig_icr, include = TRUE}
-# add ICR ID to the cpg sites
-df_alzheimer$imp_site$icr_id <- match_cpg_id_to_icr_id(df_alzheimer$imp_site$Variable, AsNumeric = FALSE)
-# # Export result to simpler structure
-df_res <- df_alzheimer$imp_site
-# # Add gene metadata to each cpg site
-df_res_meta <- add_gene_metadata_to_icr(df_res)
-# # Output a subset of the table
-dplyr::select(df_res_meta, c(icr_name, Variable, ADJ_P_VAL, is_icr_zinc, is_icr_highconf,
-                      is_icr_medconf, is_icr_lowconf, Nearest.Transcript,
-                      Distance.to.Nearest.Transcript))
 
+
+df_result <- rbind(df_all$imp_site %>% mutate(Group = "All"), df_black$imp_site %>% mutate(Group = "Black"),
+      df_white$imp_site %>% mutate(Group = "White"))
+
+# add ICR ID to the cpg sites
+df_result$icr_id <- match_cpg_id_to_icr_id(df_result$Variable, AsNumeric = FALSE)
+
+# # Add gene metadata to each cpg site
+df_result_meta <- add_gene_metadata_to_icr(df_result)
+# # Output a subset of the table
+df_display <- dplyr::select(
+  df_result_meta, c(Group, icr_name, Variable, ADJ_P_VAL, is_icr_zinc, 
+                    is_icr_highconf, is_icr_medconf, is_icr_lowconf, Nearest.Transcript,
+                    Distance.to.Nearest.Transcript))
+
+colnames(df_display) <- c("Group", "ICR", "CpG Site", "Adj p-val", "Zinc", "High", 
+                          "Med", "Low", "Nearest.Transcript", "Distance")
+```
+
+
+## All
+  
+```{r, include = TRUE}
+knitr::kable(filter(df_display, Group == "All") %>% select(-Group), format = "html")
+```
+
+## Black
+  
+```{r, include = TRUE}
+knitr::kable(filter(df_display, Group == "Black") %>% select(-Group), format = "html")
+```
+
+## White
+  
+```{r, include = TRUE}
+knitr::kable(filter(df_display, Group == "White") %>% select(-Group), format = "html")
 ```
