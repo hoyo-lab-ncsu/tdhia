@@ -24,6 +24,14 @@
 #' @param min_design_score discard probes below this design score threshold.
 #' Default: NA (don't discard any probes by design score). Design scores vary
 #' from 0-1, with a higher value being a better designed probe.
+#' @param icr_conf_levels a numerical vector listing the desired ICR confidence 
+#' levels for filtered probes.Any probes that are not included in this list are 
+#' excluded. ICR confidence scores are (1-3), where
+#' (1) High: literature validated gold standard.
+#' (2) Medium: experimental evidence of gametic origin of differential methylation.
+#' (3) Low: experimental evidence of 50% methylation in somatic tissues.
+#' Example: icr_conf_levels = c(1,2)
+#'   Would discard any probes associated with a ICR confidence score of 3.
 #' @param verbose boolean flag, when TRUE prints the results of each filtering
 #' step (default = TRUE).
 #' @param db_flag boolean when true export workspace to disk for debugging.
@@ -39,7 +47,8 @@
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                           max_sig_pval = 0.2, set_failed_betas_na = TRUE, mft = NULL,
                           max_probe_fail_rate = 0.5, discard_failed_probes = TRUE,
-                          min_design_score = NA, verbose = TRUE, db_flag = FALSE) {
+                          min_design_score = NA, icr_conf_levels = NULL,
+                          verbose = TRUE, db_flag = FALSE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")}
   # load(file = "filter_probes_debug.RData")
 
@@ -113,7 +122,7 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   }
 
 
-  # Set individual probe_beta values to NA if the p-value is above max threshold ####
+  # Set individual probe_beta values to NA if the p-value < threshold ####
   #_____________________________________________________________________________
   sig_pval_pass <- filt_probe_pval_df < max_sig_pval
   if ((!is.null(max_sig_pval)) && set_failed_betas_na) {
@@ -129,8 +138,12 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
     qsum <- (stats::quantile(unname(rowSums(is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df)),
              seq(.1,1,.1)))
     df_sum = data.frame(Quantile = names(qsum), "Fraction.Failed" = unname(qsum))
-    if (verbose) print(df_sum)
+    # print(df_sum)
+    for (n in 1:nrow(df_sum)) {
+      verbosecat(sprintf("%s \t %.03f\n", df_sum$Quantile[n], df_sum$Fraction.Failed[n]))
+    }
     verbosecat("\n")
+    
   } else {
     verbosecat(sprintf("Probe filter: keeping all individual beta values that
                        exceed p-value.\n\n"))
@@ -182,7 +195,6 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
 
   # Filter probes with low design scores              ##########################
   #_____________________________________________________________________________
-
   design_score_df <- dplyr::left_join(
     x = data.frame(Name = stringr::str_replace(rownames(filt_probe_beta_df),"_.{4}$","")),
     y = dplyr::select(mft, c("Name", "Design.Score")), by = "Name",
@@ -202,8 +214,30 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                        sum(design_score_keep_flag==TRUE)))
   }
 
+   
+  # Filter probes by ICR confidence level                             ##########
+  #_____________________________________________________________________________
+  if (!is.null(icr_conf_levels)) {
+    # icr_conf_levels is considered a WHITELIST, not a threshold.
+    df_metadata <- add_metadata_from_cpg(str_replace(rownames(filt_probe_beta_df), "_.*$",""))
+    icr_conf_keep_flag <- df_metadata$icr_conf %in% icr_conf_levels
+    
+    # FIlter out probes that are not part of specified icr_conf levels
+    filt_probe_beta_df <- filt_probe_beta_df[icr_conf_keep_flag, ]
+    filt_probe_pval_df <- filt_probe_pval_df[icr_conf_keep_flag, ]
+    design_score_df <- design_score_df[icr_conf_keep_flag, ]
+    
+    verbosecat(sprintf("Probe filter: discarding %.2f%% of probes ( %i/ %i) from undesired ICR confidence levels.
+              %i probes now remain. \n\n",
+                       100*sum(icr_conf_keep_flag==FALSE)/length(icr_conf_keep_flag),
+                       sum(icr_conf_keep_flag==FALSE),
+                       length(icr_conf_keep_flag),
+                       sum(icr_conf_keep_flag==TRUE)))
+  }
+  
+  
   # Report how many missing measurements at end of all filtering steps.
-  verbosecat(sprintf("Probe filter: After all filtering, %.0f%% probes measurments ( %i/ %i) are now NA.\n\n",
+  verbosecat(sprintf("Probe filter: After all filtering, %.0f%% of individual probe measurments ( %i/ %i) are now NA.\n\n",
                      100*sum(is.na(filt_probe_beta_df)) / prod(dim(filt_probe_beta_df)),
                      sum(is.na(filt_probe_beta_df)),
                      prod(dim(filt_probe_beta_df))))

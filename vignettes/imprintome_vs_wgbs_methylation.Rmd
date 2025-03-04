@@ -65,6 +65,8 @@ library(tibble)
 library(ggplot2)
 library(cowplot)
 library(data.table)
+library(kableExtra)
+library(ggVennDiagram)
 ```
 
 
@@ -226,7 +228,7 @@ is_validated <- sapply(1:nrow(mft), function(x) {any((
        mft[x,]$MAPINFO < df_valid$finish ))})
 gametic_cpg_ids <- mft$Name[is_validated]
 # Number of gametic evidence ICRs
-length(unique(mft$icr_id[is_validated]))
+# length(unique(mft$icr_id[is_validated]))
 
 
 if (!file.exists(data_filepath)) {
@@ -244,8 +246,9 @@ if (!file.exists(data_filepath)) {
   # B) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
-                  max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
-                  set_failed_betas_na = TRUE, discard_failed_probes = TRUE, min_design_score = .20)
+                  max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = TRUE,
+                  set_failed_betas_na = TRUE, discard_failed_probes = TRUE,
+                  min_design_score = .20, icr_conf_levels = NULL)
   # C) Merge probe measurement to cpg sites
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = TRUE)
   icr_beta <- convert_cpgs_to_icrs(cpg_beta)
@@ -803,9 +806,8 @@ We can also perform an association study the also probes for differences in meth
 
 1. **disease_state**: binary, TRUE is Alzheimer's.  
 2. **cpg_beta**: methylation beta value at a particular cpg site.  
-3. **Ethnicity**: factor with two levels: non-hispanic black and non-hispanic white.  
-4. **Age**: continuous variable, age of participant.  
-5. **Sex**: factor with 2 levels, male/ female.  
+3. **Age**: continuous variable, age of participant.  
+4. **Sex**: factor with 2 levels, male/ female.  
 
 Where disease_state is the response variable, and cpg_beta is the primary predictor, while also adjusting for ethnicity, age, and biological sex.
 
@@ -813,9 +815,6 @@ Where disease_state is the response variable, and cpg_beta is the primary predic
 
 ```{r association_study, include = TRUE}
 n.cores <- max(c(parallel::detectCores()-2,1))
-# r GLM, remove ethnicity as predictor, and try to analyze (1) all patients, (2) black only, (3) white only
-
-# Ethnicity
 
 # disease_state ~ cpg + Age + Sex, All patients
 df_all <- analyze_association(
@@ -845,16 +844,17 @@ df_black <- analyze_association(
 
 ```
   
-**Significant CpG sites**
+**Significant CpG and ICR sites**
   
 Now we can retrieve additional information for any CpG sites that are found to have an association, such as proximity to a zinc finger finger binding site, experimental evidence for it's associated ICR, and the nearest gene transcript.
 
-```{r association_sig_icr, include = TRUE}
+```{r association_sig_icr, out.width = "50%", align = "center"}
 
 
-df_result <- rbind(df_all$imp_site %>% mutate(Group = "All"), df_black$imp_site %>% mutate(Group = "Black"),
-      df_white$imp_site %>% mutate(Group = "White"))
-
+df_result <- rbind(df_all$imp_site %>% mutate(Group = "All"), 
+                   df_black$imp_site %>% mutate(Group = "Black"),
+                   df_white$imp_site %>% mutate(Group = "White")) %>% 
+  filter(ADJ_P_VAL < 0.05)
 # add ICR ID to the cpg sites
 df_result$icr_id <- match_cpg_id_to_icr_id(df_result$Variable, AsNumeric = FALSE)
 
@@ -868,23 +868,47 @@ df_display <- dplyr::select(
 
 colnames(df_display) <- c("Group", "ICR", "CpG Site", "Adj p-val", "Zinc", "High", 
                           "Med", "Low", "Nearest.Transcript", "Distance")
-```
 
+disp_table_all = filter(df_display, Group == "All") %>% select(-Group)
+disp_table_black = filter(df_display, Group == "Black") %>% select(-Group)
+disp_table_white = filter(df_display, Group == "White") %>% select(-Group)
+
+
+# Produce venn diagram of shared ICRs between groups
+ggvenn <- venn_shared_icrs(df_imp_sig = df_result, colname = "Group", group_names = NULL, 
+                             output_dir_path = NULL, name_suffix = "")
+
+ggvenn$figure
+
+```
+  
+Figure: venn diagram of the number of shared significant ICR sites between ethnicity groups from association study.
 
 ## All
   
-```{r, include = TRUE}
-knitr::kable(filter(df_display, Group == "All") %>% select(-Group), format = "html")
+Significant CpGs: `r sprintf("%.0f\n", nrow(disp_table_all))`.  
+Significant ICRs:  `r sprintf(" %.0f\n", length(unique(disp_table_all$ICR)))`.
+  
+```{r, include = TRUE, echo = TRUE}
+knitr::kable(disp_table_all, format = "html") %>% kableExtra::kable_styling()
 ```
+
 
 ## Black
   
-```{r, include = TRUE}
-knitr::kable(filter(df_display, Group == "Black") %>% select(-Group), format = "html")
+Significant CpGs: `r sprintf("%.0f\n", nrow(disp_table_black))`.  
+Significant ICRs:  `r sprintf(" %.0f\n", length(unique(disp_table_black$ICR)))`.
+  
+```{r, include = TRUE, echo = TRUE}
+knitr::kable(disp_table_black, format = "html") %>% kableExtra::kable_styling()
 ```
 
 ## White
   
-```{r, include = TRUE}
-knitr::kable(filter(df_display, Group == "White") %>% select(-Group), format = "html")
+Significant CpGs: `r sprintf("%.0f\n", nrow(disp_table_white))`.  
+Significant ICRs:  `r sprintf(" %.0f\n", length(unique(disp_table_white$ICR)))`.
+  
+```{r, include = TRUE, echo = TRUE}
+knitr::kable(disp_table_white, format = "html") %>% kableExtra::kable_styling()
 ```
+

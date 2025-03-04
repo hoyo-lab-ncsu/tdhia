@@ -65,3 +65,53 @@ add_gene_metadata_to_icr <- function(df_res, sort_adj_pval = TRUE) {
 
   return(df_res_sig)
 }
+
+
+#' add_metadata_from_cpg
+#'
+#' @param cpg_id character vector of cpg ids
+#' @importFrom rlang .data
+#' @export
+#' @returns dataframe with ICR ids, ICR confidence, and zinc finger status
+add_metadata_from_cpg <- function(cpg_id) {
+  
+  # Read list of ICRs that overlap with nearby zing finger
+  df_zinc_finger <- tdhia::imprintome_icr_zinc_finger
+  df_zinc_finger$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",df_zinc_finger$icr))
+  df_zinc_finger$near_zinf_finger <- rowSums(!df_zinc_finger[, 3:5] == "", na.rm = TRUE) > 0
+  zinc_finger_icrs <- df_zinc_finger$icr_id[df_zinc_finger$near_zinf_finger]
+  
+  
+  # Load annotated list of whole imprintome
+  # ICR_IDs that end with "#" are high confidence
+  imp_whole <- tdhia::imprintome_icr_nearest_transcripts
+  imp_whole$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",imp_whole$ID))
+  imp_whole$icr_name <- paste0("ICR ", imp_whole$icr_id)
+  # Scan for previously published icrs
+  high_conf_icrs <- imp_whole$icr_id[grep('#', imp_whole$ID)]
+  
+  # Get list of ICRs that have evidence of gametic origin for methylation
+  # Includes "high confidence" (lit validated ICRs)
+  imp_gamete <- tdhia::imprintome_icr_gametic_nearest_transcripts
+  imp_gamete$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",imp_gamete$ID))
+  med_conf_icrs <- imp_gamete$icr_id #setdiff(imp_gamete$icr_id, high_conf_icrs)
+  low_conf_icrs <- setdiff(imp_whole$icr_id, union(med_conf_icrs, high_conf_icrs))
+  
+  df  = data.frame(cpg_id = cpg_id)
+ 
+  df2 <- left_join(x = df, y =  distinct(tdhia::manifest_v1A2_design_scores %>%
+                                           select(cpg_id, icr_id)),
+                   by = join_by(cpg_id == cpg_id), keep = FALSE, multiple = "first",
+                   unmatched = "drop", na_matches = "never")
+  # Filter entries without a valid ICR
+  df2 <- df2 %>% filter(grepl(pattern = "^ICR_.*$", x = icr_id))
+  
+  df2$icr_conf = 3*(df2$icr_id %in% paste0("ICR_", low_conf_icrs))
+  df2$icr_conf[df2$icr_id %in% paste0("ICR_", med_conf_icrs)] = 2
+  df2$icr_conf[df2$icr_id %in% paste0("ICR_", high_conf_icrs)] = 1
+  
+  
+  df2$near_zinc_finger = df2$icr_id %in% zinc_finger_icrs
+  
+  return(df2)
+}

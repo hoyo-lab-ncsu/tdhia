@@ -2,6 +2,7 @@
 
 export(GLM_parallel)
 export(add_gene_metadata_to_icr)
+export(add_metadata_from_cpg)
 export(analyze_association)
 export(analyze_case_control)
 export(convert_cpgs_to_icrs)

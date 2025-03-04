@@ -13,6 +13,7 @@ filter_probes(
   max_probe_fail_rate = 0.5,
   discard_failed_probes = TRUE,
   min_design_score = NA,
+  icr_conf_levels = NULL,
   verbose = TRUE,
   db_flag = FALSE
 )
@@ -47,6 +48,15 @@ values across all samples are discarded (default = TRUE)}
 \item{min_design_score}{discard probes below this design score threshold.
 Default: NA (don't discard any probes by design score). Design scores vary
 from 0-1, with a higher value being a better designed probe.}
+
+\item{icr_conf_levels}{a numerical vector listing the desired ICR confidence
+levels for filtered probes.Any probes that are not included in this list are
+excluded. ICR confidence scores are (1-3), where
+(1) High: literature validated gold standard.
+(2) Medium: experimental evidence of gametic origin of differential methylation.
+(3) Low: experimental evidence of 50\% methylation in somatic tissues.
+Example: icr_conf_levels = c(1,2)
+Would discard any probes associated with a ICR confidence score of 3.}
 
 \item{verbose}{boolean flag, when TRUE prints the results of each filtering
 step (default = TRUE).}
