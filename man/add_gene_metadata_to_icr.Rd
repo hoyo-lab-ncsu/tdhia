@@ -4,7 +4,7 @@
 \alias{add_gene_metadata_to_icr}
 \title{add_gene_metadata_to_icr}
 \usage{
-add_gene_metadata_to_icr(df_res, sort_adj_pval = TRUE)
+add_gene_metadata_to_icr(imp_ids, imp_type = "cpg")
 }
 \arguments{
 \item{df_res}{dataframe that is output from analyze_association()}

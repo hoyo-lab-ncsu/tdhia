@@ -8,25 +8,24 @@
 #' @param sort_adj_pval sort rows by adjusted p-value
 #' @importFrom rlang .data
 #' @export
-add_gene_metadata_to_icr <- function(df_res, sort_adj_pval = TRUE) {
+add_gene_metadata_to_icr <- function(imp_ids, imp_type = "cpg") {
 
+
+  if (imp_type == "cpg") {
+     df <- data.frame(cpg_id = imp_ids)    
+    df$icr_id <- sapply(df$cpg_id, function(x)
+      icr_mapping$ICR_id[x==icr_mapping$CpG_id][1])
+  } else {
+    df <- data.frame(icr_id = imp_ids)
+  }
+  # df$icr_id <- as.numeric(str_replace(df$icr_name, "^ICR ",""))
   # Filter Significance ICRs and add nearest gene
   #_______________________________________________________________________________
-
-  # Significant ICRs
-  df_res_sig <- dplyr::filter(dplyr::select(df_res, -.data$Formula), .data$ADJ_P_VAL <0.05)
-  df_res_sig$icr_name <- stringr::str_replace(df_res_sig$icr_id, "_", " ")
-
-  # Switch to pretty names for Response variables
-  # df_res_sig$Response <- sapply(df_res_sig$Response, function (x)
-  #     response_varnames[which(x == response_vars)])
-
-  idat_dir_path <- system.file("data-raw", package = "tdhia")
 
 
   # Read list of ICRs that overlap with nearby zing finger
   df_zinc_finger <- tdhia::imprintome_icr_zinc_finger
-  df_zinc_finger$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",df_zinc_finger$icr))
+  df_zinc_finger$icr_id <- paste0("ICR_", gsub("ICR_([0-9]+).*","\\1",df_zinc_finger$icr))
   df_zinc_finger$near_zinf_finger <- rowSums(!df_zinc_finger[, 3:5] == "", na.rm = TRUE) > 0
   zinc_finger_icrs <- df_zinc_finger$icr_id[df_zinc_finger$near_zinf_finger]
 
@@ -34,36 +33,38 @@ add_gene_metadata_to_icr <- function(df_res, sort_adj_pval = TRUE) {
   # Load annotated list of whole imprintome
   # ICR_IDs that end with "#" are high confidence
   imp_whole <- tdhia::imprintome_icr_nearest_transcripts
-  imp_whole$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",imp_whole$ID))
-  imp_whole$icr_name <- paste0("ICR ", imp_whole$icr_id)
+  imp_whole$icr_id <- paste0("ICR_", gsub("ICR_([0-9]+).*","\\1",imp_whole$ID))
+  # imp_whole$icr_name <- str_replace( imp_whole$icr_id, "_", " ")
   # Scan for previously published icrs
   high_conf_icrs <- imp_whole$icr_id[grep('#', imp_whole$ID)]
 
   # Get list of ICRs that have evidence of gametic origin for methylation
   # Includes "high confidence" (lit validated ICRs)
   imp_gamete <- tdhia::imprintome_icr_gametic_nearest_transcripts
-  imp_gamete$icr_id <- as.numeric(gsub("ICR_([0-9]+).*","\\1",imp_gamete$ID))
+  imp_gamete$icr_id <- paste0("ICR_", gsub("ICR_([0-9]+).*","\\1",imp_gamete$ID))
   med_conf_icrs <- imp_gamete$icr_id #setdiff(imp_gamete$icr_id, high_conf_icrs)
   low_conf_icrs <- setdiff(imp_whole$icr_id, union(med_conf_icrs, high_conf_icrs))
 
 
   # Add zinc finger info
-  df_res_sig$is_icr_zinc <- df_res_sig$icr_id %in% paste0("ICR_", zinc_finger_icrs)
-  df_res_sig$is_icr_highconf <-  df_res_sig$icr_id %in% paste0("ICR_", high_conf_icrs)
-  df_res_sig$is_icr_medconf <-  df_res_sig$icr_id %in% paste0("ICR_", med_conf_icrs)
-  df_res_sig$is_icr_lowconf <-  df_res_sig$icr_id %in% paste0("ICR_", low_conf_icrs)
-
-
+  df$is_icr_zinc <- df$icr_id %in% zinc_finger_icrs
+  # Add icr confidence info
+  df$icr_conf = 3*(df$icr_id %in% low_conf_icrs)
+  df$icr_conf[df$icr_id %in% med_conf_icrs] = 2
+  df$icr_conf[df$icr_id %in% high_conf_icrs] = 1
 
   # Add closest gene to each ICR
-  df_res_sig <- merge(x = df_res_sig, y = imp_whole %>%
-                        dplyr::select(.data$icr_name, .data$Genomic.Coordinates, .data$Nearest.Transcript,
-                                      .data$Distance.to.Nearest.Transcript),
-                      by = "icr_name", all.x = TRUE, all.y = FALSE, sort = FALSE)
+  # df_gene <- merge(x = df, y = imp_whole %>%
+  #                       dplyr::select("icr_id", "Genomic.Coordinates", "Nearest.Transcript",
+  #                                     "Distance.to.Nearest.Transcript"),
+  #                     by = "icr_id", all.x = TRUE, all.y = FALSE, sort = FALSE)
 
-  if (sort_adj_pval) df_res_sig <- dplyr::arrange(df_res_sig, ADJ_P_VAL)
+  df_gene <-left_join(x = df, y = imp_whole %>%
+              dplyr::select("icr_id", "Genomic.Coordinates", "Nearest.Transcript",
+                            "Distance.to.Nearest.Transcript"), by = "icr_id", keep =  NULL)
+  
 
-  return(df_res_sig)
+  return(df_gene)
 }
 
 
