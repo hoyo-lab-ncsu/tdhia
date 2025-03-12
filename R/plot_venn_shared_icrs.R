@@ -12,7 +12,7 @@
 plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names = NULL, 
                              output_dir_path = getwd(), name_suffix = NULL) {
   
-  # browser()
+  # 
   # If not specified groups for the venn diagram are found in the group_names column
   if (is.null(group_names)) group_names = unique(df_imp_sig[[colname]])
   
@@ -21,15 +21,24 @@ plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names 
   for (n in seq_along(group_names)) {
     df_members[[group_names[n]]] <- unique(filter(df_imp_sig, .data[[colname]] == group_names[n])$icr_id)
   }
-  
+  # Sort groups by total number of members
+  df_members = df_members[ order(sapply(df_members, function(x) length(x)),decreasing = TRUE)]
+ 
   # Input to venn diagram package
-  
-  if (!is.null(name_suffix)) png(filename=paste0(output_dir_path, "/icr_venn_diagram",name_suffix,".png"))
+  # browser()
+  # png(filename=paste0(output_dir_path, "/icr_venn_diagram",name_suffix,".png"))
   ggv = ggVennDiagram(df_members, label = "count", category.names = 
-                  names(df_members), set_size = 8, label_size = 8,) + 
-    theme(legend.text=element_text(size=15), legend.title = element_text(size=15))
-  if (!is.null(name_suffix)) dev.off()
+                        names(df_members),
+                      set_size = 2.8, label_size = 2.8, order.intersect.by = "size") + 
+    scale_x_continuous(expand = expansion(mult = .2)) +
+    theme(legend.text=element_text(size=8), legend.title = element_text(size=8))
+  if (!is.null(name_suffix)) {
+    save_plot(filename = paste0(output_dir_path, "/icr_venn_diagram",name_suffix,".png"),
+              plot = ggv,base_height = 2,base_width = 4)
+  } 
+  
+  # if (!is.null(name_suffix)) dev.off()
   ggv
   
-  return(list(venn_input = df_members, figure = ggv))
+  return(list(enn_input = df_members, figure = ggv)) #v, 
 }
