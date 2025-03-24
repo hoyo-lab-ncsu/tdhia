@@ -13,7 +13,8 @@ GLM_parallel(
   family = "binomial",
   verbose = FALSE,
   impute_na = TRUE,
-  db_flag = TRUE
+  db_flag = TRUE,
+  .fit_model = fit_model
 )
 }
 \arguments{

@@ -244,16 +244,26 @@ if (!file.exists(data_filepath)) {
   probe_beta <- 
     load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
                          merge_replicates = NULL, db_flag = TRUE)
+   filt_probe_beta <-
+    filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
+                  max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
+                  set_failed_betas_na = FALSE, discard_failed_probes = TRUE,
+                  min_design_score = .20, icr_conf_levels = NULL)
+  cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
+  pipelines_out$no_filter <- cpg_beta$cpg_beta_df
+  
   # B) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
-                  max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = TRUE,
+                  max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
                   set_failed_betas_na = TRUE, discard_failed_probes = TRUE,
                   min_design_score = .20, icr_conf_levels = NULL)
   # C) Merge probe measurement to cpg sites
-  cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = TRUE)
+  cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   icr_beta <- convert_cpgs_to_icrs(cpg_beta)
   pipelines_out$default <- cpg_beta$cpg_beta_df
+  
+  
   
   # Pipeline 2: epicv2                                                 #########
   #_______________________________________________________________________________

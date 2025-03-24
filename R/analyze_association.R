@@ -57,8 +57,8 @@ analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol
                            rm.na.Pe = FALSE, rm.na.all = FALSE,
                            print_confounders = FALSE, verbose = TRUE,
                            icr_mapping = NULL) {
-  if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint.RData")}
-  # load(file = "study_imprint.RData")
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "analyze_association.RData")}
+  # load(file = "analyze_association.RData")
 
   if (rm.na.all) rm.na.R <- rm.na.P <- rm.na.Pe <- rm.na.Pe <- TRUE
   # This expression prevents devtools from issuing a NOTE warning
@@ -163,31 +163,34 @@ analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol
     # For each response variable
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = x, P = P, Pind = Pind,
                                              Pe = Pe,  family = family,
-                                             impute_na = impute_na,
+                                             impute_na = impute_na, .fit_model = fit_model,
                                              db_flag = db_flag, verbose = verbose)
-    test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = Pind,
-                             Pe = Pe,  family = family,
-                             impute_na = impute_na,
-                             db_flag = db_flag, verbose = verbose)
+    # test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = Pind,
+    #                          Pe = Pe,  family = family,
+    #                          impute_na = impute_na,
+    #                          db_flag = db_flag, verbose = verbose)
+    test_run <- foreach_fun(1)
   } else if (length(Pind) > 1) {
     # For each predictor variable
     foreach_fun <-  function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = x,
                                               Pe = Pe,  family = family,
-                                              impute_na = impute_na,
+                                              impute_na = impute_na, .fit_model = fit_model,
                                               db_flag = db_flag, verbose = verbose)
-    test_run <- GLM_parallel(R = R, Rind = Rind, P = P, Pind = 1,
-                             Pe = Pe,  family = family,
-                             impute_na = impute_na,
-                             db_flag = db_flag, verbose = verbose)
+    # test_run <- GLM_parallel(R = R, Rind = Rind, P = P, Pind = 1,
+    #                          Pe = Pe,  family = family,
+    #                          impute_na = impute_na,
+    #                          db_flag = db_flag, verbose = verbose)
+    test_run <- foreach_fun(1)
   } else {
     foreach_fun <- function (x) GLM_parallel(R = R, Rind = Rind, P = P, Pind = Pind,
                                              Pe = Pe,  family = family,
-                                             impute_na = impute_na,
+                                             impute_na = impute_na, .fit_model = fit_model,
                                              db_flag = db_flag, verbose = verbose)
-    test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = 1,
-                             Pe = Pe,  family = family,
-                             impute_na = impute_na,
-                             db_flag = db_flag, verbose = verbose)
+    # test_run <- GLM_parallel(R = R, Rind = 1, P = P, Pind = 1,
+    #                          Pe = Pe,  family = family,
+    #                          impute_na = impute_na,
+    #                          db_flag = db_flag, verbose = verbose)
+    test_run <- foreach_fun(1)
   }
   verbosecat(sprintf("Formula: %s\n", test_run$Formula))
 
@@ -206,26 +209,42 @@ analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol
   cl <- snow::makeCluster(n.cores)
   doSNOW::registerDoSNOW(cl)
 
+  # https://support.bioconductor.org/p/132108/
+  # BiocParallel::MulticoreParam(workers = n.cores)
+  # bp_par <- BiocParallel::SnowParam(workers = n.cores, type = "SOCK", exportvariables = TRUE)
+  # bp_out <- BiocParallel::bpoptions(exports = c("fit_model", "GLM_parallel"),packages = c("magrittr","stats"))
   # Add progress bar
-  # if (verbose) {
+  if (verbose) {
     pb <- utils::txtProgressBar(max = max(par_ind), style = 3)
     opts <- list(progress =  function(n) utils::setTxtProgressBar(pb, n))
-  # } else { opts = NULL }
-  # Execute parallel processing
-  df_fits_list <- foreach::foreach(#par_ind
-    x = par_ind, combine = rbind, .export = "GLM_parallel", .packages = c("magrittr"),
-    .options.snow = opts #.errorhandling = 'pass'
+  } else { opts = NULL }
+    # s1 <- Sys.time()
+    # par_out <- BiocParallel::bplapply(
+    #   X = par_ind[1:100], GLM_parallel, R = R, Rind = Rind, P = P,
+    #   Pe = Pe,  family = family,
+    #   impute_na = impute_na, .fit_model = fit_model,
+    #   db_flag = db_flag, verbose = FALSE, BPPARAM = bp_par, BPOPTIONS = bp_out)
+    # # df_par <- do.call(rbind, par_out)
+    # Sys.time()-s1 
+    # 
+  # Execute parallel processing                               ##################
+  #_____________________________________________________________________________
+  df_fits_list <- foreach::foreach(
+    x = par_ind, combine = rbind, .export = c("fit_model", "GLM_parallel"), 
+    .packages = c("magrittr"), .options.snow = opts
   ) %dopar% {
     foreach_fun(x)
   }
   df_fits <- do.call(rbind, df_fits_list)
-
   # End processing time
-  cat("\n")
-  finish <- Sys.time()
+  cat("\n");  finish <- Sys.time()
   verbosecat(" Finished.\n")
 
 
+  # Export for debugging
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint2.RData")}
+  # load(file = "study_imprint2.RData")
+  
   # Separate results for each variable of model
   verbosecat("Separating results for each variable used in model...\n")
   model_vars <-   df_fits$Variable[df_fits$Model_Id==1]
@@ -238,7 +257,7 @@ analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol
     dfs_sep[[n]] <- df_fits[df_fits$Variable == model_vars[n],]
   }
   names(dfs_sep) <- model_vars
-  # If cpg or ICR sites are a predictor, name the dataframe "site_id
+  # If cpg or ICR sites are a predictor, name the dataframe "imp_site"
   if (!is.null(P)) {
     df_temp <- list(df_fits[df_fits$Variable %in% colnames(P),])
     names(df_temp) <- "imp_site"
@@ -251,11 +270,6 @@ analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol
   sort_fun <- function(df) {df=df[order(df$P_VAL, decreasing = FALSE),]; return(df)}
 
 
-  # Export for debugging
-  if (db_flag) {save(list = ls(all.names = TRUE), file = "study_imprint2.RData")}
-  # load(file = "study_imprint2.RData")
-
-
   # Calculate adjusted p_value
   verbosecat("Adjusting p-values...\n")
   adj_p_val <- function(df) {
@@ -265,7 +279,6 @@ analyze_association <- function (R, P, Pe, family, n_p_adj = max(c(ncol(R), ncol
   dfs_sorted <- lapply(dfs_sep, na_fun)
   dfs_sorted <- lapply(dfs_sorted, sort_fun)
   dfs_corr   <- lapply(dfs_sorted, adj_p_val)
-
   dfs_corr$example_formula <- test_run$Formula[1]
 
   # Print out results of analysis

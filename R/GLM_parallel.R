@@ -44,7 +44,7 @@
 #' @export
 GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
                         family = "binomial", verbose = FALSE, impute_na = TRUE,
-                        db_flag = TRUE) {
+                        db_flag = TRUE, .fit_model = fit_model) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "GLM_parallel.RData") }
   # load(file = "GLM_parallel.RData")
 
@@ -89,53 +89,28 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
   # Unless no missing data, than imputes is set to 1 to not error package
   # If n_imputes <5, then set to 5, because that is considered the min if there
   # are any missing values
-  n_imputes <- ceiling(100 * sum(is.na( model_data[,1:2])) /
-                         (2 * nrow(model_data)))
+  # n_imputes <- ceiling(100 * sum(is.na( model_data[,1:2])) /
+  #                        (2 * nrow(model_data)))
+  n_imputes <- ceiling(sum(is.na(model_data)) / (nrow(model_data)*ncol(model_data)) *100)
   # If imputation is needed, set to at least 5 (original paper rec)
   if(n_imputes > 0 && n_imputes < 5) {n_imputes = 5}
 
-
-  # # Start with Response and Predictor
-  # formula_string <- paste0(colnames(R)[Rind], " ~ ", colnames(P)[Pind], plus_str(P,is.null)
-
-  # Impute missing data if flag is set and data actually missing
-  if (impute_na && n_imputes > 0 ) {
-
-    # Perform multiple imputations of the dataset
-    imp <- mice::mice(model_data, print = FALSE, m = n_imputes, maxit = 25, seed = 0)
-
-    # Fit each of the imputations
-    fits <- with(imp, glm(stats::formula(formula_string), family = family))
-
-    # Pool estimates of coefficients
-    est <- mice::pool(fits)
-    # Grab coefficient summary table
-    cf <- summary(est)
-    rownames(cf) <- cf$term
-    cf <- cf[,c(2,3,4,6)]
-    colnames(cf) <- c("Estimate", "StdError", "Statistic", "P_VAL")
-
-    aic <- mean(sapply(fits$analyses, function(x) x$aic))
-
-  } else {
-    # Either imputation is disabled, or imputation is not needed
-    # Calculate glm
-    mod = stats::glm(data = model_data, stats::formula(formula_string),
-                     family = family)
-
-    # Grab predictor from second row of summary output
-    cf = summary(mod)$coefficients
-
-    # If P is not null, remove the extra suffix "TRUE" to its var name
-    # Example:  "cg27785526TRUE" ->  "cg27785526"
-    rownames(cf)[2] <- stringr::str_replace(rownames(cf)[2], "TRUE$","")
-
-    # cf <- cf[,c(1,2,3, 5)]
-    colnames(cf)[2:4] <-c("StdError", "Statistic", "P_VAL")
-    aic <- mod$aic
-
-  }
-
+  
+  # Fit model and return fits and AIC, if fail save output and empty results
+  coefs <- stringr::str_extract_all(formula_string, stringr::regex("[^\\s-\\+~]+"))[[1]][-1]
+  cf = data.frame(Estimate = rep(NA, length(coefs)+1), StdError = NA, 
+                  Statistic = NA, P_VAL = 1, row.names = c("(Intercept)",coefs))
+  aic<- NA; model_out <-  NULL
+  tryCatch({
+    # fdsdf(fdsfsd)
+    model_out <- .fit_model(model_data, formula_string, family, impute_na, n_imputes)
+    cf = model_out$cf
+    aic = model_out$aic
+ },  error = function(e) {})
+ if (is.null(model_out)) {
+   save(list = ls(all.names = TRUE), file = paste0("GLM_parallel_error_pid-", Sys.getpid(),".RData"))
+ }
+  
   # Add response column and variable column from rownames
   df_res <-
     cbind(data.frame(Response = colnames(R)[Rind],
@@ -160,6 +135,53 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
   if (verbose) {print(cf)}
 
 
-
   return(df_res)
+}
+
+
+#' fit_model
+#' @description test
+#' @param model_data todo
+#' @param formula_string todo
+#' @param family todo
+#' @param impute_na todo
+#' @param n_imputes todo
+#' @export
+fit_model <- function(model_data, formula_string, family, impute_na, n_imputes) {
+  
+  
+  # Impute missing data if flag is set and data actually missing
+  if (impute_na && n_imputes > 0 ) {
+    
+    # Perform multiple imputations of the dataset
+    imp <- mice::mice(model_data, print = FALSE, m = n_imputes, maxit = 20, seed = 0)
+    
+    # Fit each of the imputations
+    fits <- with(imp, glm(stats::formula(formula_string), family = family))
+    # Pool estimates of coefficients
+    est <- mice::pool(fits)
+    # Grab coefficient summary table
+    cf <- summary(est)
+    rownames(cf) <- cf$term
+    cf <- cf[,c(2,3,4,6)]
+    colnames(cf) <- c("Estimate", "StdError", "Statistic", "P_VAL")
+    
+    aic <- mean(sapply(fits$analyses, function(x) x$aic))
+    
+  } else {
+    # Either imputation is disabled, or imputation is not needed
+    # Calculate glm
+    mod = stats::glm(data = model_data, stats::formula(formula_string),
+                     family = family)
+    # Grab predictor from second row of summary output
+    cf = summary(mod)$coefficients
+    
+    # If P is not null, remove the extra suffix "TRUE" to its var name
+    # Example:  "cg27785526TRUE" ->  "cg27785526"
+    rownames(cf)[2] <- stringr::str_replace(rownames(cf)[2], "TRUE$","")
+    colnames(cf)[2:4] <-c("StdError", "Statistic", "P_VAL")
+    aic <- mod$aic
+    
+  }
+  return(list(cf = cf, aic = aic))
 }

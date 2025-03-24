@@ -31,6 +31,10 @@ summarize_study <- function(dfs, varnames = NULL, max_p_val = 0.05,
         print(dfs[[n]][dfs[[n]]$ADJ_P_VAL < max_p_val,] %>%
                 dplyr::select(,-c("Formula", "Model_Id")))
       }
+
+      # Print ho wmany model fittings failed
+      cat(sprintf("%.0f/ %.0f of model fits failed.\n", sum(is.na(dfs[[n]]$Estimate)), 
+                  nrow(dfs[[n]])))
       cat("\n")
     }
 
