@@ -39,7 +39,7 @@
 #' (default = FALSE).
 #' @param db_flag boolean when true exports function workspace to disk.
 #' @param enforce_req_idats check that all idat files requested in idat_basenames
-#'  are found on disk. Throws error if this is not the case.
+#'  argument are found on disk. Throws error if this is not the case.
 #' @param enforce_idat_names boolean when true raises error if input IDAT files
 #' do not follow proper capitalization pattern, if FALSE only issues warning.
 #' @param merge_replicates string with the following possible values that
@@ -94,6 +94,11 @@ load_idata_to_probes <-
       basename_tbl <- as.data.frame(table(obs_idat_basenames))
       basename_tbl$obs_idat_basenames <- as.character(basename_tbl$obs_idat_basenames)
 
+      if (!all(basename_tbl$Freq==2)) {
+        warning(paste("IDAT_PAIR: Not all IDAT file basenames have 2 IDAT files associated with them.",
+                      "Files are missing! See basename_tbl variable"))
+      }
+      
       # Verify and error if not all requested idats are included, but could be
       # split across dirs
       if (enforce_req_idats) {
@@ -104,10 +109,7 @@ load_idata_to_probes <-
         }
       }
 
-      if (!all(basename_tbl$Freq==2)) {
-        warning(paste("IDAT_PAIR: Not all IDAT file basenames have 2 IDAT files associated with them.",
-                      "Files are missing! See basename_tbl variable"))
-      }
+   
 
       # Get unique list of basenames (removes repeats) found in input folder
       unq_obs_idat_basenames <- unique(obs_idat_full_basenames)
@@ -121,7 +123,8 @@ load_idata_to_probes <-
       if (!is.null(idat_basenames)) {
         if (is.data.frame(idat_basenames)) {
           sub_idats <- idat_basenames$idat_basename
-        } else if (is.vector(idat_basenames)) {
+        } else if (is.atomic(idat_basenames) | is.list(idat_basenames)) {
+          # Test if idat_basenames is a vector or list (regardless of attributes)
           sub_idats <- idat_basenames
         } else {stop ("idat_basenames need to be a vector or dataframe")}
 
