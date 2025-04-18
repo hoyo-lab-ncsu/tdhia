@@ -164,6 +164,7 @@ fit_model <- function(model_data, formula_string, family, impute_na, n_imputes) 
     cf <- summary(est)
     rownames(cf) <- cf$term
     cf <- cf[,c(2,3,4,6)]
+    rownames(cf)[2] <- stringr::str_replace(rownames(cf)[2], "TRUE$","")
     colnames(cf) <- c("Estimate", "StdError", "Statistic", "P_VAL")
     
     aic <- mean(sapply(fits$analyses, function(x) x$aic))

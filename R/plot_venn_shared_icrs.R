@@ -10,9 +10,11 @@
 #' @param name_suffix estra misc. suffic to saved filename if export is specified.
 #' @export
 plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names = NULL, 
-                             output_dir_path = getwd(), name_suffix = NULL) {
+                             output_dir_path = getwd(), name_suffix = NULL, db_flag = FALSE) {
   
-  # 
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "plot_venn_shared_icrs.RData")}
+  # load(file = "plot_venn_shared_icrs.RData")
+  
   # If not specified groups for the venn diagram are found in the group_names column
   if (is.null(group_names)) group_names = unique(df_imp_sig[[colname]])
   
@@ -31,7 +33,8 @@ plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names 
                         names(df_members),label_alpha = 1,
                       set_size = 4, label_size = 3.5, order.intersect.by = "size") + 
     scale_x_continuous(expand = expansion(mult = .2)) +
-    theme(legend.text=element_text(size=8), legend.title = element_text(size=8))
+    theme(legend.text=element_text(size=8), legend.title = element_text(size=8),
+          legend.position = "none")
   if (!is.null(name_suffix)) {
     save_plot(filename = paste0(output_dir_path, "/icr_venn_diagram",name_suffix,".png"),
               plot = ggv,base_height = 2,base_width = 4)
