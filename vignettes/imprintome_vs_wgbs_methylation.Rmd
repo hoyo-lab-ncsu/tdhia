@@ -866,19 +866,19 @@ df_result <- rbind(df_all$imp_site %>% mutate(Group = "All"),
                    df_black$imp_site %>% mutate(Group = "Black"),
                    df_white$imp_site %>% mutate(Group = "White")) %>% 
   filter(ADJ_P_VAL < 0.05)
+df_result$cpg_id <- df_result$Variable
 # add ICR ID to the cpg sites
-df_result$icr_id <- match_cpg_id_to_icr_id(df_result$Variable, AsNumeric = FALSE)
+df_result$icr_id <- match_cpg_id_to_icr_id(df_result$cpg_id, AsNumeric = FALSE)
 
 # # Add gene metadata to each cpg site
-df_result_meta <- add_gene_metadata_to_icr(df_result)
+df_result_meta <- tdhia::add_metadata_to_imp_sites(imp_ids = df_result$cpg_id, imp_type = "cpg")
+df_result <- cbind(df_result, df_result_meta %>% select(-c("cpg_id", "icr_id")))
 # # Output a subset of the table
 df_display <- dplyr::select(
-  df_result_meta, c(Group, icr_name, Variable, ADJ_P_VAL, is_icr_zinc, 
-                    is_icr_highconf, is_icr_medconf, is_icr_lowconf, Nearest.Transcript,
+  df_result, c(Group, icr_id, Variable, ADJ_P_VAL, is_icr_zinc, icr_conf, Nearest.Transcript,
                     Distance.to.Nearest.Transcript))
 
-colnames(df_display) <- c("Group", "ICR", "CpG Site", "Adj p-val", "Zinc", "High", 
-                          "Med", "Low", "Nearest.Transcript", "Distance")
+colnames(df_display) <- c("Group", "ICR", "CpG Site", "Adj p-val", "Zinc Finger", "ICR Conf.", "Nearest.Transcript", "Distance")
 
 disp_table_all = filter(df_display, Group == "All") %>% select(-Group)
 disp_table_black = filter(df_display, Group == "Black") %>% select(-Group)
@@ -886,7 +886,7 @@ disp_table_white = filter(df_display, Group == "White") %>% select(-Group)
 
 
 # Produce venn diagram of shared ICRs between groups
-ggvenn <- venn_shared_icrs(df_imp_sig = df_result, colname = "Group", group_names = NULL, 
+ggvenn <- tdhia::plot_venn_shared_icrs(df_imp_sig = df_result, colname = "Group", group_names = NULL, 
                              output_dir_path = NULL, name_suffix = "")
 
 ggvenn$figure
