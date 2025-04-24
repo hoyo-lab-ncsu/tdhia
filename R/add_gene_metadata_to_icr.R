@@ -2,10 +2,10 @@
 
 
 
-#' add_gene_metadata_to_icr
+#' add_metadata_to_imp_sites
 #'
-#' @param df_res dataframe that is output from analyze_association()
-#' @param sort_adj_pval sort rows by adjusted p-value
+#' @param imp_ids list of ids for getting metadata
+#' @param imp_type specify whether ids are cpg ids or icr ids
 #' @importFrom rlang .data
 #' @export
 add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg") {

@@ -3,12 +3,13 @@
 #' analyze_association
 #'
 #' @description fits a series of general linear models with parallel processing
-#' using response variable(s) R, predictor variable(s) R and confouding
-#' variable(s) C. The model formula takes on the form:
+#' using dataframes of: R response variables, P predictor variables (split across 
+#' models), and Pe predictor variables (consistent across models). The model 
+#' formula takes on the form:
 #'
 #' If R has many columns and P has one, models are parallelized over R:
 #'
-#' R\[,i] ~ Pe\[,1] + Pe\[,2] + Pe\[,3] ...
+#' R\[,i] ~ P\[,1] + Pe\[,1] + Pe\[,2] + Pe\[,3] ...
 #'
 #' If P has many variables/ columns and R has one, models are parallelized over P:
 #'
@@ -18,13 +19,13 @@
 #' values. The code handles either case. Note that R and P cannot both be
 #' multicolumn.
 #'
-#' @param R response variable(s): data frame that is patients (rows) x variables
+#' @param R dataframe of response variable so  patients (rows) x variables
 #'  (columns) could either be beta values for cpg or ICR sites, or
 #'  study metadata.
 #' @param P parallelized predictor variable(s)- data frame that is patients
 #'  (rows) x variables (columns), could either be beta values for cpg or ICR
 #'  sites. For study metadata, use Pe input argument.
-#' @param Pe extra predictor variables that are not parallelized (incuded in all
+#' @param Pe extra predictor variables that are not parallelized (included in all
 #'  fitted models).
 #' @param family string for family model argument for glm(). (ex. 'binomial', 'gaussian')
 #' @param n_p_adj number of comparisons to use for p-value adjustment. Sometimes

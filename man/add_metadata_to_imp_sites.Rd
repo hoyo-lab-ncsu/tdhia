@@ -2,15 +2,15 @@
 % Please edit documentation in R/add_gene_metadata_to_icr.R
 \name{add_metadata_to_imp_sites}
 \alias{add_metadata_to_imp_sites}
-\title{add_gene_metadata_to_icr}
+\title{add_metadata_to_imp_sites}
 \usage{
 add_metadata_to_imp_sites(imp_ids, imp_type = "cpg")
 }
 \arguments{
-\item{df_res}{dataframe that is output from analyze_association()}
+\item{imp_ids}{list of ids for getting metadata}
 
-\item{sort_adj_pval}{sort rows by adjusted p-value}
+\item{imp_type}{specify whether ids are cpg ids or icr ids}
 }
 \description{
-add_gene_metadata_to_icr
+add_metadata_to_imp_sites
 }

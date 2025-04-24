@@ -4,7 +4,12 @@
 \alias{analyze_case_control}
 \title{analyze_case_control}
 \usage{
-analyze_case_control(beta_matrix, ctrl_cols, n_adjust = nrow(beta_matrix))
+analyze_case_control(
+  beta_matrix,
+  ctrl_cols,
+  n_adjust = nrow(beta_matrix),
+  filter_na_pval = TRUE
+)
 }
 \arguments{
 \item{beta_matrix}{a matrix of beta values, cpg/ ICR site (rows) by patients (columns)}

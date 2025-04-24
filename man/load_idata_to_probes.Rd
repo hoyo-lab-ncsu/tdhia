@@ -59,7 +59,7 @@ when TRUE excludes some probes due to issues of inter-dependence of measurements
 \item{db_flag}{boolean when true exports function workspace to disk.}
 
 \item{enforce_req_idats}{check that all idat files requested in idat_basenames
-are found on disk. Throws error if this is not the case.}
+argument are found on disk. Throws error if this is not the case.}
 
 \item{enforce_idat_names}{boolean when true raises error if input IDAT files
 do not follow proper capitalization pattern, if FALSE only issues warning.}
