@@ -19,6 +19,7 @@ add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg") {
     df <- data.frame(icr_id = imp_ids)
   }
   # df$icr_id <- as.numeric(str_replace(df$icr_name, "^ICR ",""))
+  
   # Filter Significance ICRs and add nearest gene
   #_______________________________________________________________________________
 
@@ -42,7 +43,8 @@ add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg") {
   # Includes "high confidence" (lit validated ICRs)
   imp_gamete <- tdhia::imprintome_icr_gametic_nearest_transcripts
   imp_gamete$icr_id <- paste0("ICR_", gsub("ICR_([0-9]+).*","\\1",imp_gamete$ID))
-  med_conf_icrs <- imp_gamete$icr_id #setdiff(imp_gamete$icr_id, high_conf_icrs)
+  # med_conf_icrs <- imp_gamete$icr_id #setdiff(imp_gamete$icr_id, high_conf_icrs)
+  med_conf_icrs <- tdhia::imprintome_gametic_icrs$icr_id
   low_conf_icrs <- setdiff(imp_whole$icr_id, union(med_conf_icrs, high_conf_icrs))
 
 
