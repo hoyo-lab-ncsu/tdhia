@@ -17,6 +17,8 @@ analyze_case_control(
 \item{ctrl_cols}{boolean vector of which columns in beta matrix are control group}
 
 \item{n_adjust}{number to adjust p-values for FDR multiple comparisons}
+
+\item{filter_na_pval}{todo}
 }
 \description{
 analyze for changes in beta value between a control group and an

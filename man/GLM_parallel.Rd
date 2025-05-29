@@ -38,6 +38,8 @@ Default for Pind is 1 for single column dataframe.}
 package.}
 
 \item{db_flag}{boolean flag, when TRUE saves workspace to disk for debugging}
+
+\item{.fit_model}{todo}
 }
 \value{
 fit of general linear model, including

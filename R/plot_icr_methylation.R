@@ -7,7 +7,7 @@
 #' @param cpg_beta_mat a matrix of beta values, cpg sites (rows) x patients (col)
 #' @param patient_groups n
 #' @param icr_id v
-#' @plot_height_width v
+#' @param plot_height_width v
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #'

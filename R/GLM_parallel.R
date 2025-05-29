@@ -33,7 +33,7 @@
 #' @param impute_na boolean flag, when TRUE inputs missing NA values with MICE
 #' package.
 #' @param db_flag boolean flag, when TRUE saves workspace to disk for debugging
-#'
+#' @param .fit_model todo
 #' @return fit of general linear model, including
 #' - Estimate: point estimates of coefficients for each of the predictors
 #' - Std. Error: standard error of the estimates

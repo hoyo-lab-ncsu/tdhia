@@ -9,7 +9,7 @@
 #' @param beta_matrix a matrix of beta values, cpg/ ICR site (rows) by patients (columns)
 #' @param ctrl_cols boolean vector of which columns in beta matrix are control group
 #' @param n_adjust number to adjust p-values for FDR multiple comparisons
-#'
+#' @param filter_na_pval todo
 #' @export
 analyze_case_control <- function(beta_matrix, ctrl_cols, n_adjust = nrow(beta_matrix), filter_na_pval = TRUE) {
   # Initialize a vector of NAs to store p-values

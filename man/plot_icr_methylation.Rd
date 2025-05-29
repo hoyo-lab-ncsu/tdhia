@@ -6,13 +6,19 @@
 \usage{
 plot_icr_methylation(
   mat_cpg_beta,
+  sig_cpgs = NA,
   df_patient_groups,
   icr_id,
-  plot_height_width = c(5, 3)
+  xlab_txt = "",
+  plot_height_width = c(5, 3),
+  output_path,
+  max_sig_hwindow = 9
 )
 }
 \arguments{
 \item{icr_id}{v}
+
+\item{plot_height_width}{v}
 
 \item{cpg_beta_mat}{a matrix of beta values, cpg sites (rows) x patients (col)}
 

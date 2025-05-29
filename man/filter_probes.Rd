@@ -10,8 +10,10 @@ filter_probes(
   max_sig_pval = 0.2,
   set_failed_betas_na = TRUE,
   mft = NULL,
-  max_probe_fail_rate = 0.5,
+  max_probe_fail_rate = 0.25,
   discard_failed_probes = TRUE,
+  max_patient_fail_rate = 0.25,
+  discard_failed_patients = TRUE,
   min_design_score = NA,
   icr_conf_levels = NULL,
   verbose = TRUE,
@@ -38,12 +40,19 @@ max_sig_pval will be set to NA. When false, the beta value is left as is.}
 \item{mft}{manifest dataframe for the array if nto specified, the default is
 loaded.}
 
-\item{max_probe_fail_rate}{proportion value (0-1), if a probe fails the p-value
-threshold above this proportion of the samples, all measurements from this probe
-are set to NA.}
+\item{max_probe_fail_rate}{fraction value (0-1), if a probe fails the p-value
+threshold above this fraction of samples, all measurements from this probe
+are set to NA. (Default: 0.25).}
 
 \item{discard_failed_probes}{boolean flag, when TRUE any probes that have NA
-values across all samples are discarded (default = TRUE)}
+values across all samples are discarded (default = TRUE).}
+
+\item{max_patient_fail_rate}{fraction value (0-1), if a patient fails the p-value
+threshold above this fraction of probes, all measurements from this patient
+are set to NA. (Default: 0.25).}
+
+\item{discard_failed_patients}{boolean flag, when TRUE any patients that have NA
+values across all probes are discarded (default = TRUE).}
 
 \item{min_design_score}{discard probes below this design score threshold.
 Default: NA (don't discard any probes by design score). Design scores vary
