@@ -174,14 +174,14 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #_____________________________________________________________________________
   if(discard_failed_probes) {
     # Binary index of rows, TRUE means row failed QC
-    row_discard_ind <- which(rowSums(is.na(filt_probe_beta_df)) == ncol(filt_probe_beta_df))
+    row_discard_bv <- rowSums(is.na(filt_probe_beta_df)) == ncol(filt_probe_beta_df)
     # Set rows to NA
-    filt_probe_beta_df <- filt_probe_beta_df[-row_discard_ind, ]
-    filt_probe_pval_df <- filt_probe_pval_df[-row_discard_ind, ]
+    filt_probe_beta_df <- filt_probe_beta_df[!row_discard_bv, ]
+    filt_probe_pval_df <- filt_probe_pval_df[!row_discard_bv, ]
     verbosecat(sprintf("Probe filter: discarding %.0f%% probes ( %i/ %i) because all measurements are now NA.
               %i probes now remain. \n\n",
-                       100*length(row_discard_ind)/pre_discard_dim[1],
-                       length(row_discard_ind), pre_discard_dim[1],
+                       100*sum(row_discard_bv)/pre_discard_dim[1],
+                       sum(row_discard_bv), pre_discard_dim[1],
                        nrow(filt_probe_beta_df)))
   }
 
@@ -209,13 +209,13 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #_____________________________________________________________________________
   if (discard_failed_patients) {
     # Index of columns kepts
-    col_discard_ind <- which(colSums(is.na(filt_probe_beta_df)) == nrow(filt_probe_beta_df))
-    # Set rows to NA
-    filt_probe_beta_df <- filt_probe_beta_df[, -col_discard_ind]
-    filt_probe_pval_df <- filt_probe_pval_df[, -col_discard_ind]
+    col_discard_bv <- colSums(is.na(filt_probe_beta_df)) == nrow(filt_probe_beta_df)
+    # Keep non discard columns
+    filt_probe_beta_df <- filt_probe_beta_df[, !col_discard_bv]
+    filt_probe_pval_df <- filt_probe_pval_df[, !col_discard_bv]
     verbosecat(sprintf("Probe filter: discarding %.0f%% patients ( %i/ %i) because all measurements are now NA.
               %i patients now remain. \n\n",
-                       100*length(col_discard_ind)/pre_discard_dim[2], length(col_discard_ind),
+                       100*sum(col_discard_bv)/pre_discard_dim[2], sum(col_discard_bv),
                        pre_discard_dim[2], ncol(filt_probe_beta_df)))
   }
 

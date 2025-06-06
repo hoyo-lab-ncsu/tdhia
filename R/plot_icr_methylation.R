@@ -17,12 +17,13 @@
 plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr_id, xlab_txt = "", 
                                  plot_height_width = c(5,3), output_path, max_sig_hwindow = 9) {
   
-  dir.create(path = output_path, recursive = TRUE, showWarnings = FALSE)
   
+  # Create output folder
+  dir.create(path = output_path, recursive = TRUE, showWarnings = FALSE)
   
   # Get list of CpGs for specified icr
   df = left_join(x = data.frame(cpg_id = rownames(mat_cpg_beta)),
-            y = tdhia::manifest_v1A2_design_scores %>% select("cpg_id", "icr_id","MAPINFO") %>% distinct(),
+            y = tdhia::manifest_v1A2_design_scores %>% dplyr::select("cpg_id", "icr_id","MAPINFO") %>% distinct(),
             by = join_by("cpg_id"), keep = FALSE, na_matches = "never", 
             relationship = "one-to-one")
   
@@ -34,7 +35,12 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
   # ordered_cpg_ids <- df[df$icr_id == icr_id,] %>% arrange(MAPINFO) %>% pull(cpg_id)
   
   # Subset the cpg sites to those around significant cpgs
-  if (nrow(sub_mat_cpg_beta) > 2*max_sig_hwindow+1) {
+  if (length(max_sig_hwindow)==2) {
+    if (max_sig_hwindow[1] < 0) max_sig_hwindow[1] = nrow(sub_mat_cpg_beta) + max_sig_hwindow[1]
+    if (max_sig_hwindow[2] < 0) max_sig_hwindow[2] = nrow(sub_mat_cpg_beta) + max_sig_hwindow[2]
+    
+    sub_mat_cpg_beta <- sub_mat_cpg_beta[max_sig_hwindow[1]:max_sig_hwindow[2],]
+  } else if (!is.na(max_sig_hwindow) & nrow(sub_mat_cpg_beta) > 2*max_sig_hwindow+1) {
     
     sig_inds <- which(rownames(sub_mat_cpg_beta) %in% sig_cpgs)
     
@@ -88,7 +94,7 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
     geom_text(aes(label = ifelse(df_summary$cpg_id %in% sig_cpgs, "*", "")), 
               y = padded_ylim[2], size = 4, vjust=1) + 
     # geom_boxplot(aes(color = group), position = position_dodge(width=0.7), width = 0.7, linewidth = .2) +
-    scale_color_manual(values=c("red", "blue"), labels= c("Low","High"), guide = "none") + 
+    scale_color_manual(values=c("red", "blue")) + #, labels= c("Low","High"), guide = "none") + 
     scale_fill_manual(values=c("grey90", "white"), guide = "none") +
     # scale_x_continuous(expand = c(0, 0)) +
     coord_cartesian(xlim = (c(min(df_summary$cpg_id_rank), max(df_summary$cpg_id_rank))), ylim = padded_ylim) + #ylim=c(0,1)
