@@ -124,6 +124,8 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   # Measurement QC                                                    ##########
   #_____________________________________________________________________________
   measurement_pval_passed <- filt_probe_pval_df < max_sig_pval
+  # Record of how many mapped probes passed per patient
+  passed_mapped_probes_per_patient <- NA
   
   if ((!is.null(max_sig_pval)) && set_failed_betas_na) {
     filt_probe_beta_df[!measurement_pval_passed] <- NA
@@ -132,7 +134,9 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                 100*sum(is.na(filt_probe_beta_df))/prod(dim(filt_probe_beta_df)),
                 sum(is.na(filt_probe_beta_df)),prod(dim(filt_probe_beta_df)),
                 max_sig_pval))
-
+    
+    
+    passed_mapped_probes_per_patient = Matrix::colSums(measurement_pval_passed)/nrow(measurement_pval_passed)
     # Five number summary of failure rates
     verbosecat('Distribution of failiure rates for probes:\n')
     qsum <- (stats::quantile(unname(rowSums(is.na(filt_probe_beta_df))/ncol(filt_probe_beta_df)),
@@ -281,7 +285,8 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                      design_scores = design_score_df,
                      platform = probe_beta$platform,
                      manifest = probe_beta$manifest,
-                     probe_fail_rate_df = probe_fail_rate_df
+                     probe_fail_rate_df = probe_fail_rate_df,
+                     passed_mapped_probes_per_patient = passed_mapped_probes_per_patient
   )
 
   return(probe_beta)
