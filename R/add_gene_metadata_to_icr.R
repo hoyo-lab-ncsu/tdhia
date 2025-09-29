@@ -8,9 +8,11 @@
 #' @param imp_type specify whether ids are cpg ids or icr ids
 #' @importFrom rlang .data
 #' @export
-add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg") {
+add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg", db_flag = T) {
 
-
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "add_metadata_to_imp_sites.RData")}
+  # load(file = "add_metadata_to_imp_sites.RData")
+  
   if (imp_type == "cpg") {
      df <- data.frame(cpg_id = imp_ids)    
     df$icr_id <- sapply(df$cpg_id, function(x)
@@ -25,10 +27,13 @@ add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg") {
 
 
   # Read list of ICRs that overlap with nearby zing finger
-  df_zinc_finger <- tdhia::imprintome_icr_zinc_finger
-  df_zinc_finger$icr_id <- paste0("ICR_", gsub("ICR_([0-9]+).*","\\1",df_zinc_finger$icr))
-  df_zinc_finger$near_zinf_finger <- rowSums(!df_zinc_finger[, 3:5] == "", na.rm = TRUE) > 0
-  zinc_finger_icrs <- df_zinc_finger$icr_id[df_zinc_finger$near_zinf_finger]
+  df_zf <- tdhia::imprintome_icr_zinc_finger
+  
+  df_zinc_finger <- data.frame(icr_id = paste0("ICR_", gsub("ICR_([0-9]+).*","\\1",df_zf$icr)))
+  df_zinc_finger$ZFP57 <- rowSums(df_zf[,3-7] == "ZFP57") > 0
+  df_zinc_finger$ZFP445 <- rowSums(df_zf[,3-7] == "ZFP445") > 0
+  df_zinc_finger$near_zinf_finger <-   df_zinc_finger$ZFP57 |   df_zinc_finger$ZFP445
+  # zinc_finger_icrs <- df_zinc_finger$icr_id[df_zinc_finger$near_zinf_finger]
 
 
   # Load annotated list of whole imprintome
@@ -49,7 +54,10 @@ add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg") {
 
 
   # Add zinc finger info
-  df$is_icr_zinc <- df$icr_id %in% zinc_finger_icrs
+  df$is_icr_zinc <- df$icr_id %in% df_zinc_finger$icr_id[df_zinc_finger$near_zinf_finger]
+  df$ZFP57  <- df$icr_id %in% df_zinc_finger$icr_id[df_zinc_finger$ZFP57]
+  df$ZFP445 <- df$icr_id %in% df_zinc_finger$icr_id[df_zinc_finger$ZFP445]
+  
   # Add icr confidence info
   df$icr_conf = 3*(df$icr_id %in% low_conf_icrs)
   df$icr_conf[df$icr_id %in% med_conf_icrs] = 2
