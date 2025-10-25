@@ -15,13 +15,18 @@
 #'
 #' @export
 plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr_id, xlab_txt = "", 
-                                 plot_height_width = c(5,3), output_path, max_sig_hwindow = 9) {
+                                 plot_height_width = c(5,3), output_path, max_sig_hwindow = 9, db_flag = F,
+                                 filter_na_group = T, legend.position = "none", manual_cpg_index = NULL,
+                                 sample_colname = "patient_id") {
   
   
   # Create output folder
   dir.create(path = output_path, recursive = TRUE, showWarnings = FALSE)
   
-  # Get list of CpGs for specified icr
+  if(db_flag) save(list = ls(all.names = TRUE), file = "plot_icr_methylation.RData")
+  # load(file = "plot_icr_methylation.RData")
+  
+  # Get list of CpGs for specified icrs
   df = left_join(x = data.frame(cpg_id = rownames(mat_cpg_beta)),
             y = tdhia::manifest_v1A2_design_scores %>% dplyr::select("cpg_id", "icr_id","MAPINFO") %>% distinct(),
             by = join_by("cpg_id"), keep = FALSE, na_matches = "never", 
@@ -51,14 +56,17 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
     
   }
 
+  if (!is.null(manual_cpg_index)) {
+    sub_mat_cpg_beta <- sub_mat_cpg_beta[manual_cpg_index[1]:manual_cpg_index[2], ]
+  }
   
   # Ordered list of cpg sites (for factor)
   # rownames(sub_mat_cpg_beta)
   # Convert data to long format
   df_long_cpg_beta <- sub_mat_cpg_beta %>% rownames_to_column("cpg_id") %>% 
-    pivot_longer(cols = -"cpg_id", names_to = "patient_id")
+    pivot_longer(cols = -"cpg_id", names_to = sample_colname)
   
-  df_long_cpg_beta <- left_join(x = df_long_cpg_beta, y= df_patient_groups, by = join_by("patient_id"),
+  df_long_cpg_beta <- left_join(x = df_long_cpg_beta, y= df_patient_groups, by = join_by({{sample_colname}}),
             keep = FALSE, na_matches = "never", relationship = "many-to-one")
   
   df_long_cpg_beta$cpg_id <- factor(df_long_cpg_beta$cpg_id, levels = rownames(sub_mat_cpg_beta), ordered=TRUE)
@@ -71,7 +79,7 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
   df_summary$xmin = df_summary$cpg_id_rank -0.5
   df_summary$xmax = df_summary$cpg_id_rank +0.5
   df_summary$back_fill = df_summary$cpg_id_rank %% 2 == 0
-  
+  if (filter_na_group) df_summary <- df_summary %>% filter(!is.na(group))
   
   # Get ICR metadata (closest genes, zinc finger)
   icr_metadata <- add_metadata_to_imp_sites(icr_id, imp_type = "icr")
@@ -104,7 +112,8 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
     #           icr_metadata$Nearest.Transcript)) +
     ggtitle(sprintf("%s: %s", icr_id, icr_metadata$Nearest.Transcript)) +
     theme_classic(base_size = 7) + theme(axis.text.x = element_text(
-      angle = 45,vjust = 1, hjust = 1), plot.title = element_text(size = 7)) 
+      angle = 45,vjust = 1, hjust = 1), plot.title = element_text(size = 7),
+      legend.position = legend.position) 
   print(gg)
   save_plot(filename = paste0(output_path, "/", 
                               sprintf("%s_%s_%sZF", icr_id, icf_conf_str, zinc_finger_str), ".jpg"),

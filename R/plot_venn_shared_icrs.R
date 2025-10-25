@@ -30,7 +30,7 @@ plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names 
   # browser()
   # png(filename=paste0(output_dir_path, "/icr_venn_diagram",name_suffix,".png"))
   ggv = ggVennDiagram(df_members, label = "count", category.names = 
-                        names(df_members),label_alpha = 1,
+                        names(df_members),label_alpha = 1,set_color = "black", label_color = "white",
                       set_size = 4, label_size = 3.5, order.intersect.by = "size") + 
     scale_x_continuous(expand = expansion(mult = .2)) +
     theme(legend.text=element_text(size=8), legend.title = element_text(size=8),

@@ -52,7 +52,7 @@
 filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
                           max_sig_pval = 0.2, set_failed_betas_na = TRUE, mft = NULL,
                           max_probe_fail_rate = 0.25, discard_failed_probes = TRUE,
-                          max_patient_fail_rate = 0.25, discard_failed_patients = TRUE,
+                          max_patient_fail_rate = 0.30, discard_failed_patients = TRUE,
                           min_design_score = NA, icr_conf_levels = NULL,
                           verbose = TRUE, db_flag = FALSE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "filter_probes_debug.RData")}
