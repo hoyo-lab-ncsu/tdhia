@@ -12,7 +12,7 @@ filter_probes(
   mft = NULL,
   max_probe_fail_rate = 0.25,
   discard_failed_probes = TRUE,
-  max_patient_fail_rate = 0.25,
+  max_patient_fail_rate = 0.3,
   discard_failed_patients = TRUE,
   min_design_score = NA,
   icr_conf_levels = NULL,

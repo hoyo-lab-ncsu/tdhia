@@ -12,7 +12,12 @@ plot_icr_methylation(
   xlab_txt = "",
   plot_height_width = c(5, 3),
   output_path,
-  max_sig_hwindow = 9
+  max_sig_hwindow = 9,
+  db_flag = F,
+  filter_na_group = T,
+  legend.position = "none",
+  manual_cpg_index = NULL,
+  sample_colname = "patient_id"
 )
 }
 \arguments{

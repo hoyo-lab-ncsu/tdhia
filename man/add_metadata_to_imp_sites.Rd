@@ -4,7 +4,7 @@
 \alias{add_metadata_to_imp_sites}
 \title{add_metadata_to_imp_sites}
 \usage{
-add_metadata_to_imp_sites(imp_ids, imp_type = "cpg")
+add_metadata_to_imp_sites(imp_ids, imp_type = "cpg", db_flag = T)
 }
 \arguments{
 \item{imp_ids}{list of ids for getting metadata}
