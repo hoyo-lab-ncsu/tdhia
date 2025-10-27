@@ -3,21 +3,41 @@
 
 #' cpg_dmr_test
 #'
-#' @description analyze for changes in beta value between a control group and an
-#' experiment group.
+#' @description test for associations between cpg beta values and study variables.
+#' 
+#' The model equation is assumed to be
+#' 
+#' betas ~ predictors
 #'
-#' @param metadata a matrix of beta values, cpg/ ICR site (rows) by patients (columns)
-#' @param betas boolean vector of which columns in beta matrix are control group
+#' @param metadata a dataframe of study  variables, where rows are patients/ 
+#' samples. Columns are expected to be correct data type (factor variables 
+#' declared as factors, etc.). The columns specified in predictors must exist in 
+#' the dataframe, and if beadchip_correction = T, then the columns Bead, Col, 
+#' and Row must also exist in the dataframe (they are expected to contain the IDs
+#'  for the chip, and row and column of the probe).
+#'  
+#' @param predictors a vector of strings of column names within metadata that 
+#' are used as predictors for LIMMA linear models. First entry is assumed to be 
+#' primary predictor of interest.
+#' 
+#' @param betas matrix of beta values, where rows are cpg sites and columns are 
+#' patients.
+#' 
+#' @param beadchip_correction boolean, when true adds the following columns as '
+#' predictors to LIMMA linear model (if they are not already listed as predictors): 
+#' Beadchip + Col + Row.
+#' 
 #' @export
 #' @author author
-cpg_dmr_test <- function(metadata, betas, analysis_type = "casecontrol",  sig = 0.0001, db_flag = T) {
+cpg_dmr_test <- function(metadata, predictors, betas,
+                         sig = 0.0001, db_flag = T,
+                         beadchip_correction = T) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "cpg_dmr_test.RData")}
   # load(file = "cpg_dmr_test.RData")
   
   # -----------------------------
   # Annotation
   # -----------------------------
-  
   ICR_CpG <- tdhia::mapping_cpg_icr_ids %>%
     dplyr::mutate(chr_num = stringr::str_replace(ICR_chr, "^chr", ""))
   ICR_CpG$chr_num[ICR_CpG$chr_num == "X"] <- 23
@@ -32,20 +52,26 @@ cpg_dmr_test <- function(metadata, betas, analysis_type = "casecontrol",  sig = 
   rownames(metadata) <- metadata$Patient.ID
   metadata <- metadata[colnames(betas),]
   
-  if (analysis_type == "casecontrol") {
-    design <- stats::model.matrix(~ Group + Beadchip + Col + Row + Race, data = metadata)
-    coef_name <- "GroupCase"
-  } else {
-    design <- stats::model.matrix(~ PCL.Total + Beadchip + Col + Row + Race, data = metadata)
-    coef_name <- "PCL.Total"
+  
+  model_str = paste0("~ ", paste(predictors, collapse = " + "))
+  
+  if (beadchip_correction) {
+    if(!("Beadchip" %in% predictors)) {model_str = paste0(model_str, " + Beadchip")}
+    if(!("Col" %in% predictors)) {model_str = paste0(model_str, " + Col")}
+    if(!("Row" %in% predictors)) {model_str = paste0(model_str, " + Row")}
   }
+  
+  design <- stats::model.matrix(as.formula(model_str), data = metadata)
+  # If the primary predictor is a two level factor, than the name of the 
+  # coefficient in the output of limma will be the 
+  # [name of the predictor][second level of factor]
+  coef_name = paste0(predictors[1], ifelse(length(unique(metadata[[predictors[1]]]))==2, 
+                                           levels(metadata[[predictors[1]]])[2], ""))
   design <- design[, colSums(design) != 1] 
-  
-  
+
   # -----------------------------
   # Limma Analysis
   # -----------------------------
-  
   fit = limma::lmFit(betas, design)
   fit = limma::eBayes(fit)
   res = limma::topTable(fit, adjust.method="fdr", number=nrow(betas), coef=coef_name)
@@ -53,8 +79,8 @@ cpg_dmr_test <- function(metadata, betas, analysis_type = "casecontrol",  sig = 
   res = res %>% dplyr::left_join(ICR_CpG, by=dplyr::join_by(CpG_Probe == CpG_id)) %>% 
     dplyr::arrange(adj.P.Val)
   res$diffMeth = "no"
-  res$diffMeth[res$P.Value < 0.0001 & res$logFC > 0] = "Hyper"
-  res$diffMeth[res$P.Value < 0.0001 & res$logFC < 0] = "Hypo"
+  res$diffMeth[res$P.Value < sig & res$logFC > 0] = "Hyper"
+  res$diffMeth[res$P.Value < sig & res$logFC < 0] = "Hypo"
   
   # save(res, file=paste0("EWAS/res_EWAS_", label, ".Rdata"))
   # write.csv(res, paste0("EWAS/res_EWAS_", label, ".csv"))
@@ -116,7 +142,7 @@ cpg_dmr_test <- function(metadata, betas, analysis_type = "casecontrol",  sig = 
   
   volcano = ggplot2::ggplot(res, ggplot2::aes(x=logFC, y=-log10(P.Value), col=diffMeth)) +
     ggplot2::geom_point() + ggplot2::theme_minimal() +
-    ggrepel::geom_text_repel(data = res[res$P.Value<0.0001,], ggplot2::aes(label=paste0(CpG_Probe, " (", ICR_id , ")")), size=3)
+    ggrepel::geom_text_repel(data = res[res$P.Value<sig,], ggplot2::aes(label=paste0(CpG_Probe, " (", ICR_id , ")")), size=3)
   
   # png(paste0(output_dir_path, "/VolcanoPlot_", label, ".png"), res = 300, width = 12, height = 8, units = "in")
   # print(volcano)
@@ -131,7 +157,7 @@ cpg_dmr_test <- function(metadata, betas, analysis_type = "casecontrol",  sig = 
   chr_lens <- chr_lens %>% dplyr::mutate(offset = dplyr::lag(cumsum(chr_len), default = 0))
   res <- dplyr::inner_join(res, chr_lens, by = "chr_num") %>% dplyr::mutate(bp_cum = CpG_start + offset)
   axis_df <- res %>% dplyr::group_by(chr_num) %>% dplyr::summarise(center = mean(bp_cum))
-  # sig <- 0.0001
+  # sig <- sig
   
   manhattan = ggplot(res, aes(x = bp_cum, y = -log10(P.Value), color = diffMeth)) +
     geom_point(alpha = 0.75) +
@@ -167,7 +193,7 @@ cpg_dmr_test <- function(metadata, betas, analysis_type = "casecontrol",  sig = 
   # Gene Annotation for Significant CpGs
   # -----------------------------
   
-  cpgs <- res %>% dplyr::filter(P.Value < 0.0001) %>% dplyr::arrange(P.Value)
+  cpgs <- res %>% dplyr::filter(P.Value < sig) %>% dplyr::arrange(P.Value)
   
   
   genes_gr <- get_gene_info_biomart()
@@ -200,7 +226,7 @@ cpg_dmr_test <- function(metadata, betas, analysis_type = "casecontrol",  sig = 
     dplyr::relocate(perc_diff, .after = logFC)
   
   
-  # Export figrues and data
+  # Export figures and data
   out <- list(res = res, chr_lens = chr_lens, cpgs_show = cpgs_show, 
               plots = list(manhattan = manhattan, p = p, volcano = volcano))
   
@@ -215,14 +241,19 @@ cpg_dmr_test <- function(metadata, betas, analysis_type = "casecontrol",  sig = 
 #' @description analyze for changes in beta value between a control group and an
 #' experiment group.
 #'
-#' @param res a matrix of beta values, cpg/ ICR site (rows) by patients (columns)
-#' @param chr_lens boolean vector of which columns in beta matrix are control group
-#' @param pval_threshold max value for signficiant p-value from test (0-1 singleton).
+#' @param res a dataframe output from the cpg_dmr_test, one row for each cpg site.
+#'  Contains standard output from limma plus metadata specifying associated ICR,
+#'   closest gene etc.
+#' @param chr_lens a dataframe of ranges covering ICRs on each chromosome. Each 
+#' row is a seperate chromosome number. Expected to contain the following fields:
+#'   chr_num: chromosome number
+#'   chr_len: total length of each chromosome
+#'   offset offset of start of each chromosome.
+#' @param pval_threshold max value for significant p-value from test (0-1 singleton).
+#' @param global_pval_threshold max value for significance for plots.
 #' @export
 #' @author author
 icr_dmr_test <- function(res, chr_lens, pval_threshold = 0.05, sig = 0.0001) {
-  
-  
   
   
   # -----------------------------
