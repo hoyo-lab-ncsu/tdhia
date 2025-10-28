@@ -4,10 +4,19 @@
 #' plot_icr_methylation
 #'
 #'  position.
-#' @param cpg_beta_mat a matrix of beta values, cpg sites (rows) x patients (col)
-#' @param patient_groups n
-#' @param icr_id v
-#' @param plot_height_width v
+#' @param mat_cpg_beta a matrix of beta values, cpg sites (rows) x patients (col)
+#' @param sig_cpgs TODO
+#' @param df_patient_groups todo
+#' @param icr_id todo
+#' @param xlab_txt todo
+#' @param plot_height_width todo
+#' @param max_sig_hwindow todo
+#' @param output_path todo
+#' @param db_flag todo
+#' @param filter_na_group todo
+#' @param legend.position todo
+#' @param manual_cpg_index todo
+#' @param sample_colname todo
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #'

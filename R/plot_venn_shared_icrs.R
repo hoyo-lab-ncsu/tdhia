@@ -2,12 +2,13 @@
 #' venn_shared_icrs
 #' @description produces venn diagram plot of shared ICRs
 #'
-#' @param df_summary a dataframe of significant cpg sites for each icr. 
+#' @param df_imp_sig a dataframe of significant cpg sites for each icr. 
 #'  Required to have the (colname) specified and icr_id column.
 #' @param colname column name to speficy venn diagram groups
 #' @param group_names manual override of groups for venn diagram.
 #' @param output_dir_path path to output folder if export is specified.
 #' @param name_suffix estra misc. suffic to saved filename if export is specified.
+#' @param db_flag todo
 #' @export
 plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names = NULL, 
                              output_dir_path = getwd(), name_suffix = NULL, db_flag = FALSE) {

@@ -1,94 +1,128 @@
 
 
 
-#' cpg_dmr_test
+#' cpg_dml_test
 #'
 #' @description test for associations between cpg beta values and study variables.
 #' 
-#' The model equation is assumed to be
-#' 
-#' betas ~ predictors
+#' The model equation is assumed to be:
+#' cpg_beta ~ predictors
 #'
-#' @param metadata a dataframe of study  variables, where rows are patients/ 
+#' with beadchip_correction = T, then:
+#' cpg_beta ~ predictors + Bead + Col + Row
+#'
+#' @param df_study a dataframe of study variables, where rows are patients/ 
 #' samples. Columns are expected to be correct data type (factor variables 
 #' declared as factors, etc.). The columns specified in predictors must exist in 
-#' the dataframe, and if beadchip_correction = T, then the columns Bead, Col, 
-#' and Row must also exist in the dataframe (they are expected to contain the IDs
-#'  for the chip, and row and column of the probe).
+#' the dataframe, and if beadchip_correction = T, then the columns:
+#'    Bead, Col, and Row 
+#' must also exist in the dataframe (they are expected to contain the IDs
+#' for the chip, and row and column of the probe). The dataframe must also have
+#'  the column specified in sample_name, which contains the basenames for the 
+#'  IDAT methylation data files.
 #'  
-#' @param predictors a vector of strings of column names within metadata that 
+#' @param predictors a vector of strings of column names within df_study that 
 #' are used as predictors for LIMMA linear models. First entry is assumed to be 
 #' primary predictor of interest.
 #' 
-#' @param betas matrix of beta values, where rows are cpg sites and columns are 
-#' patients.
-#' 
+#' @param cpg_beta matrix of beta values, where rows are cpg sites and columns are 
+#' patients. Column names must be the same ones found in the column name of
+#' sample_name input argument contained within df_study.
+#' @param pvalue_threshold max p-value threshold for significance from LIMMA 
+#' analysis for calling hyper or hypo methylation.
+#' @param sample_name name of column that specified the unique identifier for the 
+#' sample in df_study, which also must be used for the column names of 
+#' cpg_beta (default = "sample_name").
 #' @param beadchip_correction boolean, when true adds the following columns as '
 #' predictors to LIMMA linear model (if they are not already listed as predictors): 
-#' Beadchip + Col + Row.
-#' 
+#' Bead + Col + Row. (detault = TRUE).
+#' @param write_plots boolean, when TRUE, writes plots to disk.
+#' @param output_dir_path directory path to write plots to disk.
+#' @param verbose boolean, when true, prints output to console.
+#' @param db_flag boolean, when true, save environment variables to disk.
 #' @export
 #' @author author
-cpg_dmr_test <- function(metadata, predictors, betas,
-                         sig = 0.0001, db_flag = T,
-                         beadchip_correction = T) {
-  if (db_flag) {save(list = ls(all.names = TRUE), file = "cpg_dmr_test.RData")}
-  # load(file = "cpg_dmr_test.RData")
+cpg_dml_test <- function(df_study, predictors, cpg_beta,
+                         pvalue_threshold = 0.0001, db_flag = T, sample_name = "Patient.ID",
+                         beadchip_correction = T, verbose = T, write_plots = F,
+                         output_dir_path = getwd()) {
   
-  # -----------------------------
-  # Annotation
-  # -----------------------------
-  ICR_CpG <- tdhia::mapping_cpg_icr_ids %>%
-    dplyr::mutate(chr_num = stringr::str_replace(ICR_chr, "^chr", ""))
-  ICR_CpG$chr_num[ICR_CpG$chr_num == "X"] <- 23
-  ICR_CpG$chr_num[ICR_CpG$chr_num == "Y"] <- 24
-  ICR_CpG$chr_num = as.numeric(ICR_CpG$chr_num)
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "cpg_dml_test.RData")}
+  # load(file = "cpg_dml_test.RData")
+  vsprintf <- \(x, ...) if (verbose) cat(sprintf(x, ...))
+  plots = list()
   
+  # Keep samples (patients) that exist in both study metadata and cpg_beta matrix
+  shared_patients <- intersect(df_study[[sample_name]], colnames(cpg_beta))
+  vsprintf(">> %i shared patients between study data and beta matrix, other culled.\n", length(shared_patients))
+  df_study <- df_study[df_study[[sample_name]] %in% shared_patients, ]
+  cpg_beta <- cpg_beta [, shared_patients]
   
-  # -----------------------------
-  # Design Matrix
-  # -----------------------------
-  
-  rownames(metadata) <- metadata$Patient.ID
-  metadata <- metadata[colnames(betas),]
-  
-  
-  model_str = paste0("~ ", paste(predictors, collapse = " + "))
-  
+  # Assemble predictor list
   if (beadchip_correction) {
-    if(!("Beadchip" %in% predictors)) {model_str = paste0(model_str, " + Beadchip")}
-    if(!("Col" %in% predictors)) {model_str = paste0(model_str, " + Col")}
-    if(!("Row" %in% predictors)) {model_str = paste0(model_str, " + Row")}
+    predictors <- unique(c(predictors, c("Bead", "Col", "Row")))
   }
   
-  design <- stats::model.matrix(as.formula(model_str), data = metadata)
+  # Check that all required columns exist in study data.frame
+  missed_columns <- setdiff(predictors, colnames(df_study))
+  if (length(missed_columns)>0) {
+    stop(sprintf(">> Error: these required columns do not exist in df_study: %s\n", 
+             paste(missed_columns, collapse = ", ")))
+  }
+  
+  
+  # Correlation plot of predictors                                    ##########
+  #_____________________________________________________________________________
+  corr_data = df_study[, predictors] %>% 
+    dplyr::mutate_all(as.numeric) %>% 
+    as.data.frame()
+  M = cor(corr_data, use = 'pairwise.complete.obs')
+  corr_result = corrplot::cor.mtest(M, conf.level = 0.95)
+  plots$predictor_correlations = corrplot::corrplot(
+    M,p.mat = corr_result$p, insig = 'label_sig', sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9)
+
+  if (write_plots) {
+    png(paste0(output_dir_path, "/corr_matrix.png"), res = 300, width = 10, height = 10, units = "in")
+    corrplot::corrplot(M,p.mat = testRes$p, insig = 'label_sig', sig.level = c(0.001, 0.01, 0.05),pch.cex = 0.9)
+    dev.off()
+  }
+  
+  # Get icr metadata
+  ICR_CpG <- get_icr_metadata_table()
+  
+  
+  # Create the model string to specify LIMMA analysis
+  model_str = paste0("~ ", paste(predictors, collapse = " + "))
+  vsprintf(">> Model string used for design matrix: %s\n", model_str)
+  # Create design matrix based on model string
+  design <- stats::model.matrix(as.formula(model_str), data = df_study)
   # If the primary predictor is a two level factor, than the name of the 
-  # coefficient in the output of limma will be the 
-  # [name of the predictor][second level of factor]
-  coef_name = paste0(predictors[1], ifelse(length(unique(metadata[[predictors[1]]]))==2, 
-                                           levels(metadata[[predictors[1]]])[2], ""))
+  # coefficient in the output of LIMMA will be:
+  #            [name of the predictor][second level of factor]
+  coef_name = paste0(predictors[1], ifelse(length(unique(df_study[[predictors[1]]]))==2, 
+                                           levels(df_study[[predictors[1]]])[2], ""))
   design <- design[, colSums(design) != 1] 
 
-  # -----------------------------
-  # Limma Analysis
-  # -----------------------------
-  fit = limma::lmFit(betas, design)
+
+  # Limma Analysis                                                  ############
+  #_____________________________________________________________________________
+  fit = limma::lmFit(cpg_beta, design)
   fit = limma::eBayes(fit)
-  res = limma::topTable(fit, adjust.method="fdr", number=nrow(betas), coef=coef_name)
-  res$CpG_Probe = rownames(res)
-  res = res %>% dplyr::left_join(ICR_CpG, by=dplyr::join_by(CpG_Probe == CpG_id)) %>% 
+  df_dml = limma::topTable(fit, adjust.method="fdr", number=nrow(cpg_beta), coef=coef_name)
+  df_dml$CpG_Probe = rownames(df_dml)
+  df_dml = df_dml %>% dplyr::left_join(ICR_CpG, by = dplyr::join_by(CpG_Probe == CpG_id)) %>% 
     dplyr::arrange(adj.P.Val)
-  res$diffMeth = "no"
-  res$diffMeth[res$P.Value < sig & res$logFC > 0] = "Hyper"
-  res$diffMeth[res$P.Value < sig & res$logFC < 0] = "Hypo"
+  df_dml$diffMeth = "no"
+  df_dml$diffMeth[df_dml$P.Value < pvalue_threshold & df_dml$logFC > 0] = "Hyper"
+  df_dml$diffMeth[df_dml$P.Value < pvalue_threshold & df_dml$logFC < 0] = "Hypo"
   
-  # save(res, file=paste0("EWAS/res_EWAS_", label, ".Rdata"))
-  # write.csv(res, paste0("EWAS/res_EWAS_", label, ".csv"))
+  # save(df_dml, file=paste0("EWAS/df_dml_EWAS_", label, ".Rdata"))
+  # write.csv(df_dml, paste0("EWAS/df_dml_EWAS_", label, ".csv"))
   
   
-  # -----------------------------
+
   # QQ Plot Function
-  # -----------------------------
+  #____________________________________________________________________________
   gg_qqplot = function(ps, ci = 0.95) {
     n  = length(ps)
     df = data.frame(
@@ -118,84 +152,83 @@ cpg_dmr_test <- function(metadata, predictors, betas,
   
   
   
-  # -----------------------------
   # QQ and Volcano Plots
-  # -----------------------------
-  p = gg_qqplot(res$P.Value) +
+  #____________________________________________________________________________
+  plots$qq_p_value = gg_qqplot(df_dml$P.Value) +
     ggplot2::theme_bw(base_size = 24) +
-    ggplot2::annotate(geom = "text",
-             x = -Inf,
-             y = Inf,
-             hjust = -0.15,
-             vjust = 1 + 0.15 * 3,
-             label = sprintf("N; = %.2f", inflation(res$P.Value)),
+    ggplot2::annotate(geom = "text", x = -Inf, y = Inf, hjust = -0.15, vjust = 1 + 0.15 * 3,
+                      label = sprintf("N; = %.2f", inflation(df_dml$P.Value)),
              size = 8) +
     ggplot2::theme(axis.ticks = element_line(linewidth = 0.5),
           panel.grid = element_blank())
   
-  # png(paste0(output_dir_path, "qqplot_", label, ".png"), res = 300, width = 10, height = 10, units = "in")
-  # print(p)
-  # dev.off()
-  # 
-  res$diffMeth[res$logFC > 0] = "Hyper"
-  res$diffMeth[res$logFC < 0] = "Hypo"
+  if (write_plots) {
+    png(paste0(output_dir_path, "qqplot_", label, ".png"), res = 300, width = 10, height = 10, units = "in")
+    print(plots$qq_p_value)
+    dev.off()
+  }
   
-  volcano = ggplot2::ggplot(res, ggplot2::aes(x=logFC, y=-log10(P.Value), col=diffMeth)) +
+  df_dml$diffMeth[df_dml$logFC > 0] = "Hyper"
+  df_dml$diffMeth[df_dml$logFC < 0] = "Hypo"
+  
+  plots$volcano = ggplot2::ggplot(df_dml, ggplot2::aes(x=logFC, y = -log10(P.Value), col = diffMeth)) +
     ggplot2::geom_point() + ggplot2::theme_minimal() +
-    ggrepel::geom_text_repel(data = res[res$P.Value<sig,], ggplot2::aes(label=paste0(CpG_Probe, " (", ICR_id , ")")), size=3)
+    ggrepel::geom_text_repel(data = df_dml[df_dml$P.Value < pvalue_threshold,], ggplot2::aes(
+      label=paste0(CpG_Probe, " (", ICR_id , ")")), size=3  )
   
-  # png(paste0(output_dir_path, "/VolcanoPlot_", label, ".png"), res = 300, width = 12, height = 8, units = "in")
-  # print(volcano)
-  # dev.off()
+  if (write_plots) {
+    png(paste0(output_dir_path, "/VolcanoPlot_", label, ".png"), res = 300, width = 12, height = 8, units = "in")
+    print(plots$volcano)
+    dev.off()
+  }
   
-  
-  # -----------------------------
   # Manhattan Plots
-  # -----------------------------
+  # ____________________________________________________________________________
   
-  chr_lens <- res %>% dplyr::group_by(chr_num) %>% dplyr::summarise(chr_len = as.double(max(CpG_start)))
-  chr_lens <- chr_lens %>% dplyr::mutate(offset = dplyr::lag(cumsum(chr_len), default = 0))
-  res <- dplyr::inner_join(res, chr_lens, by = "chr_num") %>% dplyr::mutate(bp_cum = CpG_start + offset)
-  axis_df <- res %>% dplyr::group_by(chr_num) %>% dplyr::summarise(center = mean(bp_cum))
+  chr_lens <- df_dml %>% dplyr::group_by(chr_num) %>% 
+    dplyr::summarise(chr_len = as.double(max(CpG_start)))
+  chr_lens <- chr_lens %>% dplyr::mutate(offset = dplyr::lag(cumsum(chr_len), 
+                                                             default = 0))
+  
+  df_dml <- dplyr::inner_join(df_dml, chr_lens, by = "chr_num") %>%
+    dplyr::mutate(bp_cum = CpG_start + offset)
+  axis_df <- df_dml %>% dplyr::group_by(chr_num) %>% 
+    dplyr::summarise(center = mean(bp_cum))
   # sig <- sig
   
-  manhattan = ggplot(res, aes(x = bp_cum, y = -log10(P.Value), color = diffMeth)) +
-    geom_point(alpha = 0.75) +
-    geom_hline(yintercept = -log10(sig), linetype = "dashed") +
-    scale_x_continuous(breaks = axis_df$center, labels = axis_df$chr_num)  +
-    scale_color_manual(values = c("#F8766D", "#35C96E"))+
-    theme_minimal() +
-    theme( 
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor.x = element_blank(),
+  plots$manhattan = ggplot2::ggplot(df_dml, ggplot2::aes(x = bp_cum, y = -log10(P.Value), color = diffMeth)) +
+    ggplot2::geom_point(alpha = 0.75) + ggplot2::geom_hline(yintercept = -log10(pvalue_threshold), linetype = "dashed") +
+    ggplot2::scale_x_continuous(breaks = axis_df$center, labels = axis_df$chr_num)  +
+    ggplot2::scale_color_manual(values = c("#F8766D", "#35C96E"))+
+    ggplot2::theme_minimal() +
+    ggplot2::theme( 
+      panel.grid.major.x = ggplot2::element_blank(),
+      panel.grid.minor.x = ggplot2::element_blank(),
       axis.title.y = ggtext::element_markdown(),
       axis.text.x = ggplot2::element_text(angle = 60, size = 8, vjust = 0.5)
     )+
     labs(y = "-log10(p)", x = "Chromosome")+ 
     ggrepel::geom_text_repel(
-      data = res[which(res$P.Value<sig),],aes(x=bp_cum, y = -log10(P.Value), label=paste0(CpG_Probe, " (", ICR_id , ")")),
-      box.padding = 0.5,
-      point.padding = 0.3,
-      max.overlaps = 10,
-      size = 3.5,
-      nudge_x = 0.05, 
+      data = df_dml[which(df_dml$P.Value<pvalue_threshold),],
+      ggplot2::aes(x=bp_cum, y = -log10(P.Value), label=paste0(CpG_Probe, " (", ICR_id , ")")),
+      box.padding = 0.5, point.padding = 0.3, max.overlaps = 10, size = 3.5, nudge_x = 0.05, 
       nudge_y = 0.05)
   
-  
-  # png(paste0(output_dir_path, "/Manhattan_", label, ".png"), res = 300, width = 15, height = 5, units = "in")
-  # print(manhattan)
-  # dev.off()
-  
-  
-  
-  
-  # -----------------------------
-  # Gene Annotation for Significant CpGs
-  # -----------------------------
-  
-  cpgs <- res %>% dplyr::filter(P.Value < sig) %>% dplyr::arrange(P.Value)
+  if (write_plots) {
+    png(paste0(output_dir_path, "/Manhattan_", label, ".png"), res = 300, width = 15, height = 5, units = "in")
+    print(manhattan)
+    dev.off()
+  }
   
   
+  
+
+  # Gene annotation for significant cpgs                    ####################
+  #_____________________________________________________________________________
+  
+  cpgs <- df_dml %>% dplyr::filter(P.Value < pvalue_threshold) %>% dplyr::arrange(P.Value)
+  
+  # Get gene info
   genes_gr <- get_gene_info_biomart()
   
   
@@ -213,7 +246,8 @@ cpg_dmr_test <- function(metadata, predictors, betas,
   cpg_gr_extended <- GenomicRanges::resize(cpg_gr, width = 20001, fix = "center")
   
   nearby <- GenomicRanges::findOverlaps(cpg_gr_extended, genes_gr)
-  genes_nearby <- data.frame(CpG_Probe = cpg_gr$CpG_Probe[S4Vectors::queryHits(nearby)], Gene = genes_gr$gene_name[S4Vectors::subjectHits(nearby)])
+  genes_nearby <- data.frame(CpG_Probe = cpg_gr$CpG_Probe[S4Vectors::queryHits(nearby)],
+                             Gene = genes_gr$gene_name[S4Vectors::subjectHits(nearby)])
   
   all_annotations <- dplyr::bind_rows(genes_overlap, genes_nearby) %>% 
     dplyr::distinct(CpG_Probe, Gene) %>% dplyr::group_by(CpG_Probe) %>% 
@@ -222,13 +256,14 @@ cpg_dmr_test <- function(metadata, predictors, betas,
   cpgs_annotated <- merge(cpgs, all_annotations, by = "CpG_Probe", all.x = TRUE)
   
   cpgs_show <- cpgs_annotated %>% 
-    dplyr::mutate(perc_diff = ifelse(logFC >= 0, paste0("+", round(logFC * 100, 2), "%"), paste0("-", round(abs(logFC * 100), 2), "%"))) %>% 
+    dplyr::mutate(perc_diff = ifelse(logFC >= 0, paste0("+", round(logFC * 100, 2), "%"), 
+                                     paste0("-", round(abs(logFC * 100), 2), "%"))) %>% 
     dplyr::relocate(perc_diff, .after = logFC)
   
   
   # Export figures and data
-  out <- list(res = res, chr_lens = chr_lens, cpgs_show = cpgs_show, 
-              plots = list(manhattan = manhattan, p = p, volcano = volcano))
+  out <- list(df_dml = df_dml, chr_lens = chr_lens, cpgs_show = cpgs_show, 
+              plots = plots)
   
   return(out)
 }
@@ -238,31 +273,42 @@ cpg_dmr_test <- function(metadata, predictors, betas,
 
 #' icr_dmr_test
 #'
-#' @description analyze for changes in beta value between a control group and an
-#' experiment group.
+#' @description analyze for changes in cpg methylation in a DMR-like region (ICR) 
+#' via a p-values aggregation test.
 #'
-#' @param res a dataframe output from the cpg_dmr_test, one row for each cpg site.
+#' @param df_dml a dataframe output from the cpg_dml_test, one row for each cpg site.
 #'  Contains standard output from limma plus metadata specifying associated ICR,
-#'   closest gene etc.
+#'   closest gene etc. Required columns:
+#'   ICR_id
+#'   ICR_chr
+#'   ICR_start
+#'   ICR_stop
+#'   logFC
+#'   P.Value: raw DML p-value.
+#'   adj.P.Val: adjusted p-value from DML.
 #' @param chr_lens a dataframe of ranges covering ICRs on each chromosome. Each 
 #' row is a seperate chromosome number. Expected to contain the following fields:
 #'   chr_num: chromosome number
 #'   chr_len: total length of each chromosome
 #'   offset offset of start of each chromosome.
 #' @param pval_threshold max value for significant p-value from test (0-1 singleton).
-#' @param global_pval_threshold max value for significance for plots.
+#' @param fdr_sig_threshold max value for fdr corrected p-values.
+#' @param db_flag todo
+#' @param verbose todo
 #' @export
 #' @author author
-icr_dmr_test <- function(res, chr_lens, pval_threshold = 0.05, sig = 0.0001) {
+icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
+                         fdr_sig_threshold = 0.0001,
+                         verbose = T, db_flag = T) {
   
   
-  # -----------------------------
+
   # Regional (DMR-like) Analysis via ICR Aggregation
-  # -----------------------------
-  # pval_threshold <- 0.05
-  res_pre <- res
+  # ____________________________________________________________________________
+
+
   
-  data_signif <- res_pre %>% dplyr::filter(adj.P.Val < pval_threshold)
+  data_signif <- df_dml %>% dplyr::filter(adj.P.Val < pval_threshold)
   
   # genes <- biomaRt::getBM(attributes = c("chromosome_name", "start_position", "end_position", "hgnc_symbol", "gene_biotype", "strand"),
   #                filters = "biotype", values = "protein_coding", mart = mart)
@@ -275,7 +321,7 @@ icr_dmr_test <- function(res, chr_lens, pval_threshold = 0.05, sig = 0.0001) {
   
   promoters_gr <- GenomicRanges::promoters(genes_gr, upstream = 1500, downstream = 500)
   
-  ICR_summary <- res_pre %>% 
+  ICR_summary <- df_dml %>% 
     dplyr::group_by(ICR_id ) %>% 
     dplyr::summarise(ICR_n = dplyr::n(), 
               ICR_chr = unique(ICR_chr), 
@@ -333,6 +379,7 @@ icr_dmr_test <- function(res, chr_lens, pval_threshold = 0.05, sig = 0.0001) {
   ICR_annotated_plot$ICR_chr[ICR_annotated_plot$ICR_chr == "chrX"] <- "chr23"
   ICR_annotated_plot$chr_num <- as.numeric(stringr::str_remove(ICR_annotated_plot$ICR_chr, "chr"))
   ICR_annotated_plot$start <- ICR_annotated_plot$ICR_start
+  
   chr_lens <- chr_lens %>% dplyr::rename_with(~ "bp_add", .cols = "offset")
   ICR_annotated_plot <- ICR_annotated_plot %>% 
     dplyr::inner_join(chr_lens, by = "chr_num") %>% 
@@ -357,7 +404,7 @@ icr_dmr_test <- function(res, chr_lens, pval_threshold = 0.05, sig = 0.0001) {
     )+ 
     ggplot2::labs(x = NULL, y = "-log10(FDR)")+ 
     ggrepel::geom_text_repel(
-      data = ICR_annotated_plot[which(ICR_annotated_plot$FDR<sig),],aes(x=bp_cum, y = -log10(FDR), label=ICR_id),
+      data = ICR_annotated_plot[which(ICR_annotated_plot$FDR<fdr_sig_threshold),],aes(x=bp_cum, y = -log10(FDR), label=ICR_id),
       box.padding = 0.5,
       point.padding = 0.3,
       max.overlaps = 10,
@@ -414,12 +461,12 @@ icr_dmr_test <- function(res, chr_lens, pval_threshold = 0.05, sig = 0.0001) {
 
 
 
-#'get_gene_info_biomart
+#' get_gene_info_biomart
 #'
 #' @description Cache biomart results in path associated with this package, this avoids
 #' querying biomart every time the code is run (will results with timeout/ blocks
 #' from too many requests)
-#' @return table of genes and associated metadata
+#' @return table of genes and associated metadata used in DML/ DMR analysis
 #' @export
 get_gene_info_biomart <- function() {
   
@@ -446,4 +493,30 @@ get_gene_info_biomart <- function() {
   return(genes_gr)
 }
 
-
+#' get_icr_metadata_table
+#'
+#' @description Cache biomart results in path associated with this package, this avoids
+#' querying biomart every time the code is run (will results with timeout/ blocks
+#' from too many requests)
+#' @return table of icr metadata with the following column names:
+#'   X 
+#'   CpG_chr 
+#'   CpG_start  
+#'   CpG_stop 
+#'   ICR_chr 
+#'   ICR_start  
+#'   ICR_stop       
+#'   CpG_Probe  
+#'   ICR_id     
+#'   CpG_id 
+#'   chr_num
+#' @export
+get_icr_metadata_table <- function() {
+  ICR_CpG <- tdhia::mapping_cpg_icr_ids %>%
+    dplyr::mutate(chr_num = stringr::str_replace(ICR_chr, "^chr", ""))
+  ICR_CpG$chr_num[ICR_CpG$chr_num == "X"] <- 23
+  ICR_CpG$chr_num[ICR_CpG$chr_num == "Y"] <- 24
+  ICR_CpG$chr_num = as.numeric(ICR_CpG$chr_num)
+  
+  return(ICR_CpG)
+}

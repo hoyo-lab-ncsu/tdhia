@@ -21,13 +21,31 @@ plot_icr_methylation(
 )
 }
 \arguments{
-\item{icr_id}{v}
+\item{mat_cpg_beta}{a matrix of beta values, cpg sites (rows) x patients (col)}
 
-\item{plot_height_width}{v}
+\item{sig_cpgs}{TODO}
 
-\item{cpg_beta_mat}{a matrix of beta values, cpg sites (rows) x patients (col)}
+\item{df_patient_groups}{todo}
 
-\item{patient_groups}{n}
+\item{icr_id}{todo}
+
+\item{xlab_txt}{todo}
+
+\item{plot_height_width}{todo}
+
+\item{output_path}{todo}
+
+\item{max_sig_hwindow}{todo}
+
+\item{db_flag}{todo}
+
+\item{filter_na_group}{todo}
+
+\item{legend.position}{todo}
+
+\item{manual_cpg_index}{todo}
+
+\item{sample_colname}{todo}
 }
 \value{
 a ggplot function handle to the plot.

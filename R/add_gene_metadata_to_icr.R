@@ -6,6 +6,7 @@
 #'
 #' @param imp_ids list of ids for getting metadata
 #' @param imp_type specify whether ids are cpg ids or icr ids
+#' @param db_flag boolean, when true, save environemnt variables to disk.
 #' @importFrom rlang .data
 #' @export
 add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg", db_flag = T) {

@@ -6,21 +6,31 @@
 \usage{
 tdhia_pipeline(
   idat_dir_paths = NULL,
+  OVERWRITE_TEMP_DATA = F,
+  probe_data_cache_path = getwd(),
   multicore = TRUE,
   idat_basenames = NULL,
   discard_unmapped_probes = TRUE,
   max_sig_pval = 0.2,
   set_failed_betas_na = FALSE,
-  max_probe_fail_rate = 0.25,
+  max_probe_fail_rate = 0.2,
   discard_failed_probes = TRUE,
+  max_patient_fail_rate = 0.25,
   smooth_adj_cpgs = FALSE,
   max_icr_fail_rate = 0.2,
-  db_flag = FALSE
+  db_flag = FALSE,
+  merge_replicates = "pre_beta",
+  enforce_req_idats = TRUE,
+  min_design_score = NA
 )
 }
 \arguments{
 \item{idat_dir_paths}{a vector of strings specifying full directory paths
 where IDAT files are located.}
+
+\item{OVERWRITE_TEMP_DATA}{todo}
+
+\item{probe_data_cache_path}{todo}
 
 \item{multicore}{boolean, when true uses n.cores processing in sesame.}
 
@@ -41,6 +51,8 @@ values set to NA).}
 \item{discard_failed_probes}{boolean when true, the probes that fail the
 max_probe_fail_rate are removed entirely.}
 
+\item{max_patient_fail_rate}{todo}
+
 \item{smooth_adj_cpgs}{boolean, when true, adjacent cpg beta values within an
 ICR are smoothed with a sliding window average.}
 
@@ -48,6 +60,12 @@ ICR are smoothed with a sliding window average.}
 missing before the entire ICR is excluded from dataset.}
 
 \item{db_flag}{flag for saving function work space for debugging.}
+
+\item{merge_replicates}{todo}
+
+\item{enforce_req_idats}{todo}
+
+\item{min_design_score}{todo}
 }
 \value{
 named list with all of the output from each of the pipeline steps.

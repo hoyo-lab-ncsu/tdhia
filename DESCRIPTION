@@ -36,7 +36,16 @@ Imports:
 	utils,
 	methods,
 	dqrng,
-	Matrix
+	Matrix,
+	GenomicRanges,
+	IRanges,
+	S4Vectors,
+	aggregation,
+	biomaRt,
+    corrplot,
+	ggrepel,
+	ggtext,
+	limma
 Suggests: 
     knitr,
     rmarkdown,

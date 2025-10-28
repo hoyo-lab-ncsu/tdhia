@@ -14,8 +14,8 @@ knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>")
 
 library(dplyr)
 # here::i_am("README.md")
-# devtools::load_all()
-library(tdhia)
+devtools::load_all()
+# library(tdhia)
 ```
 
 Here we will demonstrate how to process IDAT files from the True Diagnostic Human
@@ -27,7 +27,7 @@ We begin by first generating simulated data. Sesame imports IDAT files into a Si
 
 
 ```{r simulate}
-n_patients = 10
+n_patients = 20
 ss <- tdhia::simulate_idat_data(n_patients)
 ```
 
@@ -149,9 +149,12 @@ a csv file or similiar format.
 ```{r}
 
 df_study = data.frame(id = 1:n_patients)
-df_study$race <- as.factor(sample(c(0,1,2), 10, replace = TRUE))
+df_study$race <- as.factor(sample(c(0,1,2), size = n_patients, replace = TRUE))
 df_study$exposure<- runif(n = n_patients, min = 0, max= 10)
-df_study$smoked <- as.factor(sample(c(0,1), 10, replace = TRUE))
+df_study$smoked <- as.factor(sample(c(0,1), size = n_patients, replace = TRUE))
+df_study$Bead = factor(sample(x = c("83279", "83249", "72794", "5449"), size = n_patients, replace = T))
+df_study$Col = factor(sample(x = 1:3, size = n_patients, replace = T))
+df_study$Row = factor(sample(x = 1:6, size = n_patients, replace = T))
 df_study
 
 rownames(df_study) <- colnames(cpg_beta$cpg_beta_df)
@@ -172,4 +175,40 @@ df_complete <- analyze_association(R = select(df_study, exposure),
                                    rm.na.all = FALSE, verbose = TRUE, impute_na = TRUE,
                                    max_p_val = 0.05, n.cores = n.cores)
 
+```
+
+
+
+Next we can perform a cpg level DML analysis and ICR level DMR analysis using a pipeline from true diagnostic.
+
+The CPG level analyses uses LIMMA for increasing power for differential methylation 
+testing.
+
+
+```{r}
+
+# Differential cpg analysis
+out_cpg <- cpg_dml_test(df_study = df_study %>% tibble::rownames_to_column("Patient_ID"),
+                        predictors = c("exposure", "race", "smoked"), sample_name = "Patient_ID",
+                        cpg_beta = cpg_beta$cpg_beta_df, beadchip_correction = T,
+                        db_flag = T)
+
+out_cpg$plots$qq_p_value
+out_cpg$plots$volcano
+out_cpg$plots$manhattan
+
+```
+
+The ICR level analyses uses Lancaster p-value aggregation procedure to test for 
+altered methylation state in ICRs.
+
+
+```{r}
+
+# Differential icr analysis
+out_icr <- icr_dmr_test(df_dml = out_cpg$df_dml, chr_lens = out_cpg$chr_lens)
+
+
+
+out_icr$plots$manhplot_icr
 ```
