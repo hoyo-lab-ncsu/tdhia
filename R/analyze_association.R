@@ -274,7 +274,7 @@ analyze_association <- function (R, P = NULL, Pe = NULL, family, n_p_adj = max(c
   # Calculate adjusted p_value
   verbosecat("Adjusting p-values...\n")
   adj_p_val <- function(df) {
-    df$ADJ_P_VAL <- custom_p.adjust(df$P_VAL, method = "fdr", n = n_p_adj);
+    df$ADJ_P_VAL <- apply_fdr_correction(pvals = df$P_VAL, n = n_p_adj)
     return(df)
   }
   dfs_sorted <- lapply(dfs_sep, na_fun)

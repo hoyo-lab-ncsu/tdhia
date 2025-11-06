@@ -48,10 +48,12 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
   sub_mat_cpg_beta <- sub_mat_cpg_beta %>% arrange(df[df$icr_id == icr_id,]$MAPINFO)
   # ordered_cpg_ids <- df[df$icr_id == icr_id,] %>% arrange(MAPINFO) %>% pull(cpg_id)
   
-  # Subset the cpg sites to those around significant cpgs
+  # Subset the cpg sites to those around significant cpgs/ specified by user
   if (length(max_sig_hwindow)==2) {
+    # If indices are negative, assume index is from end, convert to positive from start
     if (max_sig_hwindow[1] < 0) max_sig_hwindow[1] = nrow(sub_mat_cpg_beta) + max_sig_hwindow[1]
     if (max_sig_hwindow[2] < 0) max_sig_hwindow[2] = nrow(sub_mat_cpg_beta) + max_sig_hwindow[2]
+    
     
     sub_mat_cpg_beta <- sub_mat_cpg_beta[max_sig_hwindow[1]:max_sig_hwindow[2],]
   } else if (!is.na(max_sig_hwindow) & nrow(sub_mat_cpg_beta) > 2*max_sig_hwindow+1) {
@@ -99,6 +101,10 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
   exact_ylim = range(df_summary$beta_mean)
   padded_ylim  = c(exact_ylim[1] - 0.1*diff(exact_ylim),exact_ylim[2] + 0.1*diff(exact_ylim))
   
+  
+  print(table(df_patient_groups$group))
+  
+  
   # Plot methylation across cpg sites in ICR
   gg <- ggplot(data = df_summary, aes(x = cpg_id, y = beta_mean)) +
     # geom_rect(aes(fill = back_fill, xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf)) +
@@ -111,7 +117,7 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
     geom_text(aes(label = ifelse(df_summary$cpg_id %in% sig_cpgs, "*", "")), 
               y = padded_ylim[2], size = 4, vjust=1) + 
     # geom_boxplot(aes(color = group), position = position_dodge(width=0.7), width = 0.7, linewidth = .2) +
-    scale_color_manual(values=c("red", "blue")) + #, labels= c("Low","High"), guide = "none") + 
+    scale_color_manual(values=c("blue", "red")) + #, labels= c("Low","High"), guide = "none") + 
     scale_fill_manual(values=c("grey90", "white"), guide = "none") +
     # scale_x_continuous(expand = c(0, 0)) +
     coord_cartesian(xlim = (c(min(df_summary$cpg_id_rank), max(df_summary$cpg_id_rank))), ylim = padded_ylim) + #ylim=c(0,1)
@@ -125,11 +131,12 @@ plot_icr_methylation <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups,
       legend.position = legend.position) 
   print(gg)
   save_plot(filename = paste0(output_path, "/", 
-                              sprintf("%s_%s_%sZF", icr_id, icf_conf_str, zinc_finger_str), ".jpg"),
+                              sprintf("Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg"),
             plot = gg,base_height = 2, base_width = 2.5)
   
   
   
   ifelse(levels(df_summary$cpg_id) %in% NA, "purple", "black")
   # Export
+  return(list(plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
 }

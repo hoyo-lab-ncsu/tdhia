@@ -1,3 +1,43 @@
+
+
+#' @title False Discovery Rate Correction with Custom Number of Comparisons 
+#'
+#' @description
+#' Applies the Benjamini-Hochberg (BH) procedure for False Discovery Rate (FDR)
+#' correction, using a user-specified value for the total number of comparisons (n),
+#' which may be less than the actual number of p-values provided.
+#'
+#' @param p_values A numeric vector of raw p-values.
+#' @param n A positive integer specifying the total number of
+#' comparisons (n) to use in the BH formula.
+#'
+#' @return A numeric vector of adjusted p-values (q-values), ordered to
+#' correspond to the input p_values.
+#' @export
+apply_fdr_correction <- function(pvals, n) {
+  # pvals: vector of raw p-values
+  # n: number of independent tests to assume (≤ length(pvals))
+  # method: any method accepted by p.adjust (e.g., "BH", "bonferroni", "holm", etc.)
+  
+  stopifnot(length(pvals) >= n,
+            all(pvals >= 0 & pvals <= 1))
+  
+  # Adjust p-values as if only n tests were performed
+  
+  # Benjamini-Hochberg adjustment with custom number of comparisons
+  ord <- order(pvals)
+  ranks <- rank(pvals, ties.method = "first")
+  adj_p <- pvals * n / ranks
+  adj_p <- pmin(adj_p, 1)
+  adj_p[ord] <- cummin(adj_p[ord[length(ord):1]])[length(ord):1]  # monotonic correction
+  
+  
+  return(adj_p)
+}
+
+
+
+
 #' custom_p.adjust
 #'
 #' @description Given a set of p-values, returns p-values adjusted using one of
