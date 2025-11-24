@@ -25,7 +25,8 @@ the dataframe, and if beadchip_correction = T, then the columns:
 Bead, Col, and Row
 must also exist in the dataframe (they are expected to contain the IDs
 for the chip, and row and column of the probe). The dataframe must also have
-Patient.ID, which is the basename for the IDAT methylation data files.}
+the column specified in sample_name, which contains the basenames for the
+IDAT methylation data files.}
 
 \item{predictors}{a vector of strings of column names within df_study that
 are used as predictors for LIMMA linear models. First entry is assumed to be
