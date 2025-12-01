@@ -45,7 +45,8 @@ Imports:
     corrplot,
 	ggrepel,
 	ggtext,
-	limma
+	limma,
+	org.Hs.eg.db
 Suggests: 
     knitr,
     rmarkdown,
