@@ -1,11 +1,27 @@
 
 
-
 #' export_model_results_for_ipa
 #'
-#' @param df_models list of ids for getting metadata
+#'
+#' IPA
+#' Create New > Upload data
+#' Columns: Expr Other, Expr Fale Discovery, ENSEMBL ID
+#' Only include genes below threshold in analysis file
+#' Reference is IPA gene only dataset, or user dataset
+#' 
+#' IPA Core Analysis Dataset Mapping
+#' >> column_in_csv_file: variable in IPA analysis <<
+#'   Nearest Transcript: Gene Symbol
+#'   ADJ_P_VAL:Expr False Discovery Rate (q-value)
+#'   emsenbl_gene_id: Ensembl
+#'   nEstimate: Expr Log Ratio
+#'
+#' @param df_models dataframe of imprintime associated model output.
 #' @param output_dir_path path to export results from each model
-#' @param db_flag boolean, when true, save environemnt variables to disk.
+#' @param imp_type specify whether the analysis done is at the icr level or 
+#' cpg level.
+#' @param add_ensembl_ids when trye, attempts to add corresponding ensembl IDS 
+#' based ont he gene symbols.
 #' @importFrom rlang .data
 #' @importFrom magrittr %>%
 #' @export
@@ -88,37 +104,36 @@ if (add_ensembl_ids) {
   
   # Attempt to fill in genes with annotation DBI
   remaining_genes_bv = is.na(df_genes$ensembl_gene_id)
-  ensemble_ids = AnnotationDbi::mapIds(org.Hs.eg.db,
+  ensemble_ids = AnnotationDbi::mapIds(org.Hs.eg.db::org.Hs.eg.db,
                                        keys=df_genes$Nearest.Transcript[remaining_genes_bv],
                                        column="ENSEMBL",
                                        keytype="SYMBOL",
                                        multiVals="first")
   df_genes$ensembl_gene_id[remaining_genes_bv] <- ensemble_ids
-  df_genes$nEstimate = -df_genes$Estimate
+  df_genes$negEstimate = -df_genes$Estimate
+  # df_genes$negInvEstimate = -(1/df_genes$Estimate)
 }
 
+
+exported_datasets <- list()
 model_names <- unique(df_genes$model_group)
 for (n in seq_along(model_names)) {
-  model_path = paste0(output_dir_path, "/", model_names[n],"_gene_pathway_analysis_input_all_icrs.csv")
+  model_path = paste0(output_dir_path, "/", model_names[n],"-group__gene_pathway_analysis_input_all_icrs.csv")
   cat(sprintf("> Exporting: %s\n", model_path))
-  write.csv(x = df_genes %>% filter(model_group==model_names[n]),
-            file = model_path)
+  exported_datasets[[n]] <- df_genes %>% filter(model_group==model_names[n]) %>% dplyr::arrange(ADJ_P_VAL)
+  write.csv(x = exported_datasets[[n]], file = model_path)
   
 }
 
 
 
 # Get list of all genes on imprintome
-df_gene_unsplit_imprintome <- tdhia::imprintome_icr_nearest_transcripts %>% dplyr::select(ID, Nearest.Transcript)
-df_gene_split_imprintome <- dataframe_split_genes(df_gene_unsplit_imprintome)
+# df_gene_unsplit_imprintome <- tdhia::imprintome_icr_nearest_transcripts %>% dplyr::select(ID, Nearest.Transcript)
+# df_gene_split_imprintome <- dataframe_split_genes(df_gene_unsplit_imprintome)
+# 
+# write.csv(x = df_gene_split_imprintome, file =  paste0(output_dir_path, "/gene_pathway_analysis_all_genes_reference.csv"))
 
-write.csv(x = df_gene_split_imprintome, file =  paste0(output_dir_path, "/gene_pathway_analysis_all_genes_reference.csv"))
-
-# IPA
-# Create New > Upload data
-# Columns: Expr Other, Expr Fale Discovery, ENSEMBL ID
-# Only include genes below threshold in analysis file
-# Reference is IPA gene only dataset, or user dataset
+return(list(exported_datasets = exported_datasets))
 
 
 }

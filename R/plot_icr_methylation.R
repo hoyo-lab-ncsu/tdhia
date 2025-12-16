@@ -40,7 +40,7 @@
 plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr_id, xlab_txt = "", 
                                  plot_height_width = c(5,3), output_path, max_sig_hwindow = NULL, db_flag = F,
                                  filter_na_group = T, legend.position = "none", 
-                                 sample_colname = "patient_id") {
+                                 sample_colname = "patient_id", overwrite_plot = F) {
   
   
   # Create output folder
@@ -81,11 +81,7 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     sub_mat_cpg_beta <- sub_mat_cpg_beta[min_ind:max_ind,]
     
   }
-# 
-#   if (!is.null(manual_cpg_index)) {
-#     sub_mat_cpg_beta <- sub_mat_cpg_beta[manual_cpg_index[1]:manual_cpg_index[2], ]
-#   }
-#   
+
   # Ordered list of cpg sites (for factor)
   # rownames(sub_mat_cpg_beta)
   # Convert data to long format
@@ -113,13 +109,10 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   icf_conf_str = c("High","Medium", "Low")[icr_metadata$icr_conf]
   
   
-  exact_ylim = range(df_summary$beta_mean)
-  padded_ylim  = c(exact_ylim[1] - 0.1*diff(exact_ylim),exact_ylim[2] + 0.1*diff(exact_ylim))
+  exact_xlim = range(df_summary$beta_mean)
+  padded_xlim  = c(exact_xlim[1] - 0.1*diff(exact_xlim),exact_xlim[2] + 0.1*diff(exact_xlim))
   
-  
-  print(table(df_patient_groups$group))
-  
-  
+ 
   # Plot methylation across cpg sites in ICR
   gg <- ggplot(data = df_summary, aes(x = cpg_id, y = beta_mean)) +
     # geom_rect(aes(fill = back_fill, xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf)) +
@@ -130,12 +123,12 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     # geom_errorbar(aes(ymin = beta_mean - beta_sem, ymax = beta_mean + beta_sem, color = group),
                   # position = position_dodge(width=0.7), width = 0.6, linewidth = .2) +
     geom_text(aes(label = ifelse(df_summary$cpg_id %in% sig_cpgs, "*", "")), 
-              y = padded_ylim[2], size = 4, vjust=1) + 
+              y = padded_xlim[2], size = 4, vjust=1) + 
     # geom_boxplot(aes(color = group), position = position_dodge(width=0.7), width = 0.7, linewidth = .2) +
     scale_color_manual(values=c("blue", "red")) + #, labels= c("Low","High"), guide = "none") + 
     scale_fill_manual(values=c("grey90", "white"), guide = "none") +
     # scale_x_continuous(expand = c(0, 0)) +
-    coord_cartesian(xlim = (c(min(df_summary$cpg_id_rank), max(df_summary$cpg_id_rank))), ylim = padded_ylim) + #ylim=c(0,1)
+    coord_cartesian(xlim = (c(min(df_summary$cpg_id_rank), max(df_summary$cpg_id_rank))), ylim = padded_xlim) + #ylim=c(0,1)
       xlab(xlab_txt) + ylab("Mean Beta Value") + 
     # geom_ribbon(aes(fill = ))+
     # ggtitle(sprintf("%s (%sZF, %s): %s", icr_id, zinc_finger_str,icf_conf_str, 
@@ -144,14 +137,18 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     theme_classic(base_size = 7) + theme(axis.text.x = element_text(
       angle = 45,vjust = 1, hjust = 1), plot.title = element_text(size = 7),
       legend.position = legend.position) 
-  print(gg)
-  save_plot(filename = paste0(output_path, "/", 
-                              sprintf("Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg"),
-            plot = gg,base_height = 2, base_width = 2.5)
   
   
+  plot_path <- paste0(output_path, "/", 
+                      sprintf("Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg")
+  if (!overwrite_plot && !file.exists(plot_path)) {
+    # Print summaries of data to command line as well
+    print(gg)
+    print(table(df_patient_groups$group))
+    save_plot(filename = plot_path, plot = gg,base_height = 2, base_width = 2.5)
+  }
+
   
-  ifelse(levels(df_summary$cpg_id) %in% NA, "purple", "black")
   # Export
   return(list(plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
 }
@@ -165,6 +162,9 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
 #' plot_icr_diffbar
 #' @description produces a simple dot pot of beta values of CpG sites within a 
 #' specified ICR, seperating patients into 2 groups.
+#' 
+#' Note: cpg sites may appear out of order, but that is because they are sorted 
+#' by their genomic position (MAPINFO) and not label
 #' 
 #' @param mat_cpg_beta a matrix of beta values, cpg sites (rows) x patients (col)
 #' @param sig_cpgs vector of cpg site IDs that are significant (can be across 
@@ -202,16 +202,13 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
 #'
 #' @export
 plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr_id, xlab_txt = "", 
-                             plot_height_width = c(5,3), output_path, max_sig_hwindow = NULL, db_flag = F,
+                             plot_height_width = c(3,2), output_path, max_sig_hwindow = NULL, db_flag = F,
                              filter_na_group = T, legend.position = "none", 
-                             sample_colname = "patient_id") {
-  
-  
+                             sample_colname = "patient_id", overwrite_plot = T) {
   # Create output folder
   dir.create(path = output_path, recursive = TRUE, showWarnings = FALSE)
-  
-  if(db_flag) save(list = ls(all.names = TRUE), file = "plot_icr_methylation.RData")
-  # load(file = "plot_icr_methylation.RData")
+  if(db_flag) save(list = ls(all.names = TRUE), file = "plot_icr_diffbar.RData")
+  # load(file = "plot_icr_diffbar.RData")
   
   # Get list of CpGs for specified icrs
   df = left_join(x = data.frame(cpg_id = rownames(mat_cpg_beta)),
@@ -222,7 +219,7 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # Subset the cpg_beta matrix
   sub_mat_cpg_beta = mat_cpg_beta[df$icr_id == icr_id,]
   
-  # Reorder rows to genomic location
+  # Reorder rows to genomic location, assuming same chromosomes
   sub_mat_cpg_beta <- sub_mat_cpg_beta %>% arrange(df[df$icr_id == icr_id,]$MAPINFO)
   # ordered_cpg_ids <- df[df$icr_id == icr_id,] %>% arrange(MAPINFO) %>% pull(cpg_id)
   
@@ -245,11 +242,7 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     sub_mat_cpg_beta <- sub_mat_cpg_beta[min_ind:max_ind,]
     
   }
-  # 
-  #   if (!is.null(manual_cpg_index)) {
-  #     sub_mat_cpg_beta <- sub_mat_cpg_beta[manual_cpg_index[1]:manual_cpg_index[2], ]
-  #   }
-  #   
+
   # Ordered list of cpg sites (for factor)
   # rownames(sub_mat_cpg_beta)
   # Convert data to long format
@@ -259,63 +252,86 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   df_long_cpg_beta <- left_join(x = df_long_cpg_beta, y= df_patient_groups, by = join_by({{sample_colname}}),
                                 keep = FALSE, na_matches = "never", relationship = "many-to-one")
   
-  df_long_cpg_beta$cpg_id <- factor(df_long_cpg_beta$cpg_id, levels = rownames(sub_mat_cpg_beta), ordered=TRUE)
-  df_long_cpg_beta$group <- factor(df_long_cpg_beta$group, levels = unique(df_long_cpg_beta$group) %>% sort(), ordered=TRUE)
+  df_long_cpg_beta$cpg_id <- factor(df_long_cpg_beta$cpg_id, levels = rev(rownames(sub_mat_cpg_beta)), ordered=TRUE)
+  df_long_cpg_beta$diff_group <- factor(df_long_cpg_beta$diff_group, levels = unique(df_long_cpg_beta$diff_group) %>% sort(), ordered=TRUE)
+  df_long_cpg_beta$subset_group <- factor(df_long_cpg_beta$subset_group, levels = unique(df_long_cpg_beta$subset_group) %>% sort(), ordered=TRUE)
   
-  df_summary <- df_long_cpg_beta %>% group_by(cpg_id, group) %>% 
-    summarize(beta_mean = mean(value, na.rm = T), beta_sd = sd(value, na.rm = T),
-              beta_sd = sd(value, na.rm = T), beta_sem = sd(value, na.rm = T)/sqrt(n()))
-  df_summary$cpg_id_rank = as.numeric(df_summary$cpg_id)
-  df_summary$xmin = df_summary$cpg_id_rank -0.5
-  df_summary$xmax = df_summary$cpg_id_rank +0.5
-  df_summary$back_fill = df_summary$cpg_id_rank %% 2 == 0
-  if (filter_na_group) df_summary <- df_summary %>% filter(!is.na(group))
+  
+  # Calculate beta difference across all patients
+  df_summary_all <- df_long_cpg_beta %>% group_by(cpg_id) %>% 
+    summarize(
+      subset_group = "All",
+      beta_mean_diff = mean(value[diff_group==1], na.rm = T) - mean(value[diff_group==2], na.rm = T),
+      n1 = sum(diff_group==1), n2 = sum(diff_group==2),
+      beta_sd_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2 +
+                            sd(value[diff_group==2], na.rm = T)^2),
+      beta_sem_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2/n1 +
+                             sd(value[diff_group==2], na.rm = T)^2/n2))
+  df_summary_all$cpg_id_rank = as.numeric(df_summary_all$cpg_id)
+  df_summary_all$xmin = df_summary_all$cpg_id_rank -0.5
+  df_summary_all$xmax = df_summary_all$cpg_id_rank +0.5
+  df_summary_all$back_fill = df_summary_all$cpg_id_rank %% 2 == 0
+  df_summary_all$cpg_sig = df_summary_all$cpg_id %in% sig_cpgs
+  
+  # Get difference in beta for each of the sample subgroups
+  df_summary_sub <- df_long_cpg_beta %>% group_by(cpg_id, subset_group) %>% 
+    summarize(
+      beta_mean_diff = mean(value[diff_group==1], na.rm = T) - mean(value[diff_group==2], na.rm = T),
+      n1 = sum(diff_group==1), n2 = sum(diff_group==2),
+      beta_sd_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2 +
+                            sd(value[diff_group==2], na.rm = T)^2),
+      beta_sem_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2/n1 +
+                             sd(value[diff_group==2], na.rm = T)^2/n2))
+  
+  temp <- df_summary_all %>% select(c("cpg_id_rank", "xmin", "xmax", "back_fill", "cpg_sig"))
+  df_summary_sub <- cbind(df_summary_sub, rbind(temp,temp))
+  # Bind summary stat of all group and subset groups
+  df_summary <- rbind(df_summary_all, df_summary_sub)
+  # Enforce factor level order (reverse because y-axis inverted in plotting)
+  df_summary$subset_group <- factor(
+    df_summary$subset_group, levels = rev(c("All", levels(df_long_cpg_beta$subset_group))), ordered = TRUE)
+
   
   # Get ICR metadata (closest genes, zinc finger)
   icr_metadata <- add_metadata_to_imp_sites(icr_id, imp_type = "icr")
   zinc_finger_str = c("-","+")[(as.numeric(icr_metadata$is_icr_zinc)+1)]
   icf_conf_str = c("High","Medium", "Low")[icr_metadata$icr_conf]
+
+  exact_xlim = range(df_summary$beta_mean_diff)
+  padded_xlim  = c(exact_xlim[1] - 0.5*diff(exact_xlim),exact_xlim[2] + 0.5*diff(exact_xlim))
   
-  
-  exact_ylim = range(df_summary$beta_mean)
-  padded_ylim  = c(exact_ylim[1] - 0.1*diff(exact_ylim),exact_ylim[2] + 0.1*diff(exact_ylim))
-  
-  
-  print(table(df_patient_groups$group))
-  
-  
+
   # Plot methylation across cpg sites in ICR
-  gg <- ggplot(data = df_summary, aes(x = cpg_id, y = beta_mean)) +
-    # geom_rect(aes(fill = back_fill, xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf)) +
-    # geom_linerange (aes(x = cpg_id, ymin = beta_mean - beta_sem,
-    #                  ymax = beta_mean + beta_sem, color = group),
-    #              linewidth = 5, alpha = 0.5, position = position_dodge(width=0.7))+
-    geom_point(aes(color = group), size = 1.5, alpha = 0.5) + 
-    # geom_errorbar(aes(ymin = beta_mean - beta_sem, ymax = beta_mean + beta_sem, color = group),
-    # position = position_dodge(width=0.7), width = 0.6, linewidth = .2) +
-    geom_text(aes(label = ifelse(df_summary$cpg_id %in% sig_cpgs, "*", "")), 
-              y = padded_ylim[2], size = 4, vjust=1) + 
-    # geom_boxplot(aes(color = group), position = position_dodge(width=0.7), width = 0.7, linewidth = .2) +
-    scale_color_manual(values=c("blue", "red")) + #, labels= c("Low","High"), guide = "none") + 
-    scale_fill_manual(values=c("grey90", "white"), guide = "none") +
-    # scale_x_continuous(expand = c(0, 0)) +
-    coord_cartesian(xlim = (c(min(df_summary$cpg_id_rank), max(df_summary$cpg_id_rank))), ylim = padded_ylim) + #ylim=c(0,1)
-    xlab(xlab_txt) + ylab("Mean Beta Value") + 
-    # geom_ribbon(aes(fill = ))+
-    # ggtitle(sprintf("%s (%sZF, %s): %s", icr_id, zinc_finger_str,icf_conf_str, 
-    #           icr_metadata$Nearest.Transcript)) +
+  gg <- ggplot(data = df_summary, aes(y = cpg_id, x = beta_mean_diff, )) +
+    geom_rect(data = df_summary_all,  aes(ymin = xmin, ymax = xmax, xmin = -Inf, xmax = +Inf), 
+               fill = ifelse(df_summary_all$back_fill, "grey92", "white"),
+               color = ifelse(df_summary_all$cpg_sig, "black", NA), linewidth = 0.25) +
+    geom_col(aes(fill = subset_group),alpha = 1, position = "dodge", width = 1) + 
+    scale_fill_manual(values = c("All" = "black", "1" = "#f03b20", "2" = "#67a9cf"))+
+    coord_cartesian(ylim = c(min(df_summary$cpg_id_rank)-0.5,
+                             max(df_summary$cpg_id_rank)+0.5), xlim = padded_xlim, expand = c(0,0)) +
+    geom_vline(xintercept = 0, color = "black")+
+    ylab(xlab_txt) + xlab("Mean Beta Value") + 
     ggtitle(sprintf("%s: %s", icr_id, icr_metadata$Nearest.Transcript)) +
-    theme_classic(base_size = 7) + theme(axis.text.x = element_text(
-      angle = 45,vjust = 1, hjust = 1), plot.title = element_text(size = 7),
-      legend.position = legend.position) 
-  print(gg)
-  save_plot(filename = paste0(output_path, "/", 
-                              sprintf("Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg"),
-            plot = gg,base_height = 2, base_width = 2.5)
+    theme_classic(base_size = 7) + 
+    theme(axis.text.x = element_text(vjust = 0.5, hjust = 1),
+          axis.text.y = element_text(colour = ifelse( df_summary$cpg_sig, "black", "grey50"),
+                                     face = "bold"),
+      plot.title = element_text(size = 7),
+      legend.position = legend.position)
+  gg
   
   
+  plot_path <- paste0(output_path, "/", 
+                      sprintf("Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg")
+  if (overwrite_plot | !file.exists(plot_path)) {
+    # Print summaries of data to command line as well
+    print(gg)
+    print(table(df_summary$diff_group))
+    save_plot(filename = plot_path, plot = gg, base_height = plot_height_width[1], base_width = plot_height_width[1])
+  }
+
   
-  ifelse(levels(df_summary$cpg_id) %in% NA, "purple", "black")
   # Export
   return(list(plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
 }
