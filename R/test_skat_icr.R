@@ -22,16 +22,12 @@
 #' @param icr_ids vector of strings of icr_ids to be tested. Default = NULL, 
 #' tests all icrs that are covered by the input cpg beta matrix.
 #' @param min_cpg minimum number of cpg sites for an icr to be included in results.
-#' @param apply_pca boolean, when true, applies SKAT to the first ncomps of a
-#' PCA of the cpg_betas matrix. Default=FALSE.
-#' @param ncomp number of PCA components to use when apply_pca=TRUE.
 #' @returns test
 #' @export
+#' @author Kate Everly
 skat_icr_test <- function(cpg_betas, df_study, response, predictors,  
-                          out_type="C",
-                          icr_ids = NULL,
-                          min_cpg = 3,
-                          apply_pca = F, ncomp = 10, db_flag = T, m_value_transform = T,
+                          out_type="C", icr_ids = NULL,
+                          min_cpg = 3, db_flag = T, m_value_transform = T,
                           verbose = T, n.cores = 1){
   if(db_flag) save(list = ls(all.names = TRUE), file = "skat_icr_test.RData")
   # load(file = "skat_icr_test.RData")
