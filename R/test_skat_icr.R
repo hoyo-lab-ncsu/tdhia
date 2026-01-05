@@ -16,18 +16,28 @@
 #' @param response string, column name of response variable located in df_study.
 #' @param predictors vector of strings of column names of predictors that are 
 #' located in df_study.
+#' @param method
+#'   davies: exact p-value for skat method
+#'   optimal.adj: skat-O unified approach, combination of SKAT and burden test
+#'    (default).
 #' @param out_type character, specifies type of variable for response column.
 #' "C": continuous (default).
 #' "D":  dichotomous.
 #' @param icr_ids vector of strings of icr_ids to be tested. Default = NULL, 
 #' tests all icrs that are covered by the input cpg beta matrix.
 #' @param min_cpg minimum number of cpg sites for an icr to be included in results.
+#' @param m_value_transform boolean, when true, transform beta values to
+#' m-values to control heteroskedasticity. Default = TRUE.
+#' @param verbose boolean, when TRUE, prints progress to command line (default = TRUE).
+#' @param n.cores integer, number of cores for processing (default = 1).
 #' @returns test
 #' @export
-#' @author Kate Everly
+#' @author Kate Everly, Bruce Corliss
 skat_icr_test <- function(cpg_betas, df_study, response, predictors,  
+                          method = "optimal.adj",
                           out_type="C", icr_ids = NULL,
                           min_cpg = 3, db_flag = T, m_value_transform = T,
+                          scaling = T,
                           verbose = T, n.cores = 1){
   if(db_flag) save(list = ls(all.names = TRUE), file = "skat_icr_test.RData")
   # load(file = "skat_icr_test.RData")
@@ -45,7 +55,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
   
   verbosecat("> Remove rows in df_study that contain NA...\n")
   # Remove all samples with NA values from study data (not supported with SKAT)
-  df_study <- df_study %>% select(all_of(c(response, predictors))) %>% tidyr::drop_na()
+  df_study <- df_study %>% dplyr::select(all_of(c(response, predictors))) %>% tidyr::drop_na()
   
   # Make the samples match and order them the same
   verbosecat("> Forcing sample id order to match between data and df_study.\n")
@@ -64,15 +74,15 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
   
   # packaged skat into function for single ICR to make parallel conversion easier in future
   if (n.cores==1){ verbosecat("> SKAT processing on single core.\n")
+    
   out = list()
   for (n in 1:length(icr_ids)) {
     
     out[[n]] <- skat_single_icr(icr_id = icr_ids[n], cpg_betas, df_study,
-                                model_str, cpg_mapping, m_value_transform)
+                                model_str, cpg_mapping, m_value_transform, scaling = scaling, method = method)
   }; df_results = do.call(rbind, out)
   
   } else {
-    
     if ((Sys.info()['sysname'] == "Windows")) {
       verbosecat("> SKAT processing multicore with snowparam on windows.\n")
       
@@ -80,13 +90,13 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
       wrap_fun = function(x, fx) {suppressPackageStartupMessages({
         library(dplyr); library(tibble)})
         fx(icr_ids[x], cpg_betas, df_study, model_str,
-                                    cpg_mapping, m_value_transform)
+                                    cpg_mapping, m_value_transform, scaling = scaling, method = method)
         }
       out <- BiocParallel::bplapply(X = 1:length(icr_ids), FUN = wrap_fun, fx = skat_single_icr, BPPARAM = param)
       df_results = do.call(rbind, out)
       
     } else {
-      
+      verbosecat("> SKAT processing multicore with multicoreparam on mac/linux.\n")
     }
   }
   
@@ -103,22 +113,29 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
 
 
 
-skat_single_icr <- function(icr_id, cpg_betas, df_study, model_str, cpg_mapping, m_value_transform) {
+skat_single_icr <- function(icr_id, cpg_betas, df_study, model_str, cpg_mapping, m_value_transform, scaling, method) {
   # Get list of cpgs for a given ICR
-  subset_cpg_ids <- cpg_mapping %>% dplyr::filter(.data$icr_id == .env$icr_id) %>% dplyr::pull(cpg_id)
+  subset_cpg_ids <- cpg_mapping %>% 
+    dplyr::filter(.data$icr_id == .env$icr_id) %>% dplyr::pull(cpg_id)
   
   # Subset cpg beta matrix to only those contained within ICR
   tZ <- cpg_betas %>% tibble::rownames_to_column("cpg_id") %>% dplyr::filter(cpg_id %in% subset_cpg_ids) %>% 
     tibble::column_to_rownames("cpg_id")
   # Tranform to m-values if requested
   if (m_value_transform) tZ = sesame::BetaValueToMValue(tZ)
+  # Transform for input into null model
+  #     rows = samples; columns = cpg sites
+  Z = Matrix::t(as.matrix(tZ))
+  # Scaling (Center data)
+  if (scaling) Zs <- scale(Z, center = TRUE, scale = TRUE)
   
   # Calculate SKAT null model
   skat_null <- SKAT::SKAT_Null_Model(
     formula =  stats::as.formula(model_str), data = df_study,
     out_type="C", n.Resampling = 0, Adjustment = TRUE)
+  
   # SKAT observed model
-  skat_out<-SKAT::SKAT(Z = Matrix::t(as.matrix(tZ)), obj = skat_null, kernel = "linear")
+  skat_out<-SKAT::SKAT(Z = Zs, obj = skat_null, kernel = "linear", method = method)
   
   # Export data
   out <- data.frame(icr_id = icr_id, skat_p_value = skat_out$p.value, n_cpg = nrow(tZ))
