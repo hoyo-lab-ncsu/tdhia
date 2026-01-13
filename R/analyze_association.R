@@ -230,12 +230,13 @@ analyze_association <- function (R, P = NULL, Pe = NULL, family, n_p_adj = max(c
     # 
   # Execute parallel processing                               ##################
   #_____________________________________________________________________________
-  df_fits_list <- foreach::foreach(
-    x = par_ind, combine = rbind, .export = c("fit_model", "GLM_parallel"), 
-    .packages = c("magrittr"), .options.snow = opts
-  ) %dopar% {
-    foreach_fun(x)
-  }
+  df_fits_list <- 
+    foreach::foreach(
+      x = par_ind, combine = rbind, .export = c("fit_model", "GLM_parallel"), 
+      .packages = c("magrittr"), .options.snow = opts
+    ) %dopar% {
+      foreach_fun(x)
+    }
   df_fits <- do.call(rbind, df_fits_list)
   # End processing time
   cat("\n");  finish <- Sys.time()

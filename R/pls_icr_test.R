@@ -30,14 +30,13 @@
 #' @return A list containing test statistics, resampling p-values,
 #' PLS coefficients, and component diagnostics.
 #'
-#' @importFrom pls plsr
 #' @importFrom stats lm glm anova fitted residuals coef deviance pchisq rbinom
 #'
 #' @export
 pls_icr_test <- function(y, Z, X = NULL,
     k = 1, B = 2000, outcome = c("continuous", "binary"),
     scale_Z = TRUE, center_Z = TRUE, seed = 1,
-    return_fits = FALSE) 
+    return_fits = FALSE, db_flag = F) 
   {
   
   # ------------------------------------------------------------
@@ -116,9 +115,7 @@ pls_icr_test <- function(y, Z, X = NULL,
   n <- nrow(Z)
   
   # Guard against degenerate cases
-  if (n < k + 5) {
-    stop("Too few samples relative to k.")
-  }
+  if (n < k + 5) { stop("Too few samples relative to k.")  }
   
   set.seed(seed)
   

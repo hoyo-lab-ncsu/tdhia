@@ -79,7 +79,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
     for (n in 1:length(icr_ids)) {
       
       out[[n]] <- skat_single_icr(icr_id = icr_ids[n], cpg_betas, df_study,
-                                  model_str, cpg_mapping, m_value_transform, scaling = scaling, method = method)
+                                  model_str, cpg_mapping, m_value_transform, scaling = scaling, method = method, out_type = out_type)
     }; df_results = do.call(rbind, out)
     
   } else {
@@ -90,7 +90,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
       wrap_fun = function(x, fx) {suppressPackageStartupMessages({
         library(dplyr); library(tibble)})
         fx(icr_ids[x], cpg_betas, df_study, model_str,
-           cpg_mapping, m_value_transform, scaling = scaling, method = method)
+           cpg_mapping, m_value_transform, scaling = scaling, method = method, out_type = out_type)
       }
       out <- BiocParallel::bplapply(X = 1:length(icr_ids), FUN = wrap_fun, fx = skat_single_icr, BPPARAM = param)
       df_results = do.call(rbind, out)
@@ -101,8 +101,8 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
   }
   
   # Calculate adjusted p-value and q-value
-  df_results$adj_p_value <- p.adjust(p = df_results$skat_p_value, method = "fdr")
-  df_results$q_value <- qvalue::qvalue(p = df_results$skat_p_value, fdr.level = 0.05)$qvalues
+  df_results$skat_adj_p_value <- p.adjust(p = df_results$skat_p_value, method = "fdr")
+  df_results$skat_q_value <- qvalue::qvalue(p = df_results$skat_p_value, fdr.level = 0.05)$qvalues
   df_results <- df_results %>% dplyr::arrange(adj_p_value)
   
   verbosecat(sprintf("> Filtering out ICRs with < %d cpg sites...\n", min_cpg))
@@ -113,7 +113,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
 
 
 
-skat_single_icr <- function(icr_id, cpg_betas, df_study, model_str, cpg_mapping, m_value_transform, scaling, method) {
+skat_single_icr <- function(icr_id, cpg_betas, df_study, model_str, cpg_mapping, m_value_transform, scaling, method, out_type) {
   # Get list of cpgs for a given ICR
   subset_cpg_ids <- cpg_mapping %>% 
     dplyr::filter(.data$icr_id == .env$icr_id) %>% dplyr::pull(cpg_id)
@@ -125,14 +125,14 @@ skat_single_icr <- function(icr_id, cpg_betas, df_study, model_str, cpg_mapping,
   if (m_value_transform) tZ = sesame::BetaValueToMValue(tZ)
   # Transform for input into null model
   #     rows = samples; columns = cpg sites
-  Z = Matrix::t(as.matrix(tZ))
+  Zs = Matrix::t(as.matrix(tZ))
   # Scaling (Center data)
-  if (scaling) Zs <- scale(Z, center = TRUE, scale = TRUE)
+  if (scaling) Zs <- scale(Zs, center = TRUE, scale = TRUE)
   
   # Calculate SKAT null model
   skat_null <- SKAT::SKAT_Null_Model(
     formula =  stats::as.formula(model_str), data = df_study,
-    out_type="C", n.Resampling = 0, Adjustment = TRUE)
+    out_type = out_type, n.Resampling = 0, Adjustment = TRUE)
   
   # SKAT observed model
   skat_out<-SKAT::SKAT(Z = Zs, obj = skat_null, kernel = "linear", method = method)

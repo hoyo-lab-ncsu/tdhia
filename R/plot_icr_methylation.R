@@ -141,7 +141,7 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   
   plot_path <- paste0(output_path, "/", 
                       sprintf("Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg")
-  if (!overwrite_plot && !file.exists(plot_path)) {
+  if (overwrite_plot) {
     # Print summaries of data to command line as well
     print(gg)
     print(table(df_patient_groups$group))
