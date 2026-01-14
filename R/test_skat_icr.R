@@ -103,7 +103,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
   # Calculate adjusted p-value and q-value
   df_results$skat_adj_p_value <- p.adjust(p = df_results$skat_p_value, method = "fdr")
   df_results$skat_q_value <- qvalue::qvalue(p = df_results$skat_p_value, fdr.level = 0.05)$qvalues
-  df_results <- df_results %>% dplyr::arrange(adj_p_value)
+  df_results <- df_results %>% dplyr::arrange(skat_adj_p_value)
   
   verbosecat(sprintf("> Filtering out ICRs with < %d cpg sites...\n", min_cpg))
   df_results <- df_results%>% filter(n_cpg >= min_cpg)
