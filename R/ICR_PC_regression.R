@@ -9,11 +9,16 @@
 #' binomial outcomes, logistic regression models using the binomial family are
 #' fit. In the case of continuous outcomes, linear regression models are fit.
 #' The full and reduced models are then compared with a likelihood ratio test
-#' (for a binomial outcome) or an F test (for a continuous outcome).
+#' (for a binomial outcome) or an F test (for a continuous outcome). The resulting
+#' q-value adjusts for multiple test correction and tells you if the full
+#' model was significantly improved over the reduced.
 
 #' @param cpg_beta cpg beta matrix (cpg_id as COLUMNS x sample_id as ROWS).
 #'  Values are assumed to be on beta scale (0-1).
 #'  Use m_value_transform to convert to m-values (recommended).
+
+#' @param m_value_transform boolean, when true, transform beta values to
+#' m-values to control heteroskedasticity. Default = TRUE.
 
 #' @param data_norm_type string. Type of data normalization you want to perform
 #' on the cpg beta values prior to creating the principal components. Options
@@ -47,8 +52,8 @@
 #'    "binomial" (default)
 #'    "continuous"
 
-#' @param icr_ids vector of strings of icr_ids to be tested. Default = NULL,
-#' tests all icrs that are covered by the input cpg beta matrix.
+#' @param icr_ids vector of strings of icr_ids to be tested. Default = NULL
+#' (tests all icrs that are covered by the input cpg beta matrix).
 
 #' @param min_cpg minimum number of cpg sites for an icr to be included in
 #' results (default is 3).
@@ -62,17 +67,27 @@
 #' so that you know your exact sample size prior to running (just my personal
 #' preference)
 #' Another quick check prior to starting is to ensure both the cpg_beta and
-#' df_study have the patients ids in rows
+#' df_study have the patients ids in rows.
 library(clusterSim)
 library(dplyr)
 library(tibble)
 library(tidyr)
+library(sesame)
 
 
-
-pc_regression_test <- function (cpg_beta, data_norm_type="n1", pct_variance = 0.80, df_study,
-                                outcome, covariates, Patient_ID, family,
-                                icr_ids = NULL, min_cpg = 3, verbose = T, n.cores){
+pc_regression_test <- function (cpg_beta,
+                                m_value_transform= TRUE,
+                                data_norm_type="n1",
+                                pct_variance = 0.80,
+                                df_study,
+                                outcome,
+                                covariates,
+                                Patient_ID,
+                                family,
+                                icr_ids = NULL,
+                                min_cpg = 3,
+                                verbose = TRUE,
+                                n.cores){
   verbosecat <- function(x) if (verbose) cat(x)
   icr_mapping = tdhia::mapping_cpg_icr_ids # load in map!
   cpg_mapping <- icr_mapping %>% # will select just the CpG and ICR ids from the icr_mapping file
@@ -85,201 +100,158 @@ pc_regression_test <- function (cpg_beta, data_norm_type="n1", pct_variance = 0.
       unname() %>% unique()
   }
 
-  # Tranform to m-values if requested
-  # need to work on this.... not sure if the CpG beta needs to get t first
-  #if (m_value_transform) tZ = sesame::BetaValueToMValue(tZ)
+  # Tranform cpg_beta matrix from beta values to m-values if requested
+  # even if you transform to m-values, the dataframe of cpg methylation levels is
+  # still referred to as the "cpg_beta" throughout the script
+  if (m_value_transform){
+    cpg_beta <- sesame::BetaValueToMValue(cpg_beta)
+  }
 
   verbosecat("> Remove rows in df_study that contain NA...\n")
   # Remove all samples with NA values from study data
   df_study <- df_study %>% select(all_of(c(outcome, covariates, Patient_ID))) %>% tidyr::drop_na()
 
   # Make the samples match and order them the same
-  verbosecat("> Forcing sample id order to match between data and df_study.\n")
+  verbosecat("> Forcing sample id order to match between cpg_beta and df_study.\n")
   shared_sample_ids <- intersect(rownames(cpg_beta),  rownames(df_study))
   cpg_beta <- cpg_beta[shared_sample_ids, ]
   df_study <- df_study[shared_sample_ids, , drop = FALSE]
-  #df_study <- df_study[rownames(df_study) %in% shared_sample_ids, ]
-  # Order df_study the same sample order as cpg_beta
   df_study <- df_study[match(x = rownames(cpg_beta), table = rownames(df_study)),]
 
-  # Dataframe to store results of test
-  df_results <- data.frame(ICR_id = icr_ids, p_value = NA, n_cpg = NA)
-
-  # packaged into function for single ICR to make parallel conversion easier in future
-  if (n.cores==1){
-
-    verbosecat("> PC regression processing on single core.\n")
-    out <-  list()
-
-    for (n in 1:length(icr_ids)) {
-
-      # Get the CpG IDs of the CpGs for an ICR
-      subset_cpg_ids <- cpg_mapping %>%
-        dplyr::filter(ICR_id == icr_ids[n]) %>% #  dplyr::filter(.data$icr_id == .env$icr_id)
-        pull(CpG_id)
-
-      # Subset the beta matrix to only have data from the CpGs found in the ICR
-      subset_cpg_beta <- cpg_beta %>%
-        dplyr::select(any_of(subset_cpg_ids))
-
-      # Data normalization prior to creating principal components
-      subset_cpg_beta.norm <- data.Normalization(subset_cpg_beta , type=data_norm_type, normalization="column")
-
-      # Create principal components
-      icr.pca <- prcomp(subset_cpg_beta.norm, center=TRUE, scale.= TRUE)
-      eigenvalues <- icr.pca$sdev^2 #Calculate eigenvalues
-      proportion_variance <- eigenvalues / sum(eigenvalues) #calculate the proportion variance of each eigenvalue
-      cumulative_variance <- cumsum(proportion_variance) #calculate the cumulative variance
-      # Create a dataframe describing each PC
-      pc_info <- tibble(
-        PC = paste0("PC", seq_along(eigenvalues)),
-        eigenvalue = eigenvalues,
-        prop_var = proportion_variance,
-        cum_var = cumulative_variance)
-      # Select only the top PCs contributing to ____% variance
-      if (nrow(pc_info) > 1) {
-        # Find the last PC where cum_var is at least ____%
-        pcs_pct_variance <- which(pc_info$cum_var >= pct_variance)
-        if (length(pcs_pct_variance) > 0) {
-          cutoff_index <- min(pcs_pct_variance)
-          selected_pcs <- pc_info[1:cutoff_index, ]
+  # Safe_fit function is to catch errors with model fitting
+  safe_fit <- function(expr, icr_id, model_type) {
+    tryCatch(
+      withCallingHandlers(
+        expr = expr,
+        warning = function(w) {
+          message(sprintf("Warning in %s model for ICR %s: %s",
+                          model_type, icr_id, conditionMessage(w)))
+          invokeRestart("muffleWarning")
         }
-      } else if (nrow(pc_info) == 1) {
-        selected_pcs <- pc_info
+      ),
+      error = function(e) {
+        message(sprintf("Error in %s model for ICR %s: %s",
+                        model_type, icr_id, conditionMessage(e)))
+        return(NULL)
       }
-
-      # Get the actual PC scores (samples × PCs), then keep only top PCs
-      pcs <- as.data.frame(icr.pca$x) %>%
-        dplyr::select(all_of(selected_pcs$PC))
-      predictor_full <- pcs
-
-# FOR BINOMIAL OUTCOMES
-      if (family == "binomial") {
-
-        predictor_cpg_names <- colnames(predictor_full) # define before adding the Patient_ID column or else Patient_ID will be considered a variable
-        predictor_full <- predictor_full %>%
-          mutate(Patient_ID = rownames(predictor_full))
-
-        study_data_full <- df_study
-        study_data_full[[outcome]] <- as.factor(study_data_full[[outcome]])
-        print(names(study_data_full))
-        #the below line will put ALL the predictors together (PCs and covariates)
-        combined_data_full <- merge(study_data_full, predictor_full, by = "Patient_ID")
-        rownames(combined_data_full) <- combined_data_full$Patient_ID
-        combined_data_full$Patient_ID <- NULL
-
-        formula_str_full <- paste(outcome, "~", paste(c(predictor_cpg_names, covariates), collapse = " + "))
-        model_formula_full <- as.formula(formula_str_full)
-
-        model_full <- tryCatch({
-          withCallingHandlers(
-            expr = {
-              glm(model_formula_full, data = combined_data_full, family = "binomial")
-            },
-            warning = function(w) {
-              message(sprintf("Warning in full model for ICR %s: %s", icr_ids[n], conditionMessage(w)))
-              invokeRestart("muffleWarning")
-            }
-          )
-        }, error = function(e) {
-          message(sprintf("Error in full model for ICR %s: %s", icr_ids[n], conditionMessage(e)))
-          return(NULL)  # No invokeRestart for errors
-        })
-
-        formula_str_red <- paste(outcome, "~", paste(covariates, collapse = " + "))
-        model_formula_red <- as.formula(formula_str_red)
-
-        model_red <- tryCatch({
-          glm(model_formula_red, data = combined_data_full, family = "binomial")
-        }, warning = function(w) {
-          message(sprintf("Warning in reduced model for ICR %s: %s", icr_ids[n], conditionMessage(w)))
-          invokeRestart("muffleWarning")
-        }, error = function(e) {
-          message(sprintf("Error in reduced model for ICR %s: %s", icr_ids[n], conditionMessage(e)))
-          return(NULL)
-        })
-
-        #calculate likelihood ratio test statistic with anova and ChiSq test
-        lrt <- anova(model_red, model_full, test = "Chisq")
-        lrt_row <- tail(lrt, 1) #the last row has the test stats
-
-        out[[n]] <- data.frame(
-          ICR_id = icr_ids[n],
-          lrt_p_value = lrt_row$`Pr(>Chi)`,
-          n_cpg = length(subset_cpg_ids)
-        )
-      }
-
-
-# FOR CONTINUOUS OUTCOMES
-      if (family == "continuous") {
-        predictor_cpg_names <- colnames(predictor_full) # define before adding the Patient_ID column or else Patient_ID will be considered a variable
-        predictor_full <- predictor_full %>%
-          mutate(Patient_ID = rownames(predictor_full))
-
-        study_data_full <- df_study
-        #study_data_full[[outcome]] <- as.factor(study_data_full[[outcome]])
-        #the below line will put ALL the predictors together (PCs and covariates)
-        combined_data_full <- merge(study_data_full, predictor_full, by = "Patient_ID")
-        rownames(combined_data_full) <- combined_data_full$Patient_ID
-        combined_data_full$Patient_ID <- NULL
-
-        formula_str_full <- paste(outcome, "~", paste(c(predictor_cpg_names, covariates), collapse = " + "))
-        model_formula_full <- as.formula(formula_str_full)
-
-        model_full <- tryCatch({
-          withCallingHandlers(
-            expr = {
-              lm(model_formula_full, data = combined_data_full)
-            },
-            warning = function(w) {
-              message(sprintf("Warning in full model for ICR %s: %s", icr_ids[n], conditionMessage(w)))
-              invokeRestart("muffleWarning")
-            }
-          )
-        }, error = function(e) {
-          message(sprintf("Error in full model for ICR %s: %s", icr_ids[n], conditionMessage(e)))
-          return(NULL)  # No invokeRestart for errors
-        })
-
-        formula_str_red <- paste(outcome, "~", paste(covariates, collapse = " + "))
-        model_formula_red <- as.formula(formula_str_red)
-
-        model_red <- tryCatch({
-          lm(model_formula_red, data = combined_data_full)
-        }, warning = function(w) {
-          message(sprintf("Warning in reduced model for ICR %s: %s", icr_ids[n], conditionMessage(w)))
-          invokeRestart("muffleWarning")
-        }, error = function(e) {
-          message(sprintf("Error in reduced model for ICR %s: %s", icr_ids[n], conditionMessage(e)))
-          return(NULL)
-        })
-
-        #calculate F test with ANOVA
-        f_test <- anova(model_red, model_full)
-        f_test_row <- tail(f_test, 1) #the last row has the test stats
-
-        out[[n]] <- data.frame(
-          ICR_id = icr_ids[n],
-          p_value = f_test_row$`Pr(>F)`,
-          n_cpg = length(subset_cpg_ids)
-        )
-      }
-
-
-    }
-
-# REGARDLESS OF BINOMIAL OR CONTINUOUS OUTCOME, COMBINE RESULTS AND CALCUALTE ADJ-P/Q VALUES
-    df_results = do.call(rbind, out)
-
-  } else {
-    verbosecat("Ahhhhhh more than one core!\n
-               Go back and change to one core until I've got multicore setup\n")
+    )
   }
 
-  # Calculate adjusted p-value and q-value
-  df_results$adj_p_value <- p.adjust(p = df_results$p_value, method = "fdr")
-  df_results$q_value <- qvalue::qvalue(p = df_results$p_value, fdr.level = 0.05)$qvalues
+  # -------------------------------------------------------------------------
+  # Helper function that processes ONE ICR (PCA + regression)
+  # -------------------------------------------------------------------------
+
+  process_icr <- function(icr_id){
+    # Get the CpG IDs of the CpGs for an ICR
+    subset_cpg_ids <- cpg_mapping %>%
+      dplyr::filter(ICR_id == icr_id) %>%
+      dplyr::pull(CpG_id)
+
+    # Subset the beta matrix to only have data from the CpGs found in the ICR
+    subset_cpg_beta <- cpg_beta %>%
+      dplyr::select(any_of(subset_cpg_ids))
+
+    # Data normalization prior to creating principal components
+    subset_cpg_beta_norm <- data.Normalization(subset_cpg_beta , type=data_norm_type, normalization="column")
+
+    # Create Principal Components
+    # -------------------------------------------------------------------------
+    icr.pca <- prcomp(subset_cpg_beta_norm, center = TRUE, scale. = TRUE)
+    eigenvalues <- icr.pca$sdev^2
+    prop_var <- eigenvalues / sum(eigenvalues) #calculate the proportion variance of each eigenvalue
+    cum_var <- cumsum(prop_var) #calculate the cumulative variance
+    # Select PCs contributing to pct_variance
+    if (length(cum_var) > 1) {
+      cutoff_index <- which(cum_var >= pct_variance)[1]
+    } else {
+      cutoff_index <- 1
+    }
+    selected_pcs <- paste0("PC", seq_len(cutoff_index))
+    # Get PC scores
+    pcs <- as.data.frame(icr.pca$x) %>%
+      dplyr::select(all_of(selected_pcs))
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+
+    # Merge PCs with study data
+    pcs$Patient_ID <- rownames(pcs)
+    combined_data <- merge(df_study, pcs, by = "Patient_ID")
+    rownames(combined_data) <- combined_data$Patient_ID
+    combined_data$Patient_ID <- NULL
+
+    predictor_cpg_names <- selected_pcs
+
+    # Build formulas
+    # -------------------------------------------------------------------------
+    full_formula <- as.formula(
+      paste(outcome, "~", paste(c(predictor_cpg_names, covariates), collapse = " + "))
+    )
+    red_formula <- as.formula(
+      paste(outcome, "~", paste(covariates, collapse = " + "))
+    )
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+
+
+    # Fit models
+    # -------------------------------------------------------------------------
+    if (family == "binomial") {
+      combined_data[[outcome]] <- as.factor(combined_data[[outcome]])
+      model_full <- safe_fit(glm(full_formula, data = combined_data, family = "binomial"),
+                             icr_id, "full")
+      model_red  <- safe_fit(glm(red_formula, data = combined_data, family = "binomial"),
+                             icr_id, "reduced")
+
+      lrt <- anova(model_red, model_full, test = "Chisq")
+      pval <- tail(lrt, 1)$`Pr(>Chi)`
+    } else {
+      model_full <- safe_fit(lm(full_formula, data = combined_data),
+                             icr_id, "full")
+      model_red  <- safe_fit(lm(red_formula,  data = combined_data),
+                             icr_id, "reduced")
+      ftest <- anova(model_red, model_full)
+      pval <- tail(ftest, 1)$`Pr(>F)`
+    }
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+
+    # SAVE RESULTS
+    tibble::tibble(
+      ICR_id = icr_id,
+      lrt_p_value = pval,
+      n_cpg = length(subset_cpg_ids)
+    )
+  }
+
+
+  # -------------------------------------------------------------------------
+  # Chose to execute on single core or multicore
+  # -------------------------------------------------------------------------
+  if (n.cores == 1) {
+
+    verbosecat("> PC regression processing on single core.\n")
+    out <- lapply(icr_ids, process_icr)
+
+  } else {
+
+    verbosecat("> PC regression processing on multiple cores.\n")
+
+    # macOS/Linux → MulticoreParam
+    # Windows → SnowParam
+    if (Sys.info()[["sysname"]] == "Windows") {
+      param <- BiocParallel::SnowParam(workers = n.cores)
+    } else {
+      param <- BiocParallel::MulticoreParam(workers = n.cores)
+    }
+
+    out <- BiocParallel::bplapply(icr_ids, process_icr, BPPARAM = param)
+  }
+
+
+  # REGARDLESS OF BINOMIAL OR CONTINUOUS OUTCOME, COMBINE RESULTS AND CALCUALTE ADJ-P/Q VALUES
+  df_results = do.call(rbind, out)
+  df_results$adj_p_value <- p.adjust(p = df_results$lrt_p_value, method = "fdr")
+  df_results$q_value <- qvalue::qvalue(p = df_results$lrt_p_value, fdr.level = 0.05)$qvalues
   df_results <- df_results %>% dplyr::arrange(adj_p_value)
 
   verbosecat(sprintf("> Filtering out ICRs with < %d cpg sites...\n", min_cpg))
