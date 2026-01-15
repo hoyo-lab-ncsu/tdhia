@@ -218,7 +218,7 @@ pc_regression_test <- function (cpg_beta,
     # SAVE RESULTS
     tibble::tibble(
       ICR_id = icr_id,
-      lrt_p_value = pval,
+      p_value = pval,
       n_cpg = length(subset_cpg_ids)
     )
   }
@@ -250,8 +250,8 @@ pc_regression_test <- function (cpg_beta,
 
   # REGARDLESS OF BINOMIAL OR CONTINUOUS OUTCOME, COMBINE RESULTS AND CALCUALTE ADJ-P/Q VALUES
   df_results = do.call(rbind, out)
-  df_results$adj_p_value <- p.adjust(p = df_results$lrt_p_value, method = "fdr")
-  df_results$q_value <- qvalue::qvalue(p = df_results$lrt_p_value, fdr.level = 0.05)$qvalues
+  df_results$adj_p_value <- p.adjust(p = df_results$p_value, method = "fdr")
+  df_results$q_value <- qvalue::qvalue(p = df_results$p_value, fdr.level = 0.05)$qvalues
   df_results <- df_results %>% dplyr::arrange(adj_p_value)
 
   verbosecat(sprintf("> Filtering out ICRs with < %d cpg sites...\n", min_cpg))
