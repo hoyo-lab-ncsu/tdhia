@@ -53,7 +53,8 @@ ivw_stouffers <- function(aa_output, adj_p_level=0.10, min_cpg=3, verbose=TRUE, 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-  # Step 1: Select ICRs of interest by any ICR that has at least 1 CpG with ADJ_P_VAL<0.10
+  # Step 1: Select ICRs of interest by any ICR that has at least 1 CpG with
+          # ADJ_P_VAL <0.10 (or chosen adj_p_val)
   cpgs_of_interest <- aa_output %>%
     dplyr::filter(ADJ_P_VAL < adj_p_level) %>%
     dplyr::pull(Variable)
@@ -85,7 +86,7 @@ ivw_stouffers <- function(aa_output, adj_p_level=0.10, min_cpg=3, verbose=TRUE, 
     }
     # Summarize the test statistics and return NA if result is infinite or zero
     Beta_IVW <- sum(subset_aa_output$Estimate / subset_aa_output$StdError^2) / sum(1 / subset_aa_output$StdError^2)
-    Z_ICR <- sum((1 / subset_aa_output$StdError^2) * subset_aa_output$Statistic) / sqrt(sum((1 / subset_aa_output$StdError^2)^2))
+    Z_ICR <- sum((1 / subset_aa_output$StdError^2) * subset_aa_output$Statistic) / sqrt(sum((1 / subset_aa_output$StdError)^2))
     p_ICR <- 2 * pnorm(-abs(Z_ICR))
     Effect_trait <- -log10(p_ICR) * sign(Beta_IVW)
     # Validity check- if there's values of infinity or 0 (or negative for p-value),
