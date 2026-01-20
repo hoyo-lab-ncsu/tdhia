@@ -74,7 +74,7 @@ load_idata_to_probes <-
       # Get list of IDAT files in target path
       obs_idat_fullnames <- dir(path = idat_dir_paths, pattern = "/*.idat", full.names = TRUE, ignore.case = TRUE)
 
-      # verify that IDAT files are properly named, raise error if not
+      # Verify that IDAT files are properly named, raise error wants it.
       correct_idat_names(obs_idat_fullnames, rename = FALSE, failcheck_error = enforce_idat_names)
 
 
@@ -102,9 +102,12 @@ load_idata_to_probes <-
       # Verify and error if not all requested idats are included, but could be
       # split across dirs
       if (enforce_req_idats) {
-        is_requested <- basename(basename_tbl$obs_idat_basenames) %in%
-          idat_basenames
-        if (sum(is_requested) != length(idat_basenames)) {
+        
+        requested_exists <- idat_basenames %in% basename(basename_tbl$obs_idat_basenames) 
+        # is_requested <- basename(basename_tbl$obs_idat_basenames) %in%
+        #   idat_basenames
+        if (any(!requested_exists)) {
+          sprintf("Missing IDAT files: %s", paste(idat_basenames[!requested_exists], collapse = ", ") )
           stop("Not all requested idat files were found in directories.")
         }
       }
