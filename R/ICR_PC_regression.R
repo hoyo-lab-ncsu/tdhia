@@ -109,7 +109,7 @@ pc_regression_test <- function (cpg_beta,
 
   verbosecat("> Remove rows in df_study that contain NA...\n")
   # Remove all samples with NA values from study data
-  df_study <- df_study %>% select(all_of(c(outcome, covariates, Patient_ID))) %>% tidyr::drop_na()
+  df_study <- df_study %>% dplyr::select(all_of(c(outcome, covariates, Patient_ID))) %>% tidyr::drop_na()
 
   # Make the samples match and order them the same
   verbosecat("> Forcing sample id order to match between cpg_beta and df_study.\n")
@@ -152,11 +152,11 @@ pc_regression_test <- function (cpg_beta,
       dplyr::select(any_of(subset_cpg_ids))
 
     # Data normalization prior to creating principal components
-    subset_cpg_beta_norm <- data.Normalization(subset_cpg_beta , type=data_norm_type, normalization="column")
+    subset_cpg_beta_norm <- clusterSim::data.Normalization(subset_cpg_beta , type=data_norm_type, normalization="column")
 
     # Create Principal Components
     # -------------------------------------------------------------------------
-    icr.pca <- prcomp(subset_cpg_beta_norm, center = TRUE, scale. = TRUE)
+    icr.pca <- stats::prcomp(subset_cpg_beta_norm, center = TRUE, scale. = TRUE)
     eigenvalues <- icr.pca$sdev^2
     prop_var <- eigenvalues / sum(eigenvalues) #calculate the proportion variance of each eigenvalue
     cum_var <- cumsum(prop_var) #calculate the cumulative variance
@@ -197,19 +197,19 @@ pc_regression_test <- function (cpg_beta,
     # -------------------------------------------------------------------------
     if (family == "binomial") {
       combined_data[[outcome]] <- as.factor(combined_data[[outcome]])
-      model_full <- safe_fit(glm(full_formula, data = combined_data, family = "binomial"),
+      model_full <- safe_fit(stats::glm(full_formula, data = combined_data, family = "binomial"),
                              icr_id, "full")
-      model_red  <- safe_fit(glm(red_formula, data = combined_data, family = "binomial"),
+      model_red  <- safe_fit(stats::glm(red_formula, data = combined_data, family = "binomial"),
                              icr_id, "reduced")
 
-      lrt <- anova(model_red, model_full, test = "Chisq")
+      lrt <- stats::anova(model_red, model_full, test = "Chisq")
       pval <- tail(lrt, 1)$`Pr(>Chi)`
     } else {
-      model_full <- safe_fit(lm(full_formula, data = combined_data),
+      model_full <- safe_fit(stats::lm(full_formula, data = combined_data),
                              icr_id, "full")
-      model_red  <- safe_fit(lm(red_formula,  data = combined_data),
+      model_red  <- safe_fit(stats::lm(red_formula,  data = combined_data),
                              icr_id, "reduced")
-      ftest <- anova(model_red, model_full)
+      ftest <- stats::anova(model_red, model_full)
       pval <- tail(ftest, 1)$`Pr(>F)`
     }
     # -------------------------------------------------------------------------
@@ -255,7 +255,7 @@ pc_regression_test <- function (cpg_beta,
   df_results <- df_results %>% dplyr::arrange(adj_p_value)
 
   verbosecat(sprintf("> Filtering out ICRs with < %d cpg sites...\n", min_cpg))
-  df_results <- df_results%>% filter(n_cpg >= min_cpg)
+  df_results <- df_results%>% dplyr::filter(n_cpg >= min_cpg)
 
   return(df_results)
 }
