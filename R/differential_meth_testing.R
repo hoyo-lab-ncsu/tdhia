@@ -38,7 +38,7 @@
 #' Bead + Col + Row. (detault = TRUE).
 #' @param write_plots boolean, when TRUE, writes plots to disk.
 #' @param output_dir_path directory path to write plots to disk.
-#' @correlation_check perform pairwise correlation check between predictors. 
+#' @param correlation_check perform pairwise correlation check between predictors. 
 #' Sometimes failes if the number of observations is too small (default = TRUE).
 #' @param verbose boolean, when true, prints output to console.
 #' @param db_flag boolean, when true, save environment variables to disk.

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_icr_methylation.R
 \name{plot_icr_diffbar}
 \alias{plot_icr_diffbar}
-\title{plot_icr_dotplot}
+\title{plot_icr_diffbar}
 \usage{
 plot_icr_diffbar(
   mat_cpg_beta,
@@ -10,46 +10,69 @@ plot_icr_diffbar(
   df_patient_groups,
   icr_id,
   xlab_txt = "",
-  plot_height_width = c(5, 3),
+  plot_height_width = c(3, 2),
   output_path,
-  max_sig_hwindow = 9,
+  max_sig_hwindow = NULL,
   db_flag = F,
   filter_na_group = T,
   legend.position = "none",
-  manual_cpg_index = NULL,
-  sample_colname = "patient_id"
+  sample_colname = "patient_id",
+  overwrite_plot = T
 )
 }
 \arguments{
 \item{mat_cpg_beta}{a matrix of beta values, cpg sites (rows) x patients (col)}
 
-\item{sig_cpgs}{TODO}
+\item{sig_cpgs}{vector of cpg site IDs that are significant (can be across
+all ICRs and not just ICR being plotted).}
 
-\item{df_patient_groups}{todo}
+\item{df_patient_groups}{a dataframe with the
+\enumerate{
+\item a sample colum  name (default: patient_id, specified by sample_colname)
+\item diff_group: column that specifies whether each patient
+is in the low (1) or high (2) group.
+\item subset_group: column that specifies different subsets of patient population
+(combined will be plotted also).
+}}
 
-\item{icr_id}{todo}
+\item{icr_id}{the ID of the specific ICR to be plotted of the form ICR_#, i.e., ICR_10.}
 
-\item{xlab_txt}{todo}
+\item{xlab_txt}{xlabel for plot}
 
-\item{plot_height_width}{todo}
+\item{plot_height_width}{vector of two numbers in inches, for plot width and
+height, as defined in cowplot::save_plot().}
 
-\item{output_path}{todo}
+\item{output_path}{full file system path so save plot to.}
 
-\item{max_sig_hwindow}{todo}
+\item{max_sig_hwindow}{dictates the window of CPG sites to be included,
+\enumerate{
+\item NULL: plot all cpg sites (default).
+\item Vector of 2 numerics: the lower and upper index of CpG sites to be
+included. If positive, the index is from the start. If negative, index is
+from the end.
+\item Single numeric: how much padding is added around significant CpG sites.0
+}}
 
-\item{db_flag}{todo}
+\item{db_flag}{when true, saves environment variables to disk to a file with
+same name as function.}
 
-\item{filter_na_group}{todo}
+\item{filter_na_group}{boolean, when TRUE (default), removes NA group from plots.}
 
-\item{legend.position}{todo}
+\item{legend.position}{specify position of legend as specified in ggplot theme
+(default = "none").}
+
+\item{sample_colname}{name of coolumn that refers to sample_id found with
+df_patient_groups, and also matc the column names in mat_cpg_beta.}
 
 \item{manual_cpg_index}{todo}
-
-\item{sample_colname}{todo}
 }
 \value{
 a ggplot function handle to the plot.
 }
 \description{
-position.
+produces a simple dot pot of beta values of CpG sites within a
+specified ICR, seperating patients into 2 groups.
+
+Note: cpg sites may appear out of order, but that is because they are sorted
+by their genomic position (MAPINFO) and not label
 }

@@ -9,11 +9,12 @@ cpg_dml_test(
   predictors,
   cpg_beta,
   pvalue_threshold = 1e-04,
-  db_flag = T,
+  db_flag = F,
   sample_name = "Patient.ID",
   beadchip_correction = T,
   verbose = T,
   write_plots = F,
+  correlation_check = F,
   output_dir_path = getwd()
 )
 }
@@ -33,7 +34,7 @@ are used as predictors for LIMMA linear models. First entry is assumed to be
 primary predictor of interest.}
 
 \item{cpg_beta}{matrix of beta values, where rows are cpg sites and columns are
-patients. Column names must be the same ones found in the column name of
+patients. Column names must be the same ones found in the entries of the column specified by
 sample_name input argument contained within df_study.}
 
 \item{pvalue_threshold}{max p-value threshold for significance from LIMMA
@@ -52,6 +53,9 @@ Bead + Col + Row. (detault = TRUE).}
 \item{verbose}{boolean, when true, prints output to console.}
 
 \item{write_plots}{boolean, when TRUE, writes plots to disk.}
+
+\item{correlation_check}{perform pairwise correlation check between predictors.
+Sometimes failes if the number of observations is too small (default = TRUE).}
 
 \item{output_dir_path}{directory path to write plots to disk.}
 }

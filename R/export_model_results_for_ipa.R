@@ -4,15 +4,15 @@
 #'
 #'
 #' IPA
-#' Create New > Upload data
+#' Create New \> Upload data
 #' Columns: Expr Other, Expr Fale Discovery, ENSEMBL ID
 #' Only include genes below threshold in analysis file
 #' Reference is IPA gene only dataset, or user dataset
 #' 
 #' IPA Core Analysis Dataset Mapping
-#' >> column_in_csv_file: variable in IPA analysis <<
+#' \> column_in_csv_file: variable in IPA analysis \<\<
 #'   Nearest Transcript: Gene Symbol
-#'   ADJ_P_VAL:Expr False Discovery Rate (q-value)
+#'   ADJ_P_VAL: Expr False Discovery Rate (q-value)
 #'   emsenbl_gene_id: Ensembl
 #'   nEstimate: Expr Log Ratio
 #'

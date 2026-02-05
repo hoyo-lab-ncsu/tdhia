@@ -16,7 +16,8 @@ plot_icr_dotplot(
   db_flag = F,
   filter_na_group = T,
   legend.position = "none",
-  sample_colname = "patient_id"
+  sample_colname = "patient_id",
+  overwrite_plot = F
 )
 }
 \arguments{

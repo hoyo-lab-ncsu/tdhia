@@ -10,13 +10,14 @@ icr_dmr_test(
   pval_threshold = 0.05,
   fdr_sig_threshold = 1e-04,
   verbose = T,
-  db_flag = T
+  db_flag = F
 )
 }
 \arguments{
-\item{df_dml}{a dataframe output from the cpg_dml_test, one row for each cpg site.
-Contains standard output from limma plus metadata specifying associated ICR,
-closest gene etc. Required columns:
+\item{df_dml}{a dataframe output from the cpg_dml_test output,
+one row for each cpg site. Contains standard output from limma plus metadata
+specifying associated ICR, closest gene etc.
+Required columns:
 ICR_id
 ICR_chr
 ICR_start
@@ -25,8 +26,9 @@ logFC
 P.Value: raw DML p-value.
 adj.P.Val: adjusted p-value from DML.}
 
-\item{chr_lens}{a dataframe of ranges covering ICRs on each chromosome. Each
-row is a seperate chromosome number. Expected to contain the following fields:
+\item{chr_lens}{a dataframe of ranges covering ICRs on each chromosome.
+This object is found in the cpg_dml_test output. Each
+row is a separate chromosome number. Expected to contain the following fields:
 chr_num: chromosome number
 chr_len: total length of each chromosome
 offset offset of start of each chromosome.}
