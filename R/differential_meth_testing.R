@@ -26,7 +26,7 @@
 #' primary predictor of interest.
 #' 
 #' @param cpg_beta matrix of beta values, where rows are cpg sites and columns are 
-#' patients. Column names must be the same ones found in the column name of
+#' patients. Column names must be the same ones found in the entries of the column specified by
 #' sample_name input argument contained within df_study.
 #' @param pvalue_threshold max p-value threshold for significance from LIMMA 
 #' analysis for calling hyper or hypo methylation.
@@ -38,13 +38,16 @@
 #' Bead + Col + Row. (detault = TRUE).
 #' @param write_plots boolean, when TRUE, writes plots to disk.
 #' @param output_dir_path directory path to write plots to disk.
+#' @correlation_check perform pairwise correlation check between predictors. 
+#' Sometimes failes if the number of observations is too small (default = TRUE).
 #' @param verbose boolean, when true, prints output to console.
 #' @param db_flag boolean, when true, save environment variables to disk.
 #' @export
 #' @author author
 cpg_dml_test <- function(df_study, predictors, cpg_beta,
-                         pvalue_threshold = 0.0001, db_flag = T, sample_name = "Patient.ID",
+                         pvalue_threshold = 0.0001, db_flag = F, sample_name = "Patient.ID",
                          beadchip_correction = T, verbose = T, write_plots = F,
+                         correlation_check = F,
                          output_dir_path = getwd()) {
   
   if (db_flag) {save(list = ls(all.names = TRUE), file = "cpg_dml_test.RData")}
@@ -73,18 +76,23 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   
   # Correlation plot of predictors                                    ##########
   #_____________________________________________________________________________
-  corr_data = df_study[, predictors] %>% 
-    dplyr::mutate_all(as.numeric) %>% 
-    as.data.frame()
-  M = cor(corr_data, use = 'pairwise.complete.obs')
-  corr_result = corrplot::cor.mtest(M, conf.level = 0.95)
-  plots$predictor_correlations = corrplot::corrplot(
-    M,p.mat = corr_result$p, insig = 'label_sig', sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9)
-
-  if (write_plots) {
-    png(paste0(output_dir_path, "/corr_matrix.png"), res = 300, width = 10, height = 10, units = "in")
-    corrplot::corrplot(M,p.mat = testRes$p, insig = 'label_sig', sig.level = c(0.001, 0.01, 0.05),pch.cex = 0.9)
-    dev.off()
+  if (correlation_check) {
+    corr_data = df_study[, predictors] %>% 
+      dplyr::mutate_all(as.numeric) %>% 
+      as.data.frame()
+    
+    corr_result = corrplot::cor.mtest(M, conf.level = 0.95)
+    plots$predictor_correlations = corrplot::corrplot(
+      M,p.mat = corr_result$p, insig = 'label_sig',
+      sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9)
+    
+    if (write_plots) {
+      png(paste0(output_dir_path, "/corr_matrix.png"), 
+          res = 300, width = 10, height = 10, units = "in")
+      corrplot::corrplot(M,p.mat = testRes$p, insig = 'label_sig',
+                         sig.level = c(0.001, 0.01, 0.05),pch.cex = 0.9)
+      dev.off()
+    }
   }
   
   # Get icr metadata
@@ -276,9 +284,10 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
 #' @description analyze for changes in cpg methylation in a DMR-like region (ICR) 
 #' via a p-values aggregation test.
 #'
-#' @param df_dml a dataframe output from the cpg_dml_test, one row for each cpg site.
-#'  Contains standard output from limma plus metadata specifying associated ICR,
-#'   closest gene etc. Required columns:
+#' @param df_dml a dataframe output from the cpg_dml_test output, 
+#'  one row for each cpg site. Contains standard output from limma plus metadata
+#'  specifying associated ICR, closest gene etc. 
+#'  Required columns:
 #'   ICR_id
 #'   ICR_chr
 #'   ICR_start
@@ -286,8 +295,9 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
 #'   logFC
 #'   P.Value: raw DML p-value.
 #'   adj.P.Val: adjusted p-value from DML.
-#' @param chr_lens a dataframe of ranges covering ICRs on each chromosome. Each 
-#' row is a seperate chromosome number. Expected to contain the following fields:
+#' @param chr_lens a dataframe of ranges covering ICRs on each chromosome. 
+#' This object is found in the cpg_dml_test output. Each 
+#' row is a separate chromosome number. Expected to contain the following fields:
 #'   chr_num: chromosome number
 #'   chr_len: total length of each chromosome
 #'   offset offset of start of each chromosome.
@@ -299,8 +309,9 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
 #' @author author
 icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
                          fdr_sig_threshold = 0.0001,
-                         verbose = T, db_flag = T) {
-  
+                         verbose = T, db_flag = F) {
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "icr_dmr_test.RData")}
+  # load(file = "icr_dmr_test.RData")
   
 
   # Regional (DMR-like) Analysis via ICR Aggregation

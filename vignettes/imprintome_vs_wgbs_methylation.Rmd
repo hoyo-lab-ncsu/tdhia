@@ -231,6 +231,13 @@ gametic_cpg_ids <- mft$Name[is_validated]
 # Number of gametic evidence ICRs
 # length(unique(mft$icr_id[is_validated]))
 
+# Process IDAT files
+# data_beta <- tdhia_pipeline(
+#   idat_dir_paths = idat_dir_path, 
+#   set_failed_betas_na = T, OVERWRITE_TEMP_DATA = F,
+#   probe_data_cache_path = paste0(output_dir_path, "/study_mediterranean_diet_betas.rda"))
+
+
 
 if (!file.exists(data_filepath)) {
   # Store raw output (cpg beta matrix) of each pipeline (and gold standard reference) into a named list
@@ -922,4 +929,25 @@ Significant ICRs:  `r sprintf(" %.0f\n", length(unique(disp_table_white$ICR)))`.
 ```{r, include = TRUE, echo = TRUE}
 knitr::kable(disp_table_white, format = "html") %>% kableExtra::kable_styling()
 ```
+
+
+Limma-Lancaster Analysis
+  
+```{r, include = TRUE, echo = TRUE}
+
+
+cpg_dml_out <- tdhia::cpg_dml_test(
+  df_study = study_metadata, predictors = c("Age", "Sex"), cpg_beta = pipelines_out$default,
+  pvalue_threshold = 0.0001, db_flag = T, sample_name = "Patient.ID", correlation_check = F,
+  beadchip_correction = F, verbose = T, write_plots = F,
+  output_dir_path = getwd())
+
+icr_dmr_test <-  tdhia::icr_dmr_test(df_dml = cpg_dml_out$df_dml, chr_lens = cpg_dml_out$chr_lens, 
+                                     pval_threshold = 0.05,
+                         fdr_sig_threshold = 0.0001,
+                         verbose = T, db_flag = F)
+
+```
+
+
 
