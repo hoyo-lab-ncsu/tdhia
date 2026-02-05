@@ -8,7 +8,7 @@
 #' The model equation is assumed to be:
 #' cpg_beta ~ predictors
 #'
-#' with beadchip_correction = T, then:
+#' With beadchip_correction = T, then:
 #' cpg_beta ~ predictors + Bead + Col + Row
 #'
 #' @param df_study a dataframe of study variables, where rows are patients/ 
@@ -20,11 +20,9 @@
 #' for the chip, and row and column of the probe). The dataframe must also have
 #'  the column specified in sample_name, which contains the basenames for the 
 #'  IDAT methylation data files.
-#'  
 #' @param predictors a vector of strings of column names within df_study that 
 #' are used as predictors for LIMMA linear models. First entry is assumed to be 
 #' primary predictor of interest.
-#' 
 #' @param cpg_beta matrix of beta values, where rows are cpg sites and columns are 
 #' patients. Column names must be the same ones found in the entries of the column specified by
 #' sample_name input argument contained within df_study.
@@ -35,11 +33,11 @@
 #' cpg_beta (default = "sample_name").
 #' @param beadchip_correction boolean, when true adds the following columns as '
 #' predictors to LIMMA linear model (if they are not already listed as predictors): 
-#' Bead + Col + Row. (detault = TRUE).
+#' Bead + Col + Row. (detault = TRUE). These columsn must already exist in study_data.
 #' @param write_plots boolean, when TRUE, writes plots to disk.
 #' @param output_dir_path directory path to write plots to disk.
-#' @param correlation_check perform pairwise correlation check between predictors. 
-#' Sometimes failes if the number of observations is too small (default = TRUE).
+#' @param correlation_check perform pairwise correlation test between predictors. 
+#' Sometimes errors if the number of observations is too small (default = TRUE).
 #' @param verbose boolean, when true, prints output to console.
 #' @param db_flag boolean, when true, save environment variables to disk.
 #' @export
@@ -227,8 +225,6 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
     print(manhattan)
     dev.off()
   }
-  
-  
   
 
   # Gene annotation for significant cpgs                    ####################
