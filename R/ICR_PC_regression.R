@@ -1,7 +1,8 @@
+#' pc_regression_test
+#'
 #' Principal component regression followed by likelihood ratio test or F test
 #' to test for the association of ICR methylation with an outcome. Both
 #' continuous and dichotomous response variables are supported.
-
 #' For each ICR, the CpG sites will be reduced to principal components that
 #' account for a chosen amount of variance (default 80%). Two regression models
 #' will be fit: a reduced model with only covariates and a full model with
@@ -12,6 +13,12 @@
 #' (for a binomial outcome) or an F test (for a continuous outcome). The resulting
 #' q-value adjusts for multiple test correction and tells you if the full
 #' model was significantly improved over the reduced.
+#'
+#' Note that there is a line of code to remove any patients that are missing
+#' data (outcome or covariates). I recommend manually filtering that out first
+#' so that you know your exact sample size prior to running (just my personal
+#' preference). Another quick check prior to starting is to ensure both the cpg_beta and
+#' df_study have the patients ids in rows.
 
 #' @param cpg_beta cpg beta matrix (cpg_id as COLUMNS x sample_id as ROWS).
 #'  Values are assumed to be on beta scale (0-1).
@@ -63,13 +70,6 @@
 #' @returns test
 #' @export
 #' @author Kate Everly
-
-#' Note that there is a line of code to remove any patients that are missing
-#' data (outcome or covariates). I recommend manually filtering that out first
-#' so that you know your exact sample size prior to running (just my personal
-#' preference)
-#' Another quick check prior to starting is to ensure both the cpg_beta and
-#' df_study have the patients ids in rows.
 
 
 pc_regression_test <- function (cpg_beta,
