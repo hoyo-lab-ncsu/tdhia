@@ -58,6 +58,8 @@
 #' @param min_cpg minimum number of cpg sites for an icr to be included in
 #' results (default is 3).
 
+#' @param n.cores number of cores to run on (default is 1)
+
 #' @returns test
 #' @export
 #' @author Kate Everly
@@ -68,11 +70,6 @@
 #' preference)
 #' Another quick check prior to starting is to ensure both the cpg_beta and
 #' df_study have the patients ids in rows.
-library(clusterSim)
-library(dplyr)
-library(tibble)
-library(tidyr)
-library(sesame)
 
 
 pc_regression_test <- function (cpg_beta,
@@ -87,7 +84,7 @@ pc_regression_test <- function (cpg_beta,
                                 icr_ids = NULL,
                                 min_cpg = 3,
                                 verbose = TRUE,
-                                n.cores){
+                                n.cores = 1){
   verbosecat <- function(x) if (verbose) cat(x)
   icr_mapping = tdhia::mapping_cpg_icr_ids # load in map!
   cpg_mapping <- icr_mapping %>% # will select just the CpG and ICR ids from the icr_mapping file
