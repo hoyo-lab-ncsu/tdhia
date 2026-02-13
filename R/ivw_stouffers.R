@@ -1,3 +1,5 @@
+#' ivw_stouffers
+#'
 #' Purpose: To evaluate coordinated methylation effects across CpG within each
 #' imprinting control region (ICR) using these steps:
 #'  0. Use analyze_associaiton to fit glm model for each CpG. The output
@@ -25,9 +27,6 @@
 #' @export
 #' @author Kate Everly
 
-
-library(dplyr)
-library(tidyverse)
 
 ivw_stouffers <- function(aa_output, adj_p_level=0.10, min_cpg=3, verbose=TRUE, top_n_icrs=NULL){
   verbosecat <- function(x) if (verbose) cat(x)

@@ -15,6 +15,7 @@ Roxygen: list(markdown = TRUE)
 biocViews:
 Imports: 
 	tidyr,
+	tidyverse,
 	qvalue,
 	clusterSim,
 	stringr,
