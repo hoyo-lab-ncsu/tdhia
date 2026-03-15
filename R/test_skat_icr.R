@@ -1,3 +1,5 @@
+
+
 #' skat_icr_test
 #'
 #' Performs kernel-regression-based association tests for methylation state for
@@ -14,7 +16,7 @@
 #' @param predictors vector of strings of column names of predictors that are
 #' located in df_study.
 #' @param method
-#'   davies: exact p-value for skat method
+#'   davies: exact p-value for skat method (heterogeneous)
 #'   optimal.adj: skat-O unified approach, combination of SKAT and burden test
 #'    (default).
 #' @param out_type character, specifies type of variable for response column.
@@ -30,7 +32,6 @@
 #' @returns test
 #' @export
 #' @author Kate Everly, Bruce Corliss
-
 skat_icr_test <- function(cpg_betas, df_study, response, predictors,
                           method = "optimal.adj",
                           out_type="C", icr_ids = NULL,

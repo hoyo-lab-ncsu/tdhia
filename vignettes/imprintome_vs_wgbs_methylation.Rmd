@@ -119,6 +119,7 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col
 
 
 #' group_by_mean
+#' 
 #' @description For study group, group mean beta/ methylation % values from a 
 #' specific imprintome pipeline, along with methylation from WGBS.
 #' 
@@ -127,6 +128,7 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col
 #' @param df_cpg_imp methylation data from a particular imprintome pipeline
 #' @param df_cpg_wgbs methylation data from wgbs data
 #' @param col_label string column label, used to label name of pipeline
+#' @param mean_max_na maximum number of missing datapoints allowed for a probe
 #' 
 #' @return
 group_by_mean <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, 
@@ -254,7 +256,7 @@ if (!file.exists(data_filepath)) {
    filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
-                  set_failed_betas_na = FALSE, discard_failed_probes = TRUE,
+                  set_failed_betas_na = FALSE, discard_failed_probes = TRUE,#discard_failed_patients = T,
                   min_design_score = .20, icr_conf_levels = NULL)
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   pipelines_out$no_filter <- cpg_beta$cpg_beta_df
@@ -452,12 +454,12 @@ gg
 
 ```
 
-## Comparison of Mean Pearson Correlation {.tabset}
+## Comparison of Mean Pearson Correlation, within Patients {.tabset}
 
-We calculate the pearson correlation of the averaged beta measurements (for each patient study group) between imprintome and WGBS measurements. The analysis is completed three times, with a different pipeline applied first before all other pipelines are applied:
+We calculate the pearson correlation of the averaged beta measurements (for each patient study group) between imprintome and WGBS measurements. The analysis is completed three times, with a different initial filtering applied first before all other pipelines are applied:
 
-1. **Base Pipeline**: basic imprintome pipeline.
-2. **Gametic Evidence Default**: Only CpG sites with experimental evidence of 50% gametic methylation are included.
+1. **Default Pipeline**: basic imprintome pipeline.
+2. **Gametic Evidence Default**: only CpG sites with experimental evidence of differential gametic methylation are included.
 3. **Design Score Default**: only probes with a design score (> 0.5) is included in the output.  
   
 Across all analysis, only CpG sites are included if they have no missing data across all 4 samples within the group for either imprintome or WGBS data.
@@ -498,6 +500,7 @@ ggf
 ```
 
 ### Gametic Evidence Default
+
   
 ```{r, include = TRUE, out.width="80%", align="center"}
 
@@ -593,7 +596,7 @@ ggf
 
 # Per Patient Correlation of Imprintome vs WGBS {.tabset}
 
-Now we can examine the correlation between beta values within each patient for the imprintome versus WGBS measurements (instead of mean correlation for each study group). The pearson correlation for each patient is calculated (cpg sites that are not included in the WGBS or imprintome data are removed). THis analysis is repeated multiple times, with different setting applied to the imprintome and WGBS data.  
+Now we can examine the correlation between beta values within each patient for the imprintome versus WGBS measurements (instead of mean correlation between each study group). The pearson correlation for each patient is calculated (cpg sites that are not included in the WGBS or imprintome data are removed). Patients are partitioned by their disease stats.
 
 1. **Default**
 2. **WGBS > 5**: CpG sites included if > 5 reads from WGBS output.  
@@ -950,6 +953,9 @@ icr_dmr_test <-  tdhia::icr_dmr_test(df_dml = cpg_dml_out$df_dml, chr_lens = cpg
                          verbose = T, db_flag = F)
 
 ```
+
+
+
 
 
 
