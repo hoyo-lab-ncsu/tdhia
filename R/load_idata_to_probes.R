@@ -176,14 +176,6 @@ load_idata_to_probes <-
     probe_pval_matrix = idat.out$p_vals
 
 
-    # if (!is.character(unq_obs_idat_basenames)) {
-    #   sample_names <- paste0("Sample_", length(unq_obs_idat_basenames))
-    # } else {
-    #   sample_names <- basename(unq_obs_idat_basenames)
-    # }
-    # colnames(probe_beta_matrix) <- sample_names
-    # colnames(probe_pval_matrix) <- sample_names
-
     # Convert matrix to dataframe for easier manipulation
     probe_beta_df <- as.data.frame(probe_beta_matrix)
     probe_pval_df <- as.data.frame(probe_pval_matrix)
@@ -224,7 +216,8 @@ load_idata_to_probes <-
     probe_beta <- list(probe_beta_df = probe_beta_df,
                        probe_pval_df = probe_pval_df,
                        platform = platform,
-                       manifest = mft)
+                       manifest = mft,
+                       idat_filepaths = unq_obs_idat_basenames)
     return(probe_beta)
 
 }
@@ -281,8 +274,6 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
     unq_obs_idat_basenames = paste0("Sample_", 1:length(unq_obs_idat_basenames))
   }
 
- 
-  
   
   # Calculate sesame p-values for individual probes
   p_vals <- do.call(cbind, BiocParallel::bplapply(ss, function(ss) {
