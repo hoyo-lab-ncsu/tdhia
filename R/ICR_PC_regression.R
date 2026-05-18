@@ -171,8 +171,9 @@ pc_regression_test <- function (cpg_beta,
     # -------------------------------------------------------------------------
 
     # Merge PCs with study data
-    pcs[[Patient_ID]] <- rownames(pcs)
-    combined_data <- merge(df_study, pcs, by = Patient_ID)
+    rownames(pcs) <- pcs[[Patient_ID]]
+    pcs[[Patient_ID]] <- NULL
+    combined_data <- cbind(df_study, pcs[rownames(df_study), , drop = FALSE])
     rownames(combined_data) <- combined_data$Patient_ID
     combined_data$Patient_ID <- NULL
 
