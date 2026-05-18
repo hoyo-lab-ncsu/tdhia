@@ -87,8 +87,9 @@ pc_regression_test <- function (cpg_beta,
                                 n.cores = 1){
   verbosecat <- function(x) if (verbose) cat(x)
   icr_mapping = tdhia::mapping_cpg_icr_ids # load in map!
-  cpg_mapping <- icr_mapping %>% # will select just the CpG and ICR ids from the icr_mapping file
-    dplyr::select(CpG_id, ICR_id)
+  cpg_mapping <- icr_mapping %>%
+    dplyr::select(CpG_id, ICR_id) %>% # will select just the CpG and ICR ids from the icr_mapping file
+    dplyr::distinct()
 
   # if icr_ids no supplied, scan for all icr_ids covered with cpg_ids
   if (is.null(icr_ids)) {
@@ -141,8 +142,9 @@ pc_regression_test <- function (cpg_beta,
   process_icr <- function(icr_id){
     # Get the CpG IDs of the CpGs for an ICR
     subset_cpg_ids <- cpg_mapping %>%
-      dplyr::filter(ICR_id == icr_id) %>%
-      dplyr::pull(CpG_id)
+      dplyr::filter(ICR_id == icr_id, CpG_id %in% colnames(cpg_beta)) %>%
+      dplyr::pull(CpG_id) %>%
+      unique()
 
     # Subset the beta matrix to only have data from the CpGs found in the ICR
     subset_cpg_beta <- cpg_beta %>%
@@ -227,7 +229,7 @@ pc_regression_test <- function (cpg_beta,
     tibble::tibble(
       ICR_id = icr_id,
       p_value = pval,
-      n_cpg = length(subset_cpg_ids)
+      n_cpg = ncol(subset_cpg_beta)
     )
   }
 
