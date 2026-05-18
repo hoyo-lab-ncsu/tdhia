@@ -39,13 +39,10 @@
 #' @export
 plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr_id, xlab_txt = "", 
                                  plot_height_width = c(5,3), output_path, max_sig_hwindow = NULL, db_flag = F,
-                                 filter_na_group = T, legend.position = "none", 
+                                 filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value", 
                                  sample_colname = "patient_id", overwrite_plot = F) {
-  
-  
   # Create output folder
   dir.create(path = output_path, recursive = TRUE, showWarnings = FALSE)
-  
   if(db_flag) save(list = ls(all.names = TRUE), file = "plot_icr_methylation.RData")
   # load(file = "plot_icr_methylation.RData")
   
@@ -115,13 +112,7 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
  
   # Plot methylation across cpg sites in ICR
   gg <- ggplot(data = df_summary, aes(x = cpg_id, y = beta_mean)) +
-    # geom_rect(aes(fill = back_fill, xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf)) +
-    # geom_linerange (aes(x = cpg_id, ymin = beta_mean - beta_sem,
-    #                  ymax = beta_mean + beta_sem, color = group),
-    #              linewidth = 5, alpha = 0.5, position = position_dodge(width=0.7))+
     geom_point(aes(color = group), size = 1.5, alpha = 0.5) + 
-    # geom_errorbar(aes(ymin = beta_mean - beta_sem, ymax = beta_mean + beta_sem, color = group),
-                  # position = position_dodge(width=0.7), width = 0.6, linewidth = .2) +
     geom_text(aes(label = ifelse(df_summary$cpg_id %in% sig_cpgs, "*", "")), 
               y = padded_xlim[2], size = 4, vjust=1) + 
     # geom_boxplot(aes(color = group), position = position_dodge(width=0.7), width = 0.7, linewidth = .2) +
@@ -129,7 +120,7 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     scale_fill_manual(values=c("grey90", "white"), guide = "none") +
     # scale_x_continuous(expand = c(0, 0)) +
     coord_cartesian(xlim = (c(min(df_summary$cpg_id_rank), max(df_summary$cpg_id_rank))), ylim = padded_xlim) + #ylim=c(0,1)
-      xlab(xlab_txt) + ylab("Mean Beta Value") + 
+      xlab(xlab_txt) + ylab(ytext) + 
     # geom_ribbon(aes(fill = ))+
     # ggtitle(sprintf("%s (%sZF, %s): %s", icr_id, zinc_finger_str,icf_conf_str, 
     #           icr_metadata$Nearest.Transcript)) +
@@ -261,7 +252,7 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   df_summary_all <- df_long_cpg_beta %>% group_by(cpg_id) %>% 
     summarize(
       subset_group = "All",
-      beta_mean_diff = mean(value[diff_group==1], na.rm = T) - mean(value[diff_group==2], na.rm = T),
+      beta_mean_diff = mean(value[diff_group==2], na.rm = T) - mean(value[diff_group==1], na.rm = T),
       n1 = sum(diff_group==1), n2 = sum(diff_group==2),
       beta_sd_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2 +
                             sd(value[diff_group==2], na.rm = T)^2),
@@ -276,14 +267,14 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # Get difference in beta for each of the sample subgroups
   df_summary_sub <- df_long_cpg_beta %>% group_by(cpg_id, subset_group) %>% 
     summarize(
-      beta_mean_diff = mean(value[diff_group==1], na.rm = T) - mean(value[diff_group==2], na.rm = T),
+      beta_mean_diff = mean(value[diff_group==2], na.rm = T) - mean(value[diff_group==1], na.rm = T),
       n1 = sum(diff_group==1), n2 = sum(diff_group==2),
       beta_sd_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2 +
                             sd(value[diff_group==2], na.rm = T)^2),
       beta_sem_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2/n1 +
                              sd(value[diff_group==2], na.rm = T)^2/n2))
   
-  temp <- df_summary_all %>% select(c("cpg_id_rank", "xmin", "xmax", "back_fill", "cpg_sig"))
+  temp <- df_summary_all %>% dplyr::select(c("cpg_id_rank", "xmin", "xmax", "back_fill", "cpg_sig"))
   df_summary_sub <- cbind(df_summary_sub, rbind(temp,temp))
   # Bind summary stat of all group and subset groups
   df_summary <- rbind(df_summary_all, df_summary_sub)

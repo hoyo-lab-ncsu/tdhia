@@ -1,3 +1,5 @@
+
+
 #' skat_icr_test
 #'
 #' Performs kernel-regression-based association tests for methylation state for
@@ -14,7 +16,7 @@
 #' @param predictors vector of strings of column names of predictors that are
 #' located in df_study.
 #' @param method
-#'   davies: exact p-value for skat method
+#'   davies: exact p-value for skat method (heterogeneous)
 #'   optimal.adj: skat-O unified approach, combination of SKAT and burden test
 #'    (default).
 #' @param out_type character, specifies type of variable for response column.
@@ -30,7 +32,6 @@
 #' @returns test
 #' @export
 #' @author Kate Everly, Bruce Corliss
-
 skat_icr_test <- function(cpg_betas, df_study, response, predictors,
                           method = "optimal.adj",
                           out_type="C", icr_ids = NULL,
@@ -65,7 +66,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
   df_study <- df_study[match(x = colnames(cpg_betas), table = rownames(df_study)),]
 
   # Dataframe to store results of test
-  df_results <- data.frame(icr_id = icr_ids, skat_p_value = NA, n_cpg = NA)
+  df_results <- data.frame(icr_id = icr_ids, skat_raw_pvalue = NA, n_cpg = NA)
 
   model_str = paste0(response , " ~ ", paste(predictors, collapse = " + "))
   verbosecat(sprintf("> Model: %s\n", model_str))
@@ -98,13 +99,14 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
     }
   }
 
-  # Calculate adjusted p-value and q-value
-  df_results$skat_adj_p_value <- p.adjust(p = df_results$skat_p_value, method = "fdr")
-  df_results$skat_q_value <- qvalue::qvalue(p = df_results$skat_p_value, fdr.level = 0.05)$qvalues
-  df_results <- df_results %>% dplyr::arrange(skat_adj_p_value)
-
+  # Remove ICRs with too few cpg sites
   verbosecat(sprintf("> Filtering out ICRs with < %d cpg sites...\n", min_cpg))
-  df_results <- df_results%>% filter(n_cpg >= min_cpg)
+  df_results <- df_results %>% filter(n_cpg >= min_cpg)
+  
+  # Calculate adjusted p-value and q-value
+  df_results$skat_adj_pvalue <- p.adjust(p = df_results$skat_raw_pvalue, method = "fdr")
+  df_results$skat_qvalue <- qvalue::qvalue(p = df_results$skat_raw_pvalue, fdr.level = 0.05)$qvalues
+  df_results <- df_results %>% dplyr::arrange(skat_adj_pvalue)
 
   return(df_results)
 }
@@ -136,6 +138,6 @@ skat_single_icr <- function(icr_id, cpg_betas, df_study, model_str, cpg_mapping,
   skat_out<-SKAT::SKAT(Z = Zs, obj = skat_null, kernel = "linear", method = method)
 
   # Export data
-  out <- data.frame(icr_id = icr_id, skat_p_value = skat_out$p.value, n_cpg = nrow(tZ))
+  out <- data.frame(icr_id = icr_id, skat_raw_pvalue = skat_out$p.value, n_cpg = nrow(tZ))
   return(out)
 }
