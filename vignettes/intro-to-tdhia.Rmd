@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>")
 
 library(dplyr)
 # here::i_am("README.md")
-devtools::load_all()
+# devtools::load_all()
 # library(tdhia)
 ```
 
@@ -130,11 +130,11 @@ Let's simulate a case control analysis, where we will test for differences in Cp
 groud_id = c(rep(0,floor(n_patients/2)), rep(1,n_patients - floor(n_patients/2)))
 
 # Test for significant cpgs, corrected for number of ICRs
-df_res <- analyze_case_control(cpg_beta$cpg_beta_df, groud_id, n_adjust = nrow(icr_beta$icr_beta_df))
+df_res <- tdhia::analyze_case_control(cpg_beta$cpg_beta_df, groud_id, n_adjust = nrow(icr_beta$icr_beta_df))
 sum(df_res$adj_sig)
 
 # Test for significant ICRs
-df_res <- analyze_case_control(icr_beta$icr_beta_df, groud_id)
+df_res <- tdhia::analyze_case_control(icr_beta$icr_beta_df, groud_id)
 sum(df_res$adj_sig)
 
 ```
@@ -168,7 +168,7 @@ rownames(df_study) <- colnames(cpg_beta$cpg_beta_df)
 
 n.cores <- max(c(parallel::detectCores()-2,1))
 
-df_complete <- analyze_association(R = select(df_study, exposure),
+df_complete <- tdhia::analyze_association(R = select(df_study, exposure),
                                    P = as.data.frame(t(cpg_beta$cpg_beta_df)),
                                    Pe = select(df_study, -exposure),
                                    family = "gaussian", n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,
@@ -188,7 +188,7 @@ testing.
 ```{r}
 
 # Differential cpg analysis
-out_cpg <- cpg_dml_test(df_study = df_study %>% tibble::rownames_to_column("Patient_ID"),
+out_cpg <- tdhia::cpg_dml_test(df_study = df_study %>% tibble::rownames_to_column("Patient_ID"),
                         predictors = c("exposure", "race", "smoked"), sample_name = "Patient_ID",
                         cpg_beta = cpg_beta$cpg_beta_df, beadchip_correction = T,
                         db_flag = T)
@@ -206,9 +206,8 @@ altered methylation state in ICRs.
 ```{r}
 
 # Differential icr analysis
-out_icr <- icr_dmr_test(df_dml = out_cpg$df_dml, chr_lens = out_cpg$chr_lens)
-
-
+out_icr <- tdhia::icr_dmr_test(df_dml = out_cpg$df_dml, chr_lens = out_cpg$chr_lens)
 
 out_icr$plots$manhplot_icr
+
 ```

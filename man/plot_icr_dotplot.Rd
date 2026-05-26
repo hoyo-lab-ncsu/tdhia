@@ -16,6 +16,7 @@ plot_icr_dotplot(
   db_flag = F,
   filter_na_group = T,
   legend.position = "none",
+  ytext = "Mean Beta Value",
   sample_colname = "patient_id",
   overwrite_plot = F
 )

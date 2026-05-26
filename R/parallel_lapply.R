@@ -26,7 +26,7 @@ parallel_lapply <- function(X, FUN, mc.cores, ...) {
     results1 <- purrr::map_dfr(ls(envir=.GlobalEnv), ~data.frame(name=.,
                                                                  is_func = is.function(get(.))))
     results2 <- dplyr::filter(results1, "is_func")
-    parallel::clusterEvalQ(cl, library("dplyr"))
+    parallel::clusterEvalQ(cl, requireNamespace("dplyr"))
     parallel::clusterExport(cl = cl, varlist = results2$name)
 
     output <- parallel::parLapply(cl=cl,X=X, fun=FUN,...)

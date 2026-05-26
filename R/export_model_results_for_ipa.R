@@ -80,13 +80,13 @@ df_genes %>% arrange(ADJ_P_VAL)
 
 # Attempt to find matching ensembl ids
 if (add_ensembl_ids) {
-  if (!requireNamespace("biomaRt", quietly = TRUE))  BiocManager::install("biomaRt", force = TRUE)
-  library(biomaRt)
+  # if (!requireNamespace("biomaRt", quietly = TRUE))  BiocManager::install("biomaRt", force = TRUE)
+  # library(biomaRt)
   
   # Connect to Ensembl (human genes)
-  mart <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+  mart <- biomaRt::useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
   # Query Ensembl for Ensembl ID + gene type
-  mapping <- getBM(
+  mapping <- biomaRt::getBM(
     attributes = c("hgnc_symbol", "ensembl_gene_id", "gene_biotype"),
     filters = "hgnc_symbol",
     values = df_genes$Nearest.Transcript,
@@ -98,7 +98,7 @@ if (add_ensembl_ids) {
   
   
   # Add biomart matches to gene list dataframe
-  df_genes <- df_genes %>% left_join(
+  df_genes <- df_genes %>% dplyr::left_join(
     mapping_unique, by = join_by(Nearest.Transcript == hgnc_symbol ), keep = F)
   
   

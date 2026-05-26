@@ -15,7 +15,6 @@ Roxygen: list(markdown = TRUE)
 biocViews:
 Imports: 
 	tidyr,
-	tidyverse,
 	qvalue,
 	clusterSim,
 	stringr,
@@ -51,7 +50,9 @@ Imports:
 	ggtext,
 	limma,
     AnnotationDbi,
-	org.Hs.eg.db
+	org.Hs.eg.db,
+	SKAT,
+	pls
 Suggests: 
     knitr,
     rmarkdown,

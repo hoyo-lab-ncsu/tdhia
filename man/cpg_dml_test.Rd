@@ -48,14 +48,14 @@ cpg_beta (default = "sample_name").}
 
 \item{beadchip_correction}{boolean, when true adds the following columns as '
 predictors to LIMMA linear model (if they are not already listed as predictors):
-Bead + Col + Row. (detault = TRUE).}
+Bead + Col + Row. (detault = TRUE). These columsn must already exist in study_data.}
 
 \item{verbose}{boolean, when true, prints output to console.}
 
 \item{write_plots}{boolean, when TRUE, writes plots to disk.}
 
-\item{correlation_check}{perform pairwise correlation check between predictors.
-Sometimes failes if the number of observations is too small (default = TRUE).}
+\item{correlation_check}{perform pairwise correlation test between predictors.
+Sometimes errors if the number of observations is too small (default = TRUE).}
 
 \item{output_dir_path}{directory path to write plots to disk.}
 }
@@ -65,7 +65,7 @@ test for associations between cpg beta values and study variables.
 The model equation is assumed to be:
 cpg_beta ~ predictors
 
-with beadchip_correction = T, then:
+With beadchip_correction = T, then:
 cpg_beta ~ predictors + Bead + Col + Row
 }
 \author{

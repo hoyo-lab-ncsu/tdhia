@@ -34,7 +34,7 @@ models, (nrows = sample size). Columns should include those specified with
 \item{predictors}{vector of strings of column names of predictors that are
 located in df_study.}
 
-\item{method}{davies: exact p-value for skat method
+\item{method}{davies: exact p-value for skat method (heterogeneous)
 optimal.adj: skat-O unified approach, combination of SKAT and burden test
 (default).}
 

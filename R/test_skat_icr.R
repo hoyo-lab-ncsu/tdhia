@@ -87,7 +87,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
 
       param  = BiocParallel::SnowParam(workers = n.cores, exportglobals = FALSE)
       wrap_fun = function(x, fx) {suppressPackageStartupMessages({
-        library(dplyr); library(tibble)})
+        requireNamespace(dplyr); requireNamespace(tibble)})
         fx(icr_ids[x], cpg_betas, df_study, model_str,
            cpg_mapping, m_value_transform, scaling = scaling, method = method, out_type = out_type)
       }

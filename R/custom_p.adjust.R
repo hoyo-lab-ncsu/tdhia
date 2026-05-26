@@ -7,7 +7,7 @@
 #' correction, using a user-specified value for the total number of comparisons (n),
 #' which may be less than the actual number of p-values provided.
 #'
-#' @param p_values A numeric vector of raw p-values.
+#' @param pvals A numeric vector of raw p-values.
 #' @param n A positive integer specifying the total number of
 #' comparisons (n) to use in the BH formula.
 #'
