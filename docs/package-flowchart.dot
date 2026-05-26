@@ -1,0 +1,123 @@
+digraph TDHIA {
+  graph [
+    rankdir=TB,
+    bgcolor="transparent",
+    pad="0.22",
+    nodesep="0.32",
+    ranksep="0.34",
+    splines=ortho,
+    ratio=compress,
+    size="8,10.5!",
+    page="8.5,11",
+    margin="0.25",
+    fontname="Helvetica",
+    labelloc="t",
+    label="tdhia package workflow"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    color="#bcc7d6",
+    penwidth=1.15,
+    fillcolor="#ffffff",
+    fontname="Helvetica",
+    fontsize=11,
+    margin="0.12,0.08"
+  ];
+
+  edge [
+    color="#738093",
+    arrowsize=0.65,
+    penwidth=1.1,
+    fontname="Helvetica",
+    fontsize=9
+  ];
+
+  inputs [
+    label="Inputs\nRaw IDAT pairs + study metadata",
+    fillcolor="#fff1bf"
+  ];
+
+  reference [
+    label="Package reference data\nmanifest + CpG/ICR maps + annotations",
+    fillcolor="#fff8e5"
+  ];
+
+  wrapper [
+    label="Optional wrapper\ntdhia_pipeline()\ncache-aware one-step run",
+    fillcolor="#eef3f8"
+  ];
+
+  load [
+    label="1. load_idata_to_probes()\nSesame import; calculate probe beta values\nand detection p-values",
+    fillcolor="#dcecff"
+  ];
+
+  probe [
+    label="probe_beta\nprobe_beta_df + probe_pval_df\nprobe_id x sample_id",
+    fillcolor="#ffffff"
+  ];
+
+  filter [
+    label="2. filter_probes()\nremove unmapped/non-CpG probes;\napply probe and patient QC",
+    fillcolor="#dcecff"
+  ];
+
+  filtered [
+    label="filtered probe_beta",
+    fillcolor="#ffffff"
+  ];
+
+  cpg_step [
+    label="3. convert_probes_to_cpgs()\naverage probes per CpG;\nfilter CpGs not mapped to ICRs",
+    fillcolor="#e3f6ea"
+  ];
+
+  cpg [
+    label="cpg_beta\ncpg_beta_df\nCpG_id x sample_id",
+    fillcolor="#ffffff"
+  ];
+
+  icr_step [
+    label="4. convert_cpgs_to_icrs()\naverage CpGs per ICR;\napply ICR missingness filter",
+    fillcolor="#e3f6ea"
+  ];
+
+  icr [
+    label="icr_beta\nicr_beta_df\nICR_id x sample_id",
+    fillcolor="#ffffff"
+  ];
+
+  analysis [
+    label="Analysis options\ncase-control t-tests | association GLMs\nCpG DML / ICR DMR | SKAT | PLS",
+    fillcolor="#e3f6ea"
+  ];
+
+  review [
+    label="Local review checks\nsample ID alignment | threshold defaults\nobject contracts | no tests/ directory",
+    fillcolor="#ffe7e7"
+  ];
+
+  { rank=same; inputs; reference; wrapper; }
+
+  inputs -> load;
+  wrapper -> load;
+
+  reference -> load [style=dashed, arrowhead=none];
+  reference -> filter [style=dashed, arrowhead=none];
+  reference -> cpg_step [style=dashed, arrowhead=none];
+  reference -> icr_step [style=dashed, arrowhead=none];
+
+  load -> probe;
+  probe -> filter;
+  filter -> filtered;
+  filtered -> cpg_step;
+  cpg_step -> cpg;
+  cpg -> icr_step;
+  icr_step -> icr;
+
+  cpg -> analysis;
+  icr -> analysis;
+  analysis -> review;
+}
