@@ -27,8 +27,10 @@
 #' @param min_cpg minimum number of cpg sites for an icr to be included in results.
 #' @param m_value_transform boolean, when true, transform beta values to
 #' m-values to control heteroskedasticity. Default = TRUE.
+#' @param scaling boolean, when true, z scales the data for SKAT analysis.
 #' @param verbose boolean, when TRUE, prints progress to command line (default = TRUE).
 #' @param n.cores integer, number of cores for processing (default = 1).
+#' @param db_flag boolean, when true, save environment to disk.
 #' @returns test
 #' @export
 #' @author Kate Everly, Bruce Corliss

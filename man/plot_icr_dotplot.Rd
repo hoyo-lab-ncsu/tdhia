@@ -57,10 +57,12 @@ same name as function.}
 \item{legend.position}{specify position of legend as specified in ggplot theme
 (default = "none").}
 
+\item{ytext}{text for y axis.}
+
 \item{sample_colname}{name of coolumn that refers to sample_id found with
 df_patient_groups, and also matc the column names in mat_cpg_beta.}
 
-\item{manual_cpg_index}{todo}
+\item{overwrite_plot}{boolean, when true, overwrite plot to disk.}
 }
 \value{
 a ggplot function handle to the plot.

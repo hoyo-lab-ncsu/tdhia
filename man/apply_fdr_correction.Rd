@@ -7,10 +7,10 @@
 apply_fdr_correction(pvals, n)
 }
 \arguments{
+\item{pvals}{A numeric vector of raw p-values.}
+
 \item{n}{A positive integer specifying the total number of
 comparisons (n) to use in the BH formula.}
-
-\item{p_values}{A numeric vector of raw p-values.}
 }
 \value{
 A numeric vector of adjusted p-values (q-values), ordered to

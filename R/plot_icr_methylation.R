@@ -27,10 +27,10 @@
 #' @param filter_na_group boolean, when TRUE (default), removes NA group from plots.
 #' @param legend.position specify position of legend as specified in ggplot theme
 #'  (default = "none").
-#' @param manual_cpg_index todo
+#' @param ytext text for y axis.
 #' @param sample_colname name of coolumn that refers to sample_id found with 
 #' df_patient_groups, and also matc the column names in mat_cpg_beta.
-#' 
+#' @param overwrite_plot boolean, when true, overwrite plot to disk.
 #' @returns a ggplot function handle to the plot.
 #'
 #' @importFrom magrittr %>%
@@ -47,16 +47,16 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # load(file = "plot_icr_methylation.RData")
   
   # Get list of CpGs for specified icrs
-  df = left_join(x = data.frame(cpg_id = rownames(mat_cpg_beta)),
-            y = tdhia::manifest_v1A2_design_scores %>% dplyr::select("cpg_id", "icr_id","MAPINFO") %>% distinct(),
-            by = join_by("cpg_id"), keep = FALSE, na_matches = "never", 
+  df = dplyr::left_join(x = data.frame(cpg_id = rownames(mat_cpg_beta)),
+            y = tdhia::manifest_v1A2_design_scores %>% dplyr::select("cpg_id", "icr_id","MAPINFO") %>% dplyr::distinct(),
+            by = dplyr::join_by("cpg_id"), keep = FALSE, na_matches = "never", 
             relationship = "one-to-one")
   
   # Subset the cpg_beta matrix
   sub_mat_cpg_beta = mat_cpg_beta[df$icr_id == icr_id,]
   
   # Reorder rows to genomic location
-  sub_mat_cpg_beta <- sub_mat_cpg_beta %>% arrange(df[df$icr_id == icr_id,]$MAPINFO)
+  sub_mat_cpg_beta <- sub_mat_cpg_beta %>% dplyr::arrange(df[df$icr_id == icr_id,]$MAPINFO)
   # ordered_cpg_ids <- df[df$icr_id == icr_id,] %>% arrange(MAPINFO) %>% pull(cpg_id)
   
   # Subset the cpg sites to those around significant cpgs/ specified by user
@@ -82,17 +82,18 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # Ordered list of cpg sites (for factor)
   # rownames(sub_mat_cpg_beta)
   # Convert data to long format
-  df_long_cpg_beta <- sub_mat_cpg_beta %>% rownames_to_column("cpg_id") %>% 
+  df_long_cpg_beta <- sub_mat_cpg_beta %>% tibble::rownames_to_column("cpg_id") %>% 
     pivot_longer(cols = -"cpg_id", names_to = sample_colname)
   
-  df_long_cpg_beta <- left_join(x = df_long_cpg_beta, y= df_patient_groups, by = join_by({{sample_colname}}),
+  df_long_cpg_beta <- left_join(x = df_long_cpg_beta, y= df_patient_groups, 
+                                by = dplyr::join_by({{sample_colname}}),
             keep = FALSE, na_matches = "never", relationship = "many-to-one")
   
   df_long_cpg_beta$cpg_id <- factor(df_long_cpg_beta$cpg_id, levels = rownames(sub_mat_cpg_beta), ordered=TRUE)
   df_long_cpg_beta$group <- factor(df_long_cpg_beta$group, levels = unique(df_long_cpg_beta$group) %>% sort(), ordered=TRUE)
   
-  df_summary <- df_long_cpg_beta %>% group_by(cpg_id, group) %>% 
-    summarize(beta_mean = mean(value, na.rm = T), beta_sd = sd(value, na.rm = T),
+  df_summary <- df_long_cpg_beta %>% dplyr::group_by(cpg_id, group) %>% 
+    dplyr::summarize(beta_mean = mean(value, na.rm = T), beta_sd = sd(value, na.rm = T),
               beta_sd = sd(value, na.rm = T), beta_sem = sd(value, na.rm = T)/sqrt(n()))
   df_summary$cpg_id_rank = as.numeric(df_summary$cpg_id)
   df_summary$xmin = df_summary$cpg_id_rank -0.5
@@ -136,7 +137,7 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     # Print summaries of data to command line as well
     print(gg)
     print(table(df_patient_groups$group))
-    save_plot(filename = plot_path, plot = gg,base_height = 2, base_width = 2.5)
+    cowplot::save_plot(filename = plot_path, plot = gg,base_height = 2, base_width = 2.5)
   }
 
   
@@ -182,10 +183,9 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
 #' @param filter_na_group boolean, when TRUE (default), removes NA group from plots.
 #' @param legend.position specify position of legend as specified in ggplot theme
 #'  (default = "none").
-#' @param manual_cpg_index todo
 #' @param sample_colname name of coolumn that refers to sample_id found with 
 #' df_patient_groups, and also matc the column names in mat_cpg_beta.
-#' 
+#' @param overwrite_plot boolean, when true, plot is overwritten to disk.
 #' @returns a ggplot function handle to the plot.
 #'
 #' @importFrom magrittr %>%

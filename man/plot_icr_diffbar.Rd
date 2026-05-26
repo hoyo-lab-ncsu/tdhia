@@ -64,7 +64,7 @@ same name as function.}
 \item{sample_colname}{name of coolumn that refers to sample_id found with
 df_patient_groups, and also matc the column names in mat_cpg_beta.}
 
-\item{manual_cpg_index}{todo}
+\item{overwrite_plot}{boolean, when true, plot is overwritten to disk.}
 }
 \value{
 a ggplot function handle to the plot.

@@ -66,6 +66,8 @@ ratio test, or linear regression with F test will be performed.
 \item{min_cpg}{minimum number of cpg sites for an icr to be included in
 results (default is 3).}
 
+\item{verbose}{boolean, when true, prints additional output.}
+
 \item{n.cores}{number of cores to run on (default is 1)}
 }
 \value{

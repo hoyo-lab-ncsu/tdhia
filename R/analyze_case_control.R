@@ -35,8 +35,8 @@ analyze_case_control <- function(beta_matrix, ctrl_cols, n_adjust = nrow(beta_ma
     df$p_val[i] <- t_test_result$p.value
     df$mean1[i] <- mean(group1, na.rm = TRUE)
     df$mean2[i] <- mean(group2, na.rm = TRUE)
-    df$std1[i] <-  sd(group1, na.rm = TRUE)
-    df$std2[i] <-  sd(group2,  na.rm = TRUE)
+    df$std1[i] <-  stats::sd(group1, na.rm = TRUE)
+    df$std2[i] <-  stats::sd(group2,  na.rm = TRUE)
     df$frac_na1[i] <-  sum(is.na(group1))/length(group1)
     df$frac_na2[i] <-  sum(is.na(group2))/length(group2)
   }

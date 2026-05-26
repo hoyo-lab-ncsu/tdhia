@@ -66,7 +66,7 @@
 #' results (default is 3).
 
 #' @param n.cores number of cores to run on (default is 1)
-
+#' @param verbose boolean, when true, prints additional output.
 #' @returns test
 #' @export
 #' @author Kate Everly

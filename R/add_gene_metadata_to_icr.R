@@ -70,7 +70,7 @@ add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg", db_flag = T) {
   #                                     "Distance.to.Nearest.Transcript"),
   #                     by = "icr_id", all.x = TRUE, all.y = FALSE, sort = FALSE)
 
-  df_gene <-left_join(x = df, y = imp_whole %>%
+  df_gene <- dplyr::left_join(x = df, y = imp_whole %>%
               dplyr::select("icr_id", "Genomic.Coordinates", "Nearest.Transcript",
                             "Distance.to.Nearest.Transcript"), by = "icr_id", keep =  NULL)
   

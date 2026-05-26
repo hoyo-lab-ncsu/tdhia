@@ -48,6 +48,8 @@ Either \code{"continuous"} or \code{"binary"}.}
 
 \item{return_fits}{Logical; if TRUE, returns fitted model objects
 (null model, alternative model, and PLS fit).}
+
+\item{db_flag}{boolean, when true, save environment to disk}
 }
 \value{
 A list containing test statistics, resampling p-values,

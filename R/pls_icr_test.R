@@ -27,6 +27,7 @@
 #' @param seed Integer random seed for reproducibility.
 #' @param return_fits Logical; if TRUE, returns fitted model objects
 #'   (null model, alternative model, and PLS fit).
+#' @param db_flag boolean, when true, save environment to disk
 #' @return A list containing test statistics, resampling p-values,
 #' PLS coefficients, and component diagnostics.
 #'

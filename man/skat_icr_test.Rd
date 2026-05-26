@@ -47,8 +47,12 @@ tests all icrs that are covered by the input cpg beta matrix.}
 
 \item{min_cpg}{minimum number of cpg sites for an icr to be included in results.}
 
+\item{db_flag}{boolean, when true, save environment to disk.}
+
 \item{m_value_transform}{boolean, when true, transform beta values to
 m-values to control heteroskedasticity. Default = TRUE.}
+
+\item{scaling}{boolean, when true, z scales the data for SKAT analysis.}
 
 \item{verbose}{boolean, when TRUE, prints progress to command line (default = TRUE).}
 
