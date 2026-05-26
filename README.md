@@ -126,6 +126,26 @@ If you need to reprocess the raw IDAT files, delete or overwrite the cached `.rd
    - discard probes that fail the p-value threshold in too many samples
    - optionally discard samples/patients that fail across too many probes
 
+   QC happens in layers:
+
+   1. **Mapping filter**: remove probes that are not mapped to a unique genomic location or are not CpG probes.
+   2. **Measurement-level signal filter**: identify individual probe/sample beta values whose detection p-value is above `max_sig_pval`.
+   3. **Probe-level fail-rate filter**: remove probes that fail signal detection in too many samples.
+   4. **Sample-level fail-rate filter**: remove samples/patients that fail signal detection across too many probes.
+   5. **Optional probe design filters**: restrict probes by design score or ICR confidence level.
+
+   Be careful when comparing direct `filter_probes()` calls with the wrapper `tdhia_pipeline()`. Their defaults are not identical:
+
+   | Setting | `filter_probes()` default | `tdhia_pipeline()` default |
+   | --- | --- | --- |
+   | `max_sig_pval` | `0.2` | `0.2` |
+   | `set_failed_betas_na` | `TRUE` | `FALSE` |
+   | `max_probe_fail_rate` | `0.25` | `0.2` |
+   | `max_patient_fail_rate` | `0.30` | `0.25` |
+   | `min_design_score` | `NA` | `NA` |
+
+   In practice, this means the one-step wrapper is somewhat stricter on probe and patient fail rates, but it does not set individual failed beta values to `NA` before the probe-level fail-rate filtering unless that argument is changed. If QC behavior matters for a study, set these arguments explicitly in the analysis script rather than relying on defaults.
+
 3. **Convert to CpG measurements**
 
    Convert the probe beta matrix to a CpG beta matrix by averaging probes that map to the same CpG site. `NA` values are ignored when possible; if all contributing values are `NA`, the CpG value is returned as `NA`.
