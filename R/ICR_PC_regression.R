@@ -107,7 +107,7 @@ pc_regression_test <- function (cpg_beta,
 
   verbosecat("> Remove rows in df_study that contain NA...\n")
   # Remove all samples with NA values from study data
-  df_study <- df_study %>% dplyr::select(all_of(c(outcome, covariates, Patient_ID))) %>% tidyr::drop_na()
+  df_study <- df_study %>% dplyr::select(dplyr::all_of(c(outcome, covariates, Patient_ID))) %>% tidyr::drop_na()
 
   # Make the samples match and order them the same
   verbosecat("> Forcing sample id order to match between cpg_beta and df_study.\n")
@@ -148,7 +148,7 @@ pc_regression_test <- function (cpg_beta,
 
     # Subset the beta matrix to only have data from the CpGs found in the ICR
     subset_cpg_beta <- cpg_beta %>%
-      dplyr::select(any_of(subset_cpg_ids))
+      dplyr::select(dplyr::any_of(subset_cpg_ids))
 
     # Data normalization prior to creating principal components
     subset_cpg_beta_norm <- clusterSim::data.Normalization(subset_cpg_beta , type=data_norm_type, normalization="column")
@@ -168,7 +168,7 @@ pc_regression_test <- function (cpg_beta,
     selected_pcs <- paste0("PC", seq_len(cutoff_index))
     # Get PC scores
     pcs <- as.data.frame(icr.pca$x) %>%
-      dplyr::select(all_of(selected_pcs))
+      dplyr::select(dplyr::all_of(selected_pcs))
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
 
@@ -193,10 +193,10 @@ pc_regression_test <- function (cpg_beta,
 
     # Build formulas
     # -------------------------------------------------------------------------
-    full_formula <- as.formula(
+    full_formula <- stats::as.formula(
       paste(outcome, "~", paste(c(predictor_cpg_names, covariates), collapse = " + "))
     )
-    red_formula <- as.formula(
+    red_formula <- stats::as.formula(
       paste(outcome, "~", paste(covariates, collapse = " + "))
     )
     # -------------------------------------------------------------------------
@@ -213,14 +213,14 @@ pc_regression_test <- function (cpg_beta,
                              icr_id, "reduced")
 
       lrt <- stats::anova(model_red, model_full, test = "Chisq")
-      pval <- tail(lrt, 1)$`Pr(>Chi)`
+      pval <- utils::tail(lrt, 1)$`Pr(>Chi)`
     } else {
       model_full <- safe_fit(stats::lm(full_formula, data = combined_data),
                              icr_id, "full")
       model_red  <- safe_fit(stats::lm(red_formula,  data = combined_data),
                              icr_id, "reduced")
       ftest <- stats::anova(model_red, model_full)
-      pval <- tail(ftest, 1)$`Pr(>F)`
+      pval <- utils::tail(ftest, 1)$`Pr(>F)`
     }
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -269,4 +269,3 @@ pc_regression_test <- function (cpg_beta,
 
   return(df_results)
 }
-

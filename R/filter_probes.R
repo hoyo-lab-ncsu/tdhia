@@ -251,7 +251,11 @@ filter_probes <- function(probe_beta, discard_unmapped_probes = TRUE,
   #_____________________________________________________________________________
   if (!is.null(icr_conf_levels)) {
     # icr_conf_levels is considered a WHITELIST, not a threshold.
-    df_metadata <- add_metadata_from_cpg(str_replace(rownames(filt_probe_beta_df), "_.*$",""))
+    df_metadata <- add_metadata_to_imp_sites(
+      stringr::str_replace(rownames(filt_probe_beta_df), "_.*$", ""),
+      imp_type = "cpg",
+      db_flag = FALSE
+    )
     icr_conf_keep_flag <- df_metadata$icr_conf %in% icr_conf_levels
     
     # FIlter out probes that are not part of specified icr_conf levels
@@ -341,5 +345,4 @@ pbates <- function(mean_p_vals, samples, n_sims = 1e6) {
 
   return(p_vals)
 }
-
 

@@ -83,9 +83,9 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # rownames(sub_mat_cpg_beta)
   # Convert data to long format
   df_long_cpg_beta <- sub_mat_cpg_beta %>% tibble::rownames_to_column("cpg_id") %>% 
-    pivot_longer(cols = -"cpg_id", names_to = sample_colname)
+    tidyr::pivot_longer(cols = -"cpg_id", names_to = sample_colname)
   
-  df_long_cpg_beta <- left_join(x = df_long_cpg_beta, y= df_patient_groups, 
+  df_long_cpg_beta <- dplyr::left_join(x = df_long_cpg_beta, y= df_patient_groups, 
                                 by = dplyr::join_by({{sample_colname}}),
             keep = FALSE, na_matches = "never", relationship = "many-to-one")
   
@@ -93,13 +93,13 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   df_long_cpg_beta$group <- factor(df_long_cpg_beta$group, levels = unique(df_long_cpg_beta$group) %>% sort(), ordered=TRUE)
   
   df_summary <- df_long_cpg_beta %>% dplyr::group_by(cpg_id, group) %>% 
-    dplyr::summarize(beta_mean = mean(value, na.rm = T), beta_sd = sd(value, na.rm = T),
-              beta_sd = sd(value, na.rm = T), beta_sem = sd(value, na.rm = T)/sqrt(n()))
+    dplyr::summarize(beta_mean = mean(value, na.rm = T), beta_sd = stats::sd(value, na.rm = T),
+              beta_sd = stats::sd(value, na.rm = T), beta_sem = stats::sd(value, na.rm = T)/sqrt(dplyr::n()))
   df_summary$cpg_id_rank = as.numeric(df_summary$cpg_id)
   df_summary$xmin = df_summary$cpg_id_rank -0.5
   df_summary$xmax = df_summary$cpg_id_rank +0.5
   df_summary$back_fill = df_summary$cpg_id_rank %% 2 == 0
-  if (filter_na_group) df_summary <- df_summary %>% filter(!is.na(group))
+  if (filter_na_group) df_summary <- df_summary %>% dplyr::filter(!is.na(group))
   
   # Get ICR metadata (closest genes, zinc finger)
   icr_metadata <- add_metadata_to_imp_sites(icr_id, imp_type = "icr")
@@ -202,16 +202,16 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # load(file = "plot_icr_diffbar.RData")
   
   # Get list of CpGs for specified icrs
-  df = left_join(x = data.frame(cpg_id = rownames(mat_cpg_beta)),
-                 y = tdhia::manifest_v1A2_design_scores %>% dplyr::select("cpg_id", "icr_id","MAPINFO") %>% distinct(),
-                 by = join_by("cpg_id"), keep = FALSE, na_matches = "never", 
+  df = dplyr::left_join(x = data.frame(cpg_id = rownames(mat_cpg_beta)),
+                 y = tdhia::manifest_v1A2_design_scores %>% dplyr::select("cpg_id", "icr_id","MAPINFO") %>% dplyr::distinct(),
+                 by = dplyr::join_by("cpg_id"), keep = FALSE, na_matches = "never", 
                  relationship = "one-to-one")
   
   # Subset the cpg_beta matrix
   sub_mat_cpg_beta = mat_cpg_beta[df$icr_id == icr_id,]
   
   # Reorder rows to genomic location, assuming same chromosomes
-  sub_mat_cpg_beta <- sub_mat_cpg_beta %>% arrange(df[df$icr_id == icr_id,]$MAPINFO)
+  sub_mat_cpg_beta <- sub_mat_cpg_beta %>% dplyr::arrange(df[df$icr_id == icr_id,]$MAPINFO)
   # ordered_cpg_ids <- df[df$icr_id == icr_id,] %>% arrange(MAPINFO) %>% pull(cpg_id)
   
   # Subset the cpg sites to those around significant cpgs/ specified by user
@@ -237,10 +237,10 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # Ordered list of cpg sites (for factor)
   # rownames(sub_mat_cpg_beta)
   # Convert data to long format
-  df_long_cpg_beta <- sub_mat_cpg_beta %>% rownames_to_column("cpg_id") %>% 
-    pivot_longer(cols = -"cpg_id", names_to = sample_colname)
+  df_long_cpg_beta <- sub_mat_cpg_beta %>% tibble::rownames_to_column("cpg_id") %>% 
+    tidyr::pivot_longer(cols = -"cpg_id", names_to = sample_colname)
   
-  df_long_cpg_beta <- left_join(x = df_long_cpg_beta, y= df_patient_groups, by = join_by({{sample_colname}}),
+  df_long_cpg_beta <- dplyr::left_join(x = df_long_cpg_beta, y= df_patient_groups, by = dplyr::join_by({{sample_colname}}),
                                 keep = FALSE, na_matches = "never", relationship = "many-to-one")
   
   df_long_cpg_beta$cpg_id <- factor(df_long_cpg_beta$cpg_id, levels = rev(rownames(sub_mat_cpg_beta)), ordered=TRUE)
@@ -249,15 +249,15 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   
   
   # Calculate beta difference across all patients
-  df_summary_all <- df_long_cpg_beta %>% group_by(cpg_id) %>% 
-    summarize(
+  df_summary_all <- df_long_cpg_beta %>% dplyr::group_by(cpg_id) %>% 
+    dplyr::summarize(
       subset_group = "All",
       beta_mean_diff = mean(value[diff_group==2], na.rm = T) - mean(value[diff_group==1], na.rm = T),
       n1 = sum(diff_group==1), n2 = sum(diff_group==2),
-      beta_sd_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2 +
-                            sd(value[diff_group==2], na.rm = T)^2),
-      beta_sem_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2/n1 +
-                             sd(value[diff_group==2], na.rm = T)^2/n2))
+      beta_sd_diff = sqrt(stats::sd(value[diff_group==1], na.rm = T)^2 +
+                            stats::sd(value[diff_group==2], na.rm = T)^2),
+      beta_sem_diff = sqrt(stats::sd(value[diff_group==1], na.rm = T)^2/n1 +
+                             stats::sd(value[diff_group==2], na.rm = T)^2/n2))
   df_summary_all$cpg_id_rank = as.numeric(df_summary_all$cpg_id)
   df_summary_all$xmin = df_summary_all$cpg_id_rank -0.5
   df_summary_all$xmax = df_summary_all$cpg_id_rank +0.5
@@ -265,14 +265,14 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   df_summary_all$cpg_sig = df_summary_all$cpg_id %in% sig_cpgs
   
   # Get difference in beta for each of the sample subgroups
-  df_summary_sub <- df_long_cpg_beta %>% group_by(cpg_id, subset_group) %>% 
-    summarize(
+  df_summary_sub <- df_long_cpg_beta %>% dplyr::group_by(cpg_id, subset_group) %>% 
+    dplyr::summarize(
       beta_mean_diff = mean(value[diff_group==2], na.rm = T) - mean(value[diff_group==1], na.rm = T),
       n1 = sum(diff_group==1), n2 = sum(diff_group==2),
-      beta_sd_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2 +
-                            sd(value[diff_group==2], na.rm = T)^2),
-      beta_sem_diff = sqrt(sd(value[diff_group==1], na.rm = T)^2/n1 +
-                             sd(value[diff_group==2], na.rm = T)^2/n2))
+      beta_sd_diff = sqrt(stats::sd(value[diff_group==1], na.rm = T)^2 +
+                            stats::sd(value[diff_group==2], na.rm = T)^2),
+      beta_sem_diff = sqrt(stats::sd(value[diff_group==1], na.rm = T)^2/n1 +
+                             stats::sd(value[diff_group==2], na.rm = T)^2/n2))
   
   temp <- df_summary_all %>% dplyr::select(c("cpg_id_rank", "xmin", "xmax", "back_fill", "cpg_sig"))
   df_summary_sub <- cbind(df_summary_sub, rbind(temp,temp))
@@ -319,7 +319,7 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     # Print summaries of data to command line as well
     print(gg)
     print(table(df_summary$diff_group))
-    save_plot(filename = plot_path, plot = gg, base_height = plot_height_width[1], base_width = plot_height_width[1])
+    cowplot::save_plot(filename = plot_path, plot = gg, base_height = plot_height_width[1], base_width = plot_height_width[1])
   }
 
   

@@ -44,10 +44,10 @@ df_gene_unsplit$ind = 1:nrow(df_gene_unsplit)
 dataframe_split_genes <- function(df) {
   temp_list = list(); k = 1
   for (n in 1:nrow(df)) {
-    splits <- str_split(string = df$Nearest.Transcript[n],pattern = "\\|")
+    splits <- stringr::str_split(string = df$Nearest.Transcript[n], pattern = "\\|")
     # Add row for each entry
     for (m in seq_along(splits[[1]])) {
-      temp_list[[k]] <- df[n,] %>% mutate(Nearest.Transcript = splits[[1]][m])
+      temp_list[[k]] <- df[n,] %>% dplyr::mutate(Nearest.Transcript = splits[[1]][m])
       k = k+1
     }
   }
@@ -58,10 +58,10 @@ df_gene_split <- dataframe_split_genes(df_gene_unsplit)
 
 temp_list = list(); k = 1
 for (n in 1:nrow(df_gene_unsplit)) {
-  splits <- str_split(string = df_gene_unsplit$Nearest.Transcript[n],pattern = "\\|")
+  splits <- stringr::str_split(string = df_gene_unsplit$Nearest.Transcript[n], pattern = "\\|")
   # Add row for each entry
   for (m in seq_along(splits[[1]])) {
-    temp_list[[k]] <- df_gene_unsplit[n,] %>% mutate(Nearest.Transcript = splits[[1]][m])
+    temp_list[[k]] <- df_gene_unsplit[n,] %>% dplyr::mutate(Nearest.Transcript = splits[[1]][m])
     k = k+1
   }
 }
@@ -70,11 +70,11 @@ df_gene_split <- do.call(rbind, temp_list)
 
 # Grab max magnitude model estimate for each gene (and model group)
 df_genes <- df_gene_split %>% 
-  group_by(model_group, Nearest.Transcript) %>% 
-  summarize(Estimate = Estimate[which.max(abs(Estimate))],
+  dplyr::group_by(model_group, Nearest.Transcript) %>% 
+  dplyr::summarize(Estimate = Estimate[which.max(abs(Estimate))],
             ADJ_P_VAL = min(ADJ_P_VAL), ind = mean(ind)) %>% 
-  arrange(ind) %>% dplyr::select(-ind)
-df_genes %>% arrange(ADJ_P_VAL)
+  dplyr::arrange(ind) %>% dplyr::select(-ind)
+df_genes %>% dplyr::arrange(ADJ_P_VAL)
 
 
 
@@ -99,7 +99,7 @@ if (add_ensembl_ids) {
   
   # Add biomart matches to gene list dataframe
   df_genes <- df_genes %>% dplyr::left_join(
-    mapping_unique, by = join_by(Nearest.Transcript == hgnc_symbol ), keep = F)
+    mapping_unique, by = dplyr::join_by(Nearest.Transcript == hgnc_symbol ), keep = F)
   
   
   # Attempt to fill in genes with annotation DBI
@@ -120,8 +120,8 @@ model_names <- unique(df_genes$model_group)
 for (n in seq_along(model_names)) {
   model_path = paste0(output_dir_path, "/", model_names[n],"-group__gene_pathway_analysis_input_all_icrs.csv")
   cat(sprintf("> Exporting: %s\n", model_path))
-  exported_datasets[[n]] <- df_genes %>% filter(model_group==model_names[n]) %>% dplyr::arrange(ADJ_P_VAL)
-  write.csv(x = exported_datasets[[n]], file = model_path)
+  exported_datasets[[n]] <- df_genes %>% dplyr::filter(model_group==model_names[n]) %>% dplyr::arrange(ADJ_P_VAL)
+  utils::write.csv(x = exported_datasets[[n]], file = model_path)
   
 }
 
@@ -137,5 +137,4 @@ return(list(exported_datasets = exported_datasets))
 
 
 }
-
 

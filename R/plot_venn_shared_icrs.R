@@ -22,7 +22,7 @@ plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names 
   # For each group included in venn diagram, get list of all ICRs in that group
   df_members = list()
   for (n in seq_along(group_names)) {
-    df_members[[group_names[n]]] <- unique(filter(df_imp_sig, .data[[colname]] == group_names[n])$icr_id)
+    df_members[[group_names[n]]] <- unique(dplyr::filter(df_imp_sig, .data[[colname]] == group_names[n])$icr_id)
   }
   # Sort groups by total number of members
   df_members = df_members[ order(sapply(df_members, function(x) length(x)),decreasing = TRUE)]
@@ -30,14 +30,14 @@ plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names 
   # Input to venn diagram package
   # browser()
   # png(filename=paste0(output_dir_path, "/icr_venn_diagram",name_suffix,".png"))
-  ggv = ggVennDiagram(df_members, label = "count", category.names = 
+  ggv = ggVennDiagram::ggVennDiagram(df_members, label = "count", category.names = 
                         names(df_members),label_alpha = 1,set_color = "black", label_color = "white",
                       set_size = 4, label_size = 3.5, order.intersect.by = "size") + 
     scale_x_continuous(expand = expansion(mult = .2)) +
     theme(legend.text=element_text(size=8), legend.title = element_text(size=8),
           legend.position = "none")
   if (!is.null(name_suffix)) {
-    save_plot(filename = paste0(output_dir_path, "/icr_venn_diagram",name_suffix,".png"),
+    cowplot::save_plot(filename = paste0(output_dir_path, "/icr_venn_diagram",name_suffix,".png"),
               plot = ggv,base_height = 2,base_width = 4)
   } 
   

@@ -56,7 +56,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
 
   verbosecat("> Remove rows in df_study that contain NA...\n")
   # Remove all samples with NA values from study data (not supported with SKAT)
-  df_study <- df_study %>% dplyr::select(all_of(c(response, predictors))) %>% tidyr::drop_na()
+  df_study <- df_study %>% dplyr::select(dplyr::all_of(c(response, predictors))) %>% tidyr::drop_na()
 
   # Make the samples match and order them the same
   verbosecat("> Forcing sample id order to match between data and df_study.\n")
@@ -89,7 +89,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
 
       param  = BiocParallel::SnowParam(workers = n.cores, exportglobals = FALSE)
       wrap_fun = function(x, fx) {suppressPackageStartupMessages({
-        requireNamespace(dplyr); requireNamespace(tibble)})
+        requireNamespace("dplyr"); requireNamespace("tibble")})
         fx(icr_ids[x], cpg_betas, df_study, model_str,
            cpg_mapping, m_value_transform, scaling = scaling, method = method, out_type = out_type)
       }
@@ -103,7 +103,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
 
   # Remove ICRs with too few cpg sites
   verbosecat(sprintf("> Filtering out ICRs with < %d cpg sites...\n", min_cpg))
-  df_results <- df_results %>% filter(n_cpg >= min_cpg)
+  df_results <- df_results %>% dplyr::filter(n_cpg >= min_cpg)
   
   # Calculate adjusted p-value and q-value
   df_results$skat_adj_pvalue <- p.adjust(p = df_results$skat_raw_pvalue, method = "fdr")
