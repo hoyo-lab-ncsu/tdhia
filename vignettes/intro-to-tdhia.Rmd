@@ -160,6 +160,7 @@ df_study$smoked <- as.factor(sample(c(0,1), size = n_patients, replace = TRUE))
 df_study$Bead = factor(sample(x = c("83279", "83249", "72794", "5449"), size = n_patients, replace = T))
 df_study$Col = factor(sample(x = 1:3, size = n_patients, replace = T))
 df_study$Row = factor(sample(x = 1:6, size = n_patients, replace = T))
+df_study$Patient_ID <- colnames(cpg_beta$cpg_beta_df)
 df_study
 
 rownames(df_study) <- colnames(cpg_beta$cpg_beta_df)
@@ -183,8 +184,105 @@ df_complete <- tdhia::analyze_association(R = select(df_study, exposure),
 ```
 
 
+## ICR-level regression tests
 
-Next we can perform a cpg level DML analysis and ICR level DMR analysis using a pipeline from true diagnostic.
+TDHIA also includes regression tools for testing ICR-level methylation patterns.
+Two direct ICR-level options are principal component regression and SKAT. A third
+option first tests individual CpGs with LIMMA and then combines CpG-level
+p-values within each ICR using Lancaster's method.
+
+For binary traits, make sure the phenotype is coded as a two-level factor and
+set the reference group before modeling. The examples below use the simulated
+`smoked` variable as a placeholder binary outcome. For continuous outcomes, use
+`family = "continuous"` in `pc_regression_test()` and `out_type = "C"` in
+`skat_icr_test()`.
+
+```{r eval=FALSE}
+# Prepare analysis metadata and keep complete cases for the selected model.
+icr_study <- df_study %>%
+  dplyr::select(Patient_ID, smoked, exposure, race) %>%
+  tidyr::drop_na()
+
+rownames(icr_study) <- icr_study$Patient_ID
+icr_study$smoked <- stats::relevel(as.factor(icr_study$smoked), ref = "0")
+
+# Keep the same samples in the methylation matrix and study metadata.
+shared_ids <- intersect(colnames(cpg_beta$cpg_beta_df), rownames(icr_study))
+cpg_beta_icr <- cpg_beta$cpg_beta_df[, shared_ids, drop = FALSE]
+icr_study <- icr_study[shared_ids, , drop = FALSE]
+```
+
+### Principal component regression
+
+Principal component regression summarizes the CpGs inside each ICR with enough
+principal components to explain the requested fraction of methylation variance.
+It then compares a full model that includes those methylation PCs to a reduced
+model with only the covariates.
+
+```{r eval=FALSE}
+# pc_regression_test() expects samples as rows and CpGs as columns.
+cpg_beta_pc <- as.data.frame(t(cpg_beta_icr))
+
+pc_icr_results <- tdhia::pc_regression_test(
+  cpg_beta = cpg_beta_pc,
+  m_value_transform = TRUE,
+  data_norm_type = "n1",
+  pct_variance = 0.80,
+  df_study = icr_study,
+  outcome = "smoked",
+  covariates = c("exposure", "race"),
+  Patient_ID = "Patient_ID",
+  family = "binomial",
+  icr_ids = NULL,
+  min_cpg = 3,
+  verbose = TRUE,
+  n.cores = 1
+)
+
+pc_icr_results <- pc_icr_results %>%
+  dplyr::left_join(
+    tdhia::add_metadata_to_imp_sites(pc_icr_results$ICR_id, imp_type = "icr", db_flag = FALSE),
+    by = c("ICR_id" = "icr_id")
+  )
+
+head(pc_icr_results)
+```
+
+### SKAT ICR regression
+
+SKAT tests each ICR as a set of CpG methylation values. It is useful when the
+CpGs inside an ICR may have heterogeneous effects.
+
+```{r eval=FALSE}
+skat_icr_results <- tdhia::skat_icr_test(
+  cpg_betas = as.data.frame(cpg_beta_icr),
+  df_study = icr_study,
+  response = "smoked",
+  predictors = c("exposure", "race"),
+  method = "optimal.adj",
+  out_type = "D",
+  icr_ids = NULL,
+  min_cpg = 3,
+  db_flag = FALSE,
+  m_value_transform = TRUE,
+  scaling = TRUE,
+  verbose = TRUE,
+  n.cores = 1
+)
+
+skat_icr_results <- skat_icr_results %>%
+  dplyr::left_join(
+    tdhia::add_metadata_to_imp_sites(skat_icr_results$icr_id, imp_type = "icr", db_flag = FALSE),
+    by = "icr_id"
+  )
+
+head(skat_icr_results)
+```
+
+### LIMMA followed by Lancaster aggregation
+
+Next we can perform a CpG-level DML analysis and ICR-level DMR analysis using a
+LIMMA-based workflow.
 
 The CPG level analyses uses LIMMA for increasing power for differential methylation 
 testing. This example queries external annotation services through downstream
@@ -194,11 +292,15 @@ it interactively when network access and annotation resources are available.
 
 ```{r eval=FALSE}
 
-# Differential cpg analysis
-out_cpg <- tdhia::cpg_dml_test(df_study = df_study %>% tibble::rownames_to_column("Patient_ID"),
-                        predictors = c("exposure", "race", "smoked"), sample_name = "Patient_ID",
-                        cpg_beta = cpg_beta$cpg_beta_df, beadchip_correction = T,
-                        db_flag = FALSE)
+# Differential CpG analysis with LIMMA.
+out_cpg <- tdhia::cpg_dml_test(
+  df_study = df_study,
+  predictors = c("smoked", "exposure", "race"),
+  sample_name = "Patient_ID",
+  cpg_beta = cpg_beta$cpg_beta_df,
+  beadchip_correction = TRUE,
+  db_flag = FALSE
+)
 
 out_cpg$plots$qq_p_value
 out_cpg$plots$volcano
@@ -206,7 +308,7 @@ out_cpg$plots$manhattan
 
 ```
 
-The ICR level analyses uses Lancaster p-value aggregation procedure to test for 
+The ICR level analyses uses Lancaster p-value aggregation procedure to test for
 altered methylation state in ICRs.
 
 
