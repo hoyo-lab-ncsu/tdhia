@@ -6,3 +6,19 @@ inst/doc
 vignettes/*/html/*
 /doc/
 /Meta/
+
+# macOS/local IDE files
+.DS_Store
+**/.DS_Store
+
+# Local markdown/render previews
+README.html
+
+# Local analysis/manuscript output files
+Supplementary_Table_S1.xlsx
+Supplementary_Table_S1_ldl.docx
+ldl_sig_icr_summary_with_genes.csv
+nest_metabolic_markers_final.csv
+sample_ids.txt
+tri_sig_icr_summary_with_genes.csv
+uhdl_sig_icr_summary_with_genes.csv
