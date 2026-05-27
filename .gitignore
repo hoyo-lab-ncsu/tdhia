@@ -6,6 +6,8 @@ inst/doc
 vignettes/*/html/*
 /doc/
 /Meta/
+tdhia_*.tar.gz
+*.Rcheck/
 
 # macOS/local IDE files
 .DS_Store

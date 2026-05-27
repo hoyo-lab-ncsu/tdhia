@@ -9,8 +9,8 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>")
+```{r setup, include = FALSE, purl = FALSE}
+knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>", eval = FALSE, purl = FALSE)
 
 library(dplyr)
 # here::i_am("README.md")
@@ -21,12 +21,17 @@ library(dplyr)
 Here we will demonstrate how to process IDAT files from the True Diagnostic Human
 Imprintome Array (TDHIA) with the tdhia package.
 
+The code is not evaluated during package checks because several steps require
+annotation resources and Sesame/Bioconductor cache files that may not be
+available on offline build systems. Copy the chunks into an interactive R
+session after installing the package and required annotation data.
+
 ## Dataset generation
 
 We begin by first generating simulated data. Sesame imports IDAT files into a SigSet data object. We are going to artificially generate SigSet files. Let's do a dataset of 10 SigSets (IDATS).
 
 
-```{r simulate}
+```{r simulate, eval=FALSE}
 n_patients = 20
 ss <- tdhia::simulate_idat_data(n_patients)
 ```
@@ -40,14 +45,14 @@ detection p-values. This is returned in a named list, with the following fields:
   
 
 
-```{r probes}
+```{r probes, eval=FALSE}
 probe_beta <-
     tdhia::load_idata_to_probes(idat_dir_paths = ss, multicore = 2, 
                          quantile_norm = FALSE, db_flag = TRUE)
 ```
   
 You can access the probe beta matrix with the **probe_beta_df** field.
-```{r visualize}
+```{r visualize, eval=FALSE}
 # Access probe beta matrix
 head(probe_beta$probe_beta_df)
 ```
@@ -57,7 +62,7 @@ We can filter out low quality probes with the filt_probe_beta(). This function
 returns a named list with the same format as *probe_beta* above.  
 
 
-```{r filter}
+```{r filter, eval=FALSE}
 # 2) Filter probes that are not mapped and discard poor signal
 # Output: rows: probe_id     x     columns: patient
 filt_probe_beta <-
@@ -68,7 +73,7 @@ filt_probe_beta <-
 ```
 
 You can access the filtered probe beta matrix with the **probe_beta_df** field.
-```{r filter_visualize}
+```{r filter_visualize, eval=FALSE}
 # Access filtered probe beta matrix
 head(filt_probe_beta$probe_beta_df)
 ```
@@ -84,7 +89,7 @@ matrix, stored in a named list of the form:
   
 Probe beta values that belong to the same cpg site for a given patient are averaged.  
 
-```{r cpg}
+```{r cpg, eval=FALSE}
 #3  Convert probe beta matrix to a cpg beta matrix
 # Output: rows: cpg_id     x     columns: patient
 cpg_beta <- tdhia::convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE, 
@@ -92,7 +97,7 @@ cpg_beta <- tdhia::convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE
 ```
 
 You can access the filtered probe beta matrix with the **cpg_beta_df** field.
-```{r cpg_visualize}
+```{r cpg_visualize, eval=FALSE}
 # Access filtered probe beta matrix
 head(cpg_beta$cpg_beta_df)
 ```
@@ -109,7 +114,7 @@ returned in a named list of the form:
 Probe beta values that belong to the same cpg site for a given patient are averaged.  
 
 
-```{r icr}
+```{r icr, eval=FALSE}
 
 #4  Convert probe beta matrix to an icr beta matrix
 # Output: rows: icr_id     x     columns: patient
@@ -118,14 +123,14 @@ icr_beta <- tdhia::convert_cpgs_to_icrs(cpg_beta, max_icr_fail_rate = 0.2)
 ```
 
 You can access the filtered probe beta matrix with the **probe_beta_df** field.
-```{r}
+```{r eval=FALSE}
 # Access filtered probe beta matrix
 head(icr_beta$icr_beta_df)
 ```
 
 Let's simulate a case control analysis, where we will test for differences in CpG methylation state between a control group and an treatment group.
 
-```{r}
+```{r eval=FALSE}
 
 groud_id = c(rep(0,floor(n_patients/2)), rep(1,n_patients - floor(n_patients/2)))
 
@@ -146,7 +151,7 @@ First, a data frame is created with patient information, including any response
 variables or predictors. For actual analysis, this data is usually imported from
 a csv file or similiar format.
 
-```{r}
+```{r eval=FALSE}
 
 df_study = data.frame(id = 1:n_patients)
 df_study$race <- as.factor(sample(c(0,1,2), size = n_patients, replace = TRUE))
@@ -164,7 +169,7 @@ rownames(df_study) <- colnames(cpg_beta$cpg_beta_df)
 
 
 
-```{r}
+```{r eval=FALSE}
 
 n.cores <- max(c(parallel::detectCores()-2,1))
 
@@ -182,16 +187,18 @@ df_complete <- tdhia::analyze_association(R = select(df_study, exposure),
 Next we can perform a cpg level DML analysis and ICR level DMR analysis using a pipeline from true diagnostic.
 
 The CPG level analyses uses LIMMA for increasing power for differential methylation 
-testing.
+testing. This example queries external annotation services through downstream
+annotation helpers, so it is shown but not evaluated during package checks. Run
+it interactively when network access and annotation resources are available.
 
 
-```{r}
+```{r eval=FALSE}
 
 # Differential cpg analysis
 out_cpg <- tdhia::cpg_dml_test(df_study = df_study %>% tibble::rownames_to_column("Patient_ID"),
                         predictors = c("exposure", "race", "smoked"), sample_name = "Patient_ID",
                         cpg_beta = cpg_beta$cpg_beta_df, beadchip_correction = T,
-                        db_flag = T)
+                        db_flag = FALSE)
 
 out_cpg$plots$qq_p_value
 out_cpg$plots$volcano
@@ -203,7 +210,7 @@ The ICR level analyses uses Lancaster p-value aggregation procedure to test for
 altered methylation state in ICRs.
 
 
-```{r}
+```{r eval=FALSE}
 
 # Differential icr analysis
 out_icr <- tdhia::icr_dmr_test(df_dml = out_cpg$df_dml, chr_lens = out_cpg$chr_lens)

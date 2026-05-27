@@ -11,11 +11,14 @@ output:
     toc_float: true
     code_folding: hide
     toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
-vignette: >
-  %\VignetteIndexEntry{Comparison of Methylation Measurements between Imprintome and WGBS}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
 ---
+
+<!--
+This R Markdown file is a manuscript/reproduction analysis, not a package-built
+vignette. It requires full Git LFS IDAT files and cached/manuscript data. It is
+intentionally not registered with a \VignetteIndexEntry block so R CMD build
+does not attempt to rebuild it during package checks.
+-->
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(

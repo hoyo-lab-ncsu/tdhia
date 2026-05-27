@@ -15,7 +15,8 @@ cpg_dml_test(
   verbose = T,
   write_plots = F,
   correlation_check = F,
-  output_dir_path = getwd()
+  output_dir_path = getwd(),
+  label = predictors[1]
 )
 }
 \arguments{
@@ -58,6 +59,9 @@ Bead + Col + Row. (detault = TRUE). These columsn must already exist in study_da
 Sometimes errors if the number of observations is too small (default = TRUE).}
 
 \item{output_dir_path}{directory path to write plots to disk.}
+
+\item{label}{optional label used when writing plot files. Defaults to the
+primary predictor name.}
 }
 \description{
 test for associations between cpg beta values and study variables.

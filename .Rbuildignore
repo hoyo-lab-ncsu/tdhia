@@ -4,3 +4,4 @@
 ^data-raw$
 ^doc$
 ^Meta$
+^vignettes/imprintome_vs_wgbs_methylation\.Rmd$
