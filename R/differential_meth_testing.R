@@ -36,6 +36,8 @@
 #' Bead + Col + Row. (detault = TRUE). These columsn must already exist in study_data.
 #' @param write_plots boolean, when TRUE, writes plots to disk.
 #' @param output_dir_path directory path to write plots to disk.
+#' @param label optional label used when writing plot files. Defaults to the
+#' primary predictor name.
 #' @param correlation_check perform pairwise correlation test between predictors. 
 #' Sometimes errors if the number of observations is too small (default = TRUE).
 #' @param verbose boolean, when true, prints output to console.
@@ -46,18 +48,24 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
                          pvalue_threshold = 0.0001, db_flag = F, sample_name = "Patient.ID",
                          beadchip_correction = T, verbose = T, write_plots = F,
                          correlation_check = F,
-                         output_dir_path = getwd()) {
+                         output_dir_path = getwd(), label = predictors[1]) {
   
   if (db_flag) {save(list = ls(all.names = TRUE), file = "cpg_dml_test.RData")}
   # load(file = "cpg_dml_test.RData")
   vsprintf <- \(x, ...) if (verbose) cat(sprintf(x, ...))
   plots = list()
+  if (!sample_name %in% colnames(df_study)) {
+    stop(sprintf(">> Error: sample_name column '%s' does not exist in df_study.", sample_name))
+  }
   
   # Keep samples (patients) that exist in both study metadata and cpg_beta matrix
-  shared_patients <- intersect(df_study[[sample_name]], colnames(cpg_beta))
+  shared_patients <- unique(df_study[[sample_name]][df_study[[sample_name]] %in% colnames(cpg_beta)])
   vsprintf(">> %i shared patients between study data and beta matrix, other culled.\n", length(shared_patients))
-  df_study <- df_study[df_study[[sample_name]] %in% shared_patients, ]
-  cpg_beta <- cpg_beta [, shared_patients]
+  if (length(shared_patients) == 0) {
+    stop(">> Error: no shared patients between df_study and cpg_beta column names.")
+  }
+  df_study <- df_study[match(shared_patients, df_study[[sample_name]]), , drop = FALSE]
+  cpg_beta <- cpg_beta[, shared_patients, drop = FALSE]
   
   # Assemble predictor list
   if (beadchip_correction) {
@@ -70,26 +78,30 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
     stop(sprintf(">> Error: these required columns do not exist in df_study: %s\n", 
              paste(missed_columns, collapse = ", ")))
   }
+  if (anyNA(df_study[, predictors, drop = FALSE])) {
+    stop(">> Error: df_study contains NA values in model predictor columns. Remove or impute them before cpg_dml_test().")
+  }
   
   
   # Correlation plot of predictors                                    ##########
   #_____________________________________________________________________________
   if (correlation_check) {
     corr_data = df_study[, predictors] %>% 
-      dplyr::mutate_all(as.numeric) %>% 
+      dplyr::mutate(dplyr::across(dplyr::everything(), ~ if (is.numeric(.x)) .x else as.numeric(as.factor(.x)))) %>% 
       as.data.frame()
     
-    corr_result = corrplot::cor.mtest(M, conf.level = 0.95)
+    M <- stats::cor(corr_data, use = "pairwise.complete.obs")
+    corr_result = corrplot::cor.mtest(corr_data, conf.level = 0.95)
     plots$predictor_correlations = corrplot::corrplot(
       M,p.mat = corr_result$p, insig = 'label_sig',
       sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9)
     
     if (write_plots) {
-      png(paste0(output_dir_path, "/corr_matrix.png"), 
+      grDevices::png(file.path(output_dir_path, paste0("corr_matrix_", label, ".png")),
           res = 300, width = 10, height = 10, units = "in")
-      corrplot::corrplot(M,p.mat = testRes$p, insig = 'label_sig',
+      corrplot::corrplot(M,p.mat = corr_result$p, insig = 'label_sig',
                          sig.level = c(0.001, 0.01, 0.05),pch.cex = 0.9)
-      dev.off()
+      grDevices::dev.off()
     }
   }
   
@@ -101,13 +113,26 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   model_str = paste0("~ ", paste(predictors, collapse = " + "))
   vsprintf(">> Model string used for design matrix: %s\n", model_str)
   # Create design matrix based on model string
-  design <- stats::model.matrix(as.formula(model_str), data = df_study)
-  # If the primary predictor is a two level factor, than the name of the 
-  # coefficient in the output of LIMMA will be:
-  #            [name of the predictor][second level of factor]
-  coef_name = paste0(predictors[1], ifelse(length(unique(df_study[[predictors[1]]]))==2, 
-                                           levels(df_study[[predictors[1]]])[2], ""))
-  design <- design[, colSums(design) != 1] 
+  model_formula <- stats::as.formula(model_str)
+  design <- stats::model.matrix(model_formula, data = df_study)
+  terms_obj <- stats::terms(model_formula)
+  primary_term_index <- match(predictors[1], attr(terms_obj, "term.labels"))
+  primary_coef_cols <- which(attr(design, "assign") == primary_term_index)
+  if (length(primary_coef_cols) == 0) {
+    stop(sprintf(">> Error: could not identify LIMMA coefficient for primary predictor '%s'.", predictors[1]))
+  }
+  if (length(primary_coef_cols) > 1) {
+    stop(sprintf(
+      ">> Error: primary predictor '%s' maps to multiple design columns (%s). Use a two-level factor, numeric predictor, or define an explicit contrast before calling cpg_dml_test().",
+      predictors[1], paste(colnames(design)[primary_coef_cols], collapse = ", ")
+    ))
+  }
+  coef_name <- colnames(design)[primary_coef_cols]
+  non_estimable <- limma::nonEstimable(design)
+  if (!is.null(non_estimable)) {
+    stop(sprintf(">> Error: design matrix has non-estimable coefficients: %s", paste(non_estimable, collapse = ", ")))
+  }
+  vsprintf(">> LIMMA coefficient tested: %s\n", coef_name)
 
 
   # Limma Analysis                                                  ############
@@ -169,13 +194,10 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
           panel.grid = element_blank())
   
   if (write_plots) {
-    png(paste0(output_dir_path, "qqplot_", label, ".png"), res = 300, width = 10, height = 10, units = "in")
+    grDevices::png(file.path(output_dir_path, paste0("qqplot_", label, ".png")), res = 300, width = 10, height = 10, units = "in")
     print(plots$qq_p_value)
-    dev.off()
+    grDevices::dev.off()
   }
-  
-  df_dml$diffMeth[df_dml$logFC > 0] = "Hyper"
-  df_dml$diffMeth[df_dml$logFC < 0] = "Hypo"
   
   plots$volcano = ggplot2::ggplot(df_dml, ggplot2::aes(x=logFC, y = -log10(P.Value), col = diffMeth)) +
     ggplot2::geom_point() + ggplot2::theme_minimal() +
@@ -183,9 +205,9 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
       label=paste0(CpG_Probe, " (", ICR_id , ")")), size=3  )
   
   if (write_plots) {
-    png(paste0(output_dir_path, "/VolcanoPlot_", label, ".png"), res = 300, width = 12, height = 8, units = "in")
+    grDevices::png(file.path(output_dir_path, paste0("VolcanoPlot_", label, ".png")), res = 300, width = 12, height = 8, units = "in")
     print(plots$volcano)
-    dev.off()
+    grDevices::dev.off()
   }
   
   # Manhattan Plots
@@ -205,7 +227,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   plots$manhattan = ggplot2::ggplot(df_dml, ggplot2::aes(x = bp_cum, y = -log10(P.Value), color = diffMeth)) +
     ggplot2::geom_point(alpha = 0.75) + ggplot2::geom_hline(yintercept = -log10(pvalue_threshold), linetype = "dashed") +
     ggplot2::scale_x_continuous(breaks = axis_df$center, labels = axis_df$chr_num)  +
-    ggplot2::scale_color_manual(values = c("#F8766D", "#35C96E"))+
+    ggplot2::scale_color_manual(values = c(Hyper = "#F8766D", Hypo = "#35C96E", no = "grey70"))+
     ggplot2::theme_minimal() +
     ggplot2::theme( 
       panel.grid.major.x = ggplot2::element_blank(),
@@ -221,9 +243,9 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
       nudge_y = 0.05)
   
   if (write_plots) {
-    png(paste0(output_dir_path, "/Manhattan_", label, ".png"), res = 300, width = 15, height = 5, units = "in")
-    print(manhattan)
-    dev.off()
+    grDevices::png(file.path(output_dir_path, paste0("Manhattan_", label, ".png")), res = 300, width = 15, height = 5, units = "in")
+    print(plots$manhattan)
+    grDevices::dev.off()
   }
   
 
