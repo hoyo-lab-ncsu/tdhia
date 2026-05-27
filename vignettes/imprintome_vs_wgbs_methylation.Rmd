@@ -88,7 +88,7 @@ We also load two user-defined helper functions for organizing data to for the co
 #' @param col_label string column label, used to label name of pipeline
 #' 
 #' @return
-group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col_label, db_flag = TRUE) {
+group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col_label, db_flag = FALSE) {
     if (db_flag) {save(list = ls(all.names = TRUE), file = "group_by_patient.RData")}
   # load(file = "group_by_patient.RData")
   
@@ -132,7 +132,7 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col
 #' 
 #' @return
 group_by_mean <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, 
-                          col_label, db_flag = TRUE, mean_max_na = 1) {
+                          col_label, db_flag = FALSE, mean_max_na = 1) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "group_by_mean.RData")}
   # load(file = "vignettes/group_by_mean.RData")
   
@@ -214,9 +214,11 @@ There are various options within the TDHIA pipeline for processing imprintome da
 
 ```{r processing, include = TRUE, cache = FALSE}
 
-# Using a persistent app directory to cache output for this code chunk
+# Using a persistent app directory to cache output for this code chunk.
+# Update the cache version when pipeline settings or package data used below change.
 user_data_path <- rappdirs::user_data_dir("tdhia")
-data_filepath <- file.path(paste0(user_data_path, "/vignette_imprint_vs_wgbs_data.rds"))
+cache_version <- "v1"
+data_filepath <- file.path(user_data_path, paste0("vignette_imprint_vs_wgbs_data_", cache_version, ".RData"))
 dir.create(dirname(data_filepath), showWarnings = FALSE, recursive = TRUE)
 idat_dir_path <- system.file("extdata", package="tdhia")
 
@@ -252,7 +254,7 @@ if (!file.exists(data_filepath)) {
   # A) Load probe data and merge
   probe_beta <- 
     load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
-                         merge_replicates = NULL, db_flag = TRUE)
+                         merge_replicates = NULL, db_flag = FALSE)
    filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
                   max_sig_pval = 0.2, max_probe_fail_rate = 0.25, db_flag = FALSE,
@@ -271,6 +273,7 @@ if (!file.exists(data_filepath)) {
   cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   icr_beta <- convert_cpgs_to_icrs(cpg_beta)
   pipelines_out$default <- cpg_beta$cpg_beta_df
+  default_cpg_beta_df <- cpg_beta$cpg_beta_df
   
   
   
@@ -278,7 +281,7 @@ if (!file.exists(data_filepath)) {
   #_______________________________________________________________________________
   # Standard pipeline, but only including cpg sites that are shared with Illumina 
   # epic version 2 array
-  pipelines_out$epicv2 <- cpg_beta$cpg_beta_df[rownames(cpg_beta$cpg_beta_df) %in%
+  pipelines_out$epicv2 <- default_cpg_beta_df[rownames(default_cpg_beta_df) %in%
                                             tdhia::epicv2_shared_cpg_sites$Name,]
   
   
@@ -286,16 +289,21 @@ if (!file.exists(data_filepath)) {
   #______________________________________________________________________________
   # Standard pipeline, but setting all measurements from imprintome are included 
   # if the corresponding wgbs count is greater than some threshold.
-  cpg_beta_df2 = cpg_beta$cpg_beta_df
+  cpg_beta_df2 = default_cpg_beta_df
   # Remove any CpG beta value if it's corresponding count in wgbs is too low
   # must go patient-by-patient to assemble a blacklist of cpg sites with too low count
   
-  for (n in 1:ncol(cpg_beta_df2)) {
+  for (n in seq_len(ncol(cpg_beta_df2))) {
     # CpGs with count < 5 or NA values
-  cpg_black_list <- rownames(tdhia::alzheimer_study_wbgs_shared_cpg$count)[
-    which(tdhia::alzheimer_study_wbgs_shared_cpg$count %>% select(all_of(n)) < 5 |
-            tdhia::alzheimer_study_wbgs_shared_cpg$count %>% select(all_of(n)) %>% is.na())]
-  cpg_beta_df2[rownames(cpg_beta_df2) %in% cpg_black_list, n] = NA
+    imp_sample <- colnames(cpg_beta_df2)[n]
+    wgbs_sample <- study_metadata$wgbs_base_names[match(imp_sample, study_metadata$Patient.ID)]
+    if (is.na(wgbs_sample)) {
+      wgbs_sample <- colnames(tdhia::alzheimer_study_wbgs_shared_cpg$count)[n]
+    }
+    wgbs_count <- tdhia::alzheimer_study_wbgs_shared_cpg$count[[wgbs_sample]]
+    cpg_black_list <- rownames(tdhia::alzheimer_study_wbgs_shared_cpg$count)[
+      wgbs_count < 5 | is.na(wgbs_count)]
+    cpg_beta_df2[rownames(cpg_beta_df2) %in% cpg_black_list, n] = NA
   }
   pipelines_out$wgbs_count  <- cpg_beta_df2
   
@@ -322,7 +330,7 @@ if (!file.exists(data_filepath)) {
   # Standard pipeline, but only cpg's that have experiment-based gametic support 
   # data are included (from 384 ICRs).
   # Subset of cpg sites with direct gametic data supporting icr
-  pipelines_out$gametic <- cpg_beta$cpg_beta_df[rownames(cpg_beta$cpg_beta_df) %in%
+  pipelines_out$gametic <- default_cpg_beta_df[rownames(default_cpg_beta_df) %in%
                                             gametic_cpg_ids,]
   
   
@@ -338,14 +346,14 @@ if (!file.exists(data_filepath)) {
                   set_failed_betas_na = FALSE, discard_failed_probes = TRUE, 
                   min_design_score = .20)
   # D) Merge probe measurement to cpg sites
-  cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = TRUE)
+  cpg_beta <- convert_probes_to_cpgs(filt_probe_beta, db_flag = FALSE)
   pipelines_out$low_p_val <- cpg_beta$cpg_beta_df
   
   
   # Pipeline 7: design_thresh                                         ###########
   #_______________________________________________________________________________
-  # Standard pipeline, excluding probes with low design score (0.30) are excluded.
-  #    Flags: min_design_score = .30
+  # Standard pipeline, excluding probes with low design score (0.50).
+  #    Flags: min_design_score = .50
   # C) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
@@ -367,7 +375,7 @@ if (!file.exists(data_filepath)) {
   # A) Load probe data and merge
   probe_beta <- 
     load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
-                         merge_replicates = "pre_beta", db_flag = TRUE)
+                         merge_replicates = "pre_beta", db_flag = FALSE)
   # B) Filter probes results
   filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
@@ -472,7 +480,7 @@ Across all analysis, only CpG sites are included if they have no missing data ac
 df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1), function (x)
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_out[[x]],
                  df_cpg_wgbs = pipelines_out$reference, wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count, 
-                col_label = names(pipelines_out)[x], mean_max_na = 0, db_flag = TRUE)))
+                col_label = names(pipelines_out)[x], mean_max_na = 0, db_flag = FALSE)))
 # Calculate summary of correlation to gold standard
 df_mean_summary <- df_grouped %>% dplyr::filter(!is.na(mean_imp) & !is.na(mean_wgbs)) %>%
   dplyr::group_by(group_id, pipeline_name) %>% 
@@ -516,7 +524,7 @@ df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_gametic))-1), func
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_gametic[[x]],
                  df_cpg_wgbs = pipelines_gametic$reference, 
                 wgbs_counts = wgbs_counts_ds, mean_max_na = 0,
-                col_label = names(pipelines_gametic)[x], db_flag = TRUE)))
+                col_label = names(pipelines_gametic)[x], db_flag = FALSE)))
 
 # Calculate summary of correlation to gold standard
 df_mean_summary <- df_grouped %>% dplyr::filter(!is.na(mean_imp) & !is.na(mean_wgbs)) %>%
@@ -565,7 +573,7 @@ df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_design))-1), funct
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_design[[x]],
                  df_cpg_wgbs = pipelines_design$reference, 
                 wgbs_counts = wgbs_counts_ds, mean_max_na = 0,
-                col_label = names(pipelines_design)[x], db_flag = TRUE)))
+                col_label = names(pipelines_design)[x], db_flag = FALSE)))
 
 # Calculate summary of correlation to gold standard
 df_mean_summary <- df_grouped %>% dplyr::filter(!is.na(mean_imp) & !is.na(mean_wgbs)) %>%
@@ -835,11 +843,13 @@ Where disease_state is the response variable, and cpg_beta is the primary predic
 
 
 ```{r association_study, include = TRUE}
+set.seed(1)
 n.cores <- max(c(parallel::detectCores()-2,1))
+association_cpg_beta <- pipelines_out$default
 
 # disease_state ~ cpg + Age + Sex, All patients
 df_all <- analyze_association(
-  R = select(study_metadata, disease_state), P = as.data.frame(t(pipelines_out$default)),
+  R = select(study_metadata, disease_state), P = as.data.frame(t(association_cpg_beta)),
   Pe = select(study_metadata, c(Age, Sex)), family = "binomial", 
   n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
@@ -848,7 +858,7 @@ df_all <- analyze_association(
 ix_white <- study_metadata$Ethnicity == "NHW"
 df_white <- analyze_association(
   R = select(study_metadata[ix_white,], disease_state), 
-  P = as.data.frame(t(select(pipelines_out$pre_merge, study_metadata$Patient.ID[ix_white]))),
+  P = as.data.frame(t(select(association_cpg_beta, study_metadata$Patient.ID[ix_white]))),
   Pe = select(study_metadata[ix_white,], c(Age, Sex)), family = "binomial", 
   n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
@@ -857,7 +867,7 @@ df_white <- analyze_association(
 ix_black <- study_metadata$Ethnicity == "NHB"
 df_black <- analyze_association(
   R = select(study_metadata[ix_black,], disease_state), 
-  P = as.data.frame(t(select(pipelines_out$pre_merge, study_metadata$Patient.ID[ix_black]))),
+  P = as.data.frame(t(select(association_cpg_beta, study_metadata$Patient.ID[ix_black]))),
   Pe = select(study_metadata[ix_black,], c(Age, Sex)), family = "binomial", 
   n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
@@ -942,7 +952,7 @@ knitr::kable(disp_table_white, format = "html") %>% kableExtra::kable_styling()
 # Cpg LIMMA test
 cpg_dml_out <- tdhia::cpg_dml_test(
   df_study = study_metadata, predictors = c("Age", "Sex"), cpg_beta = pipelines_out$default,
-  pvalue_threshold = 0.0001, db_flag = T, sample_name = "Patient.ID", correlation_check = F,
+  pvalue_threshold = 0.0001, db_flag = F, sample_name = "Patient.ID", correlation_check = F,
   beadchip_correction = F, verbose = T, write_plots = F,
   output_dir_path = getwd())
 
@@ -953,9 +963,3 @@ icr_dmr_test <-  tdhia::icr_dmr_test(df_dml = cpg_dml_out$df_dml, chr_lens = cpg
                          verbose = T, db_flag = F)
 
 ```
-
-
-
-
-
-
