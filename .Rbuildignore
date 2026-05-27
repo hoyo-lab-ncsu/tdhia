@@ -3,5 +3,17 @@
 ^LICENSE\.md$
 ^data-raw$
 ^doc$
+^docs$
 ^Meta$
 ^vignettes/imprintome_vs_wgbs_methylation\.Rmd$
+^README\.html$
+^.*\.RData$
+^.*\.Rcheck$
+^.*\.tar\.gz$
+^Supplementary_Table_S1\.xlsx$
+^Supplementary_Table_S1_ldl\.docx$
+^ldl_sig_icr_summary_with_genes\.csv$
+^nest_metabolic_markers_final\.csv$
+^sample_ids\.txt$
+^tri_sig_icr_summary_with_genes\.csv$
+^uhdl_sig_icr_summary_with_genes\.csv$
