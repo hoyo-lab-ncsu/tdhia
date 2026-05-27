@@ -64,6 +64,3 @@ Suggests:
 	kableExtra,
 	scales
 VignetteBuilder: knitr
-Remotes:
-    bioc::AnnotationDbi,
-    bioc::org.Hs.eg.db
