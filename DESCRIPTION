@@ -51,8 +51,7 @@ Imports:
 	limma,
     AnnotationDbi,
 	org.Hs.eg.db,
-	SKAT,
-	pls
+	SKAT
 Suggests: 
     knitr,
     rmarkdown,
