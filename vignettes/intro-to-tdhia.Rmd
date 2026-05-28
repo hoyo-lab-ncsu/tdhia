@@ -102,6 +102,32 @@ You can access the filtered probe beta matrix with the **cpg_beta_df** field.
 head(cpg_beta$cpg_beta_df)
 ```
 
+After the CpG matrix has been created, a QC report can be generated. This report
+summarizes missingness and beta-value distributions by sample and feature, and
+optionally saves a PDF with histograms, density overlays, a sample-sample
+correlation heatmap, and PCA plots. When the relevant matrices are present, the
+report also includes detection p-value QC, retention counts, design score
+summaries, ICR coverage, replicate-probe agreement, and sample outlier flags.
+
+```{r qc_report, eval=FALSE}
+data_beta <- list(
+  filt_probe_beta = filt_probe_beta,
+  cpg_beta = cpg_beta
+)
+
+qc_cpg <- tdhia::tdhia_qc_report(
+  data_beta = data_beta,
+  output_dir_path = "tdhia_results",
+  level = "cpg",
+  show_plots = TRUE,
+  save_pdf = TRUE,
+  save_metrics = TRUE
+)
+
+qc_cpg$sample_metrics
+qc_cpg$feature_metrics
+```
+
 
 
 Finally, we can convert the cpg beta matric to an icr beta matric, which is 
