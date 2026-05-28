@@ -38,6 +38,18 @@ The code is generally tolerant of suffix capitalization, but consistent `Red` an
    - Cloning the repository with Git or GitHub Desktop. This is recommended because it allows you to sync local code with remote updates.
 4. Clone or download the companion repository with example scripts: `tdhia_scripts`.
 
+### Install The Released Package
+
+The current release is `v0.1.0`. Install this version directly from GitHub with:
+
+```r
+install.packages("remotes")
+remotes::install_github("hoyo-lab-ncsu/tdhia@v0.1.0")
+```
+
+This is the recommended option for users who want the released package version
+rather than the active development branch.
+
 ### RStudio
 
 1. Open RStudio.
