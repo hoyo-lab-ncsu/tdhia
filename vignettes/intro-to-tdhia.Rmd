@@ -1,6 +1,6 @@
 ---
 title: "Analyzing TDHIA IDAT files"
-author: "Vignette Author"
+author: "Dereje Jima"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
@@ -101,6 +101,8 @@ You can access the filtered probe beta matrix with the **cpg_beta_df** field.
 # Access filtered probe beta matrix
 head(cpg_beta$cpg_beta_df)
 ```
+
+## Generate QC Report
 
 After the CpG matrix has been created, a QC report can be generated. This report
 summarizes missingness and beta-value distributions by sample and feature, and
@@ -345,4 +347,19 @@ out_icr <- tdhia::icr_dmr_test(df_dml = out_cpg$df_dml, chr_lens = out_cpg$chr_l
 
 out_icr$plots$manhplot_icr
 
+```
+
+## Package Information
+
+This vignette was prepared for **tdhia** version 0.1.0. The package provides
+helpers for importing TDHIA IDAT files, filtering probe-level methylation
+signals, aggregating probes to CpG and ICR-level matrices, generating QC
+summaries, and running CpG- and ICR-level methylation association workflows.
+
+For reproducibility, record the package and R session versions used for each
+analysis run.
+
+```{r package_info, eval=FALSE}
+packageVersion("tdhia")
+sessionInfo()
 ```
