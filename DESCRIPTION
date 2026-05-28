@@ -1,0 +1,65 @@
+Package: tdhia
+Type: Package
+Title: Analyze TruDx Version 1 Custom Human imprintome Array
+Version: 0.1.0
+Author: Dereje Jima, Bruce Corliss
+Maintainer: Dereje Jima <ddjima2014@gmail.com>, Bruce Corliss <bacorli2@ncsu.edu>
+Description: A set of functions that analyze methylation data from the True Diagnostic Imprintome methylation array.
+Depends: R (>= 4.3)
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+LazyDataCompression: xz
+RoxygenNote: 7.3.3
+Roxygen: list(markdown = TRUE)
+biocViews:
+Imports: 
+	tidyr,
+	qvalue,
+	clusterSim,
+	stringr,
+	sesame,
+	sesameData,
+	dplyr,
+	preprocessCore,
+	magrittr,
+	rlang,
+	BiocParallel,
+	tibble,
+	purrr,
+	parallel,
+	doParallel,
+	zoo,
+	foreach,
+	ggplot2,
+	reshape2,
+	doSNOW,
+	snow,
+	mice,
+	utils,
+	methods,
+	dqrng,
+	Matrix,
+	GenomicRanges,
+	IRanges,
+	S4Vectors,
+	aggregation,
+	biomaRt,
+    corrplot,
+	ggrepel,
+	ggtext,
+	limma,
+    AnnotationDbi,
+	org.Hs.eg.db,
+	SKAT
+Suggests: 
+    knitr,
+    rmarkdown,
+	here,
+	cowplot,
+	rappdirs,
+	data.table,
+	ggVennDiagram,
+	kableExtra,
+	scales
+VignetteBuilder: knitr

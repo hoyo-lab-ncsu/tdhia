@@ -1,0 +1,18 @@
+﻿Sample ID,AD Case/Control,Ethnicity,Age,Sex,Brain Region,Time ,AD Neuropathologic changes
+312,AD Case,NHB,84,Male,Temporal Cortex,2,High
+411,AD Case,NHB,>89,Female,Temporal Cortex,,Intermediate
+760,AD Case,NHB,77,Female,Temporal Cortex,1,Intermediate
+1381,AD Case,NHB,88,Female,Temporal Cortex,1,High
+1620,AD Case,NHB,63,Female,Temporal Cortex,1,High
+1594,AD Case,NHW,88,Male,Temporal Cortex,1,Intermediate
+1665,AD Case,NHW,86,Female,Temporal Cortex,2,AD
+1696,AD Case,NHW,>89,Male,Temporal Cortex,1,Intermediate
+1705,AD Case,NHW,77,Female,Temporal Cortex,4,AD
+94,Control,NHB,67,Female,Cerebellum,1,None
+158,Control,NHB,56,Male,Cerebellum,4,None
+328,Control,NHB,69,Male,Cerebellum,1,None
+591,Control,NHB,78,Female,Temporal Cortex,2,None
+1545,Control,NHW,64,Female,Temporal Cortex,3,None
+1600,Control,NHW,85,Female,Temporal Cortex,3,None
+1609,Control,NHW,86,Male,Temporal Cortex,4,Low
+1678,Control,NHW,87,Male,Temporal Cortex,4,None

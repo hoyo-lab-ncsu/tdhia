@@ -1,0 +1,17 @@
+﻿patient_id,group,race
+207344530004_R01C01,control,black
+207344530004_R03C01,control,black
+207344530004_R05C01,alzheimer,black
+207344530004_R07C01,control,black
+207344530004_R09C01,alzheimer,black
+207344530004_R11C01,control,black
+207344530004_R02C01,alzheimer,black
+207344530004_R04C01,alzheimer,black
+207344530004_R06C01,control,white
+207344530004_R08C01,alzheimer,white
+207344530004_R10C01,control,white
+207344530004_R12C01,control,white
+207344530004_R01C02,alzheimer,white
+207344530004_R03C02,control,white
+207344530004_R05C02,alzheimer,white
+207344530004_R07C02,alzheimer,white
