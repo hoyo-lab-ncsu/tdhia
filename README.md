@@ -157,6 +157,18 @@ If you need to reprocess the raw IDAT files, delete or overwrite the cached `.rd
 
    CpGs that do not map to an ICR are usually discarded. After probe filtering, coverage is commonly around 7,000 to 9,000 CpG sites out of roughly 10,000 CpG sites.
 
+   A CpG-level QC report can be generated after this step:
+
+   ```r
+   qc_cpg <- tdhia::tdhia_qc_report(
+     data_beta = data_beta,
+     output_dir_path = "tdhia_results",
+     level = "cpg"
+   )
+   ```
+
+   The report saves sample-level and feature-level QC metrics, plus a PDF with missingness histograms, beta-density overlays, a sample correlation heatmap, and PCA plots. When the relevant objects are available, it also adds detection p-value QC, retention counts, design score summaries, ICR coverage, replicate-probe agreement, and simple sample outlier flags. The same helper can summarize `level = "probe"` or `level = "icr"` when those matrices are available.
+
 4. **Option: convert to ICR measurements**
 
    Convert the CpG beta matrix to an ICR beta matrix by averaging CpGs that map to the same ICR.
