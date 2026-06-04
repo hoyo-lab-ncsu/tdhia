@@ -25,6 +25,10 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+# devtools::load_all( reset = TRUE, recompile = TRUE)
+# devtools::build_rmd("vignettes/imprintome_vs_wgbs_methylation.Rmd")
+
 # Uncomment this next line if you want to knit this file on it's own, make sure working directory is set to tdhia repository base folder.
 # if (!("tdhia" %in% .packages())) devtools::load_all()
 
@@ -949,20 +953,64 @@ knitr::kable(disp_table_white, format = "html") %>% kableExtra::kable_styling()
 
 # Cpg Limma test with Lancaster ICR Analysis
   
+## CpG Limma Analysis  {.tabset}
   
 ```{r, include = TRUE, echo = TRUE}
 
 # Cpg LIMMA test
 cpg_dml_out <- tdhia::cpg_dml_test(
-  df_study = study_metadata, predictors = c("Age", "Sex"), cpg_beta = pipelines_out$default,
-  pvalue_threshold = 0.0001, db_flag = F, sample_name = "Patient.ID", correlation_check = F,
+  df_study = study_metadata, predictors = c("disease_state", "Age", "Sex"), cpg_beta = pipelines_out$default,
+  pvalue_threshold = 0.001, db_flag = F, sample_name = "Patient.ID", correlation_check = F,
   beadchip_correction = F, verbose = T, write_plots = F,
   output_dir_path = getwd())
 
+
+```
+
+### QQ P-value Plot
+
+```{r, include = TRUE, echo = TRUE}
+cpg_dml_out$plots$qq_p_value
+```
+
+### Volcano Plot
+
+```{r, include = TRUE, echo = TRUE}
+cpg_dml_out$plots$volcano
+```
+
+### Manhattan Plot
+
+```{r, include = TRUE, echo = TRUE}
+cpg_dml_out$plots$manhattan
+```
+
+### Table Output
+
+```{r, include = TRUE, echo = TRUE}
+knitr::kable(cpg_dml_out$df_dml, format = "html") %>% kableExtra::kable_styling()
+```
+
+## Lancaster ICR Analysis  {.tabset}
+
+```{r, include = TRUE, echo = TRUE}
 # ICR Lancaster test using LIMMA p-values
 icr_dmr_test <-  tdhia::icr_dmr_test(df_dml = cpg_dml_out$df_dml, chr_lens = cpg_dml_out$chr_lens, 
                                      pval_threshold = 0.05,
                          fdr_sig_threshold = 0.0001,
                          verbose = T, db_flag = F)
-
 ```
+
+### Manhattan Plot
+
+```{r, include = TRUE, echo = TRUE}
+icr_dmr_test$plots$manhplot_icr
+```
+
+### Table Output
+
+```{r, include = TRUE, echo = TRUE}
+knitr::kable(icr_dmr_test$ICR_summary, format = "html") %>% kableExtra::kable_styling()
+```
+
+
