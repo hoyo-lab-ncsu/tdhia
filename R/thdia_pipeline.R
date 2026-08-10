@@ -31,7 +31,7 @@
 #' @param min_design_score todo
 #'
 #' @return named list with all of the output from each of the pipeline steps.
-#'
+#' @export
 tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
                            probe_data_cache_path = getwd(),
                            multicore = TRUE, idat_basenames = NULL,
