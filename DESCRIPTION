@@ -10,7 +10,6 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 LazyDataCompression: xz
-RoxygenNote: 7.3.3
 Roxygen: list(markdown = TRUE)
 biocViews:
 Imports: 
@@ -63,3 +62,4 @@ Suggests:
 	kableExtra,
 	scales
 VignetteBuilder: knitr
+Config/roxygen2/version: 8.0.0

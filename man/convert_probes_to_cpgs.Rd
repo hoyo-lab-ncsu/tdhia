@@ -17,9 +17,11 @@ convert_probes_to_cpgs(
 }
 \arguments{
 \item{probe_beta}{a list object that must contain
-- probe_beta_df: beta value dataframe, probe_id x patient_id
-- probe_pval_df: p-value value dataframe, probe_id x patient_id
-- Probe_ID: vector of string containing ID for each probe}
+\itemize{
+\item probe_beta_df: beta value dataframe, probe_id x patient_id
+\item probe_pval_df: p-value value dataframe, probe_id x patient_id
+\item Probe_ID: vector of string containing ID for each probe
+}}
 
 \item{quantile_norm}{a boolean flag, when true normalizes the beta values
 between columns of the icr beta dataframe. Default is FALSE because this

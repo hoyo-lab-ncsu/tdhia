@@ -14,5 +14,7 @@ add_metadata_to_imp_sites(imp_ids, imp_type = "cpg", db_flag = T)
 \item{db_flag}{boolean, when true, save environemnt variables to disk.}
 }
 \description{
-add_metadata_to_imp_sites
+For the zinc finger (ZFP57, ZFP445) columsn are binding sites located within
+1000 bp from the imprintome site. Sites were found based on  ChIP-Seq peaks
+measured from transduced HEK 293T cells and KAP1 in hES H1 cells (GEO; GSE78099).
 }
