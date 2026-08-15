@@ -30,7 +30,7 @@ knitr::opts_chunk$set(
 # devtools::build_rmd("vignettes/imprintome_vs_wgbs_methylation.Rmd")
 
 # Uncomment this next line if you want to knit this file on it's own, make sure working directory is set to tdhia repository base folder.
-# if (!("tdhia" %in% .packages())) devtools::load_all()
+if (!("tdhia" %in% .packages())) devtools::load_all()
 
 # detach(name = "package:tdhia", unload=TRUE)
 # remove.packages("tdhia")
@@ -104,9 +104,9 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col
     # colnames(df_cpg_imp == df_study$Patient.ID[n]
     x = select(df_cpg_imp, one_of(df_study$Patient.ID[n])) %>% rename(imp = 1) %>%
       rownames_to_column("cpg_id")
-    y = select(df_cpg_wgbs, one_of(df_study$wgbs_base_names[n])) %>%  rename(wgbs = 1) %>%
+    y = select(df_cpg_wgbs, one_of(df_study$Patient.ID[n])) %>%  rename(wgbs = 1) %>%
       rownames_to_column("cpg_id")
-    z = select(wgbs_counts, one_of(df_study$wgbs_base_names[n])) %>%  rename(wgbs_counts = 1) %>%
+    z = select(wgbs_counts, one_of(df_study$Patient.ID[n])) %>%  rename(wgbs_counts = 1) %>%
       rownames_to_column("cpg_id")
     df_join0 <- left_join(x = x, y = y, by = "cpg_id", keep = FALSE, na_matches = "never",
                          unmatched= "drop", relationship = "one-to-one")
@@ -114,8 +114,8 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col
                          unmatched= "drop", relationship = "one-to-one")
     
     # colnames(df_join) <- c("cpg_id", "imp","wgbs", "wgbs_count") 
-    df_join$sample_id <- df_study$wgbs_base_names[n]
-    df_join$treatment <- df_study$Treatment[n]
+    df_join$sample_id <- df_study$Patient.ID[n]
+    df_join$study_group <- df_study$study_group[n]
     df_join$pipeline_name <- col_label
     df_list[[n]] <- df_join
   }
@@ -141,7 +141,7 @@ group_by_patient <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, col
 group_by_mean <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts, 
                           col_label, db_flag = FALSE, mean_max_na = 1) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "group_by_mean.RData")}
-  # load(file = "vignettes/group_by_mean.RData")
+  # load(file = "group_by_mean.RData")
   
   # Helper function
   nRowMeans <- function(x, max_na) {
@@ -161,9 +161,9 @@ group_by_mean <- function(df_study, df_cpg_imp, df_cpg_wgbs, wgbs_counts,
     x <- data.frame(mean_imp = nRowMeans(select(df_cpg_imp, df_study$Patient.ID[bind]), max_na = mean_max_na)) %>%
       rownames_to_column("cpg_id")
     # WGBS data, extract columns matching patients in group
-    y <- data.frame(mean_wgbs = nRowMeans(select(df_cpg_wgbs, df_study$wgbs_base_names[bind]),
+    y <- data.frame(mean_wgbs = nRowMeans(select(df_cpg_wgbs, df_study$Patient.ID[bind]),
                                           max_na = mean_max_na),
-                    mean_wgbs_count = nRowMeans(select(wgbs_counts, df_study$wgbs_base_names[bind]), 
+                    mean_wgbs_count = nRowMeans(select(wgbs_counts, df_study$Patient.ID[bind]), 
                                                max_na = mean_max_na)) %>% 
       rownames_to_column("cpg_id")
     
@@ -188,7 +188,7 @@ Study metadata is read from a dataframe included in the package, with columns de
 0. *Rownames*: base file name for imprintome IDAT files.  
 1. **ID**: patient index within this table (not study ID). 
 2. **FileName**: filename of WGBS output files.  
-3. **Treatment**: factor seperating patients by race and disease state (black control, 
+3. **study_group**: factor seperating patients by race and disease state (black control, 
 white contro, black AD, white AD).  
 4. **sampleID**: NEST or SHIP study ID (?). 
 5. **X**: NEST or SHIP study ID (?).  
@@ -199,8 +199,47 @@ white contro, black AD, white AD).
 10. **disease_state**: boolean, when true, denotes patients is a diseased patient with AD.  
 
 ```{r metadata, include = TRUE, cache = FALSE}
-# Loading AD study data 
-study_metadata <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
+
+# Download dataset from GEO
+local_download <- tdhia::download_geo_methylation("GSE268075", quiet = T)
+
+# Load metadata from GEO
+study_metadata <- read.csv(file.path(local_download$metadata_files))
+
+# Define 
+study_metadata <- study_metadata %>% dplyr::select(geo_accession, data_row_count, race.ch1, tissue.ch1, disease.ch1, supplementary_file)
+study_metadata$Patient.ID <- study_metadata$supplementary_file %>%
+  basename() %>% stringr::str_replace("_grn.IDAT.gz", "") 
+study_metadata <- study_metadata %>% select(-supplementary_file)
+study_metadata <- study_metadata %>% rename(race = race.ch1, tissue = tissue.ch1,  disease =  disease.ch1)
+study_metadata$race = recode(study_metadata$race, "black" = "NHB", "white" = "NHW")
+
+# Loading additional AD study data 
+study_metadata2 <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
+patient_id_geo_lookup  <- setNames(study_metadata$Patient.ID, study_metadata$Patient.ID %>%
+   sub(pattern="GSM[0-9]*_", replacement = ""))
+study_metadata2$Patient.ID <- patient_id_geo_lookup[study_metadata2$Patient.ID]
+
+# Joining tables together
+study_metadata <- study_metadata %>% left_join(study_metadata2 %>% select(
+  Patient.ID, Ethnicity, Age, Sex, Brain.Region, Time, AD.Neuropathologic.changes, 
+  wgbs_base_names), by = join_by(Patient.ID) )
+
+# Add patient_ids with GEO numbers as IDs for patients across datasets
+rownames(study_metadata) <- study_metadata$Patient.ID
+
+# Custom variables for convenience
+study_metadata$is_control = study_metadata$disease == "Control"
+study_metadata$disease_state = study_metadata$disease == "Alzheimer Disease"
+study_metadata$study_group = paste0(
+  ifelse(study_metadata$race=="NHB", "Black", "White"), " " ,
+  ifelse(study_metadata$disease=="Control", "Ctrl", "AD"))
+
+# Remove incomplete rows
+study_metadata <- filter(study_metadata, !is.na(wgbs_base_names))
+ 
+# Remove extraneous variables
+study_metadata <- study_metadata %>% select(-c(data_row_count, Brain.Region, Time))
 
 ```
 
@@ -221,14 +260,20 @@ There are various options within the TDHIA pipeline for processing imprintome da
 
 ```{r processing, include = TRUE, cache = FALSE}
 
+
+
+
+
 # Using a persistent app directory to cache output for this code chunk.
 # Update the cache version when pipeline settings or package data used below change.
 user_data_path <- rappdirs::user_data_dir("tdhia")
 cache_version <- "v1"
 data_filepath <- file.path(user_data_path, paste0("vignette_imprint_vs_wgbs_data_", cache_version, ".RData"))
 dir.create(dirname(data_filepath), showWarnings = FALSE, recursive = TRUE)
-idat_dir_path <- system.file("extdata", package="tdhia")
+idat_dir_path <- file.path(local_download$directory, "idat")
 
+# Correct IDAT filenames to match SeSame importation 
+correct_idat_names(idat_dir_path, rename = T)
 
 # Get whitelist of CpG sites that have gametic validation
 # df_valid <- as.data.frame(data.table::fread(paste0(system.file("data-raw", package = "tdhia"), "/validated_ICRs_11152024.bed")))
@@ -248,6 +293,11 @@ gametic_cpg_ids <- mft$Name[is_validated]
 #   set_failed_betas_na = T, OVERWRITE_TEMP_DATA = F,
 #   probe_data_cache_path = paste0(output_dir_path, "/study_mediterranean_diet_betas.rda"))
 
+# Define count matrix of overlapping cpg sites with wgbs and imprintome array
+wbgs_shared_cpg <- tdhia::alzheimer_study_wbgs_shared_cpg$count
+lookup  <- setNames(study_metadata$Patient.ID, study_metadata$wgbs_base_names)
+colnames(wbgs_shared_cpg) <- lookup[colnames(wbgs_shared_cpg)]
+
 
 
 if (!file.exists(data_filepath)) {
@@ -260,7 +310,8 @@ if (!file.exists(data_filepath)) {
   # Standard base pipeline
   # A) Load probe data and merge
   probe_beta <- 
-    load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
+    load_idata_to_probes(idat_dir_paths = idat_dir_path, idat_basenames = study_metadata$Patient.ID ,
+                         enforce_req_idats = TRUE, 
                          merge_replicates = NULL, db_flag = FALSE)
    filt_probe_beta <-
     filter_probes(probe_beta = probe_beta, discard_unmapped_probes =TRUE ,
@@ -302,13 +353,9 @@ if (!file.exists(data_filepath)) {
   
   for (n in seq_len(ncol(cpg_beta_df2))) {
     # CpGs with count < 5 or NA values
-    imp_sample <- colnames(cpg_beta_df2)[n]
-    wgbs_sample <- study_metadata$wgbs_base_names[match(imp_sample, study_metadata$Patient.ID)]
-    if (is.na(wgbs_sample)) {
-      wgbs_sample <- colnames(tdhia::alzheimer_study_wbgs_shared_cpg$count)[n]
-    }
-    wgbs_count <- tdhia::alzheimer_study_wbgs_shared_cpg$count[[wgbs_sample]]
-    cpg_black_list <- rownames(tdhia::alzheimer_study_wbgs_shared_cpg$count)[
+    sample_name <- colnames(cpg_beta_df2)[n]
+    wgbs_count <- wbgs_shared_cpg[[sample_name]]
+    cpg_black_list <- rownames(wbgs_shared_cpg)[
       wgbs_count < 5 | is.na(wgbs_count)]
     cpg_beta_df2[rownames(cpg_beta_df2) %in% cpg_black_list, n] = NA
   }
@@ -381,7 +428,8 @@ if (!file.exists(data_filepath)) {
   # probe based on which has the smallest detection p-value.
   # A) Load probe data and merge
   probe_beta <- 
-    load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
+    load_idata_to_probes(idat_dir_paths = idat_dir_path, idat_basenames = study_metadata$Patient.ID ,
+                         enforce_req_idats = TRUE, 
                          merge_replicates = "pre_beta", db_flag = FALSE)
   # B) Filter probes results
   filt_probe_beta <-
@@ -403,7 +451,8 @@ if (!file.exists(data_filepath)) {
   # probe #1, probe #2).
   # A) Load probe data and merge
   probe_beta <- 
-    load_idata_to_probes(idat_dir_paths = idat_dir_path, enforce_req_idats = TRUE, 
+    load_idata_to_probes(idat_dir_paths = idat_dir_path, idat_basenames = study_metadata$Patient.ID ,
+                         enforce_req_idats = TRUE, 
                          merge_replicates = "post_beta", db_flag = FALSE)
   # B) Filter probes results
   filt_probe_beta <-
@@ -419,6 +468,8 @@ if (!file.exists(data_filepath)) {
   #_______________________________________________________________________________
   # Methylation ratio calculated for the same cpg sites using wgbs data.
   pipelines_out$reference <- tdhia::alzheimer_study_wbgs_shared_cpg$ratio
+  # lookup  <- setNames(study_metadata$Patient.ID, study_metadata$wgbs_base_names)
+  colnames(pipelines_out$reference) <- lookup[colnames(pipelines_out$reference)]
   
   save(pipelines_out, icr_beta, file = data_filepath)
 } else {
@@ -448,10 +499,16 @@ Now we can compare the agreement of results between the imprintome array and WGB
 
 ```{r, include = TRUE}
 # Arrange beta values for plotting, both imprintome and wgbs, paired by patient
-df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1), function (x)
+
+wbgs_shared_cpg <- tdhia::alzheimer_study_wbgs_shared_cpg$count
+colnames(wbgs_shared_cpg) <- lookup[colnames(wbgs_shared_cpg)]
+  
+
+
+df_grouped <- do.call(rbind, lapply( 1:(length(names(pipelines_out))-1), function (x)
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_out[[x]],
-                 df_cpg_wgbs = pipelines_out$reference, wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count, 
-                col_label = names(pipelines_out)[x], mean_max_na = 3)))
+                 df_cpg_wgbs = pipelines_out$reference, wgbs_counts = wbgs_shared_cpg, 
+                col_label = names(pipelines_out)[x], mean_max_na = 3, db_flag = T)) )
 
 ```
 
@@ -486,7 +543,7 @@ Across all analysis, only CpG sites are included if they have no missing data ac
 # Arrange beta values for plotting, both imprintome and wgbs, paired by patient
 df_grouped <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1), function (x)
   group_by_mean(df_study = study_metadata, df_cpg_imp = pipelines_out[[x]],
-                 df_cpg_wgbs = pipelines_out$reference, wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count, 
+                 df_cpg_wgbs = pipelines_out$reference, wgbs_counts = wbgs_shared_cpg, 
                 col_label = names(pipelines_out)[x], mean_max_na = 0, db_flag = FALSE)))
 # Calculate summary of correlation to gold standard
 df_mean_summary <- df_grouped %>% dplyr::filter(!is.na(mean_imp) & !is.na(mean_wgbs)) %>%
@@ -522,8 +579,19 @@ ggf
 # Apply whitelist to all pipeline outputs and reference pipelines
 pipelines_gametic <- lapply(pipelines_out, function(x) x[rownames(x) %in% gametic_cpg_ids,])
 # Apply whitelist to wgbs count matrix also so both have same dimensions/ rows
-wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
-wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% gametic_cpg_ids,] 
+# wgbs_counts <- wbgs_shared_cpg
+wgbs_counts_ds <- wbgs_shared_cpg[rownames(wbgs_shared_cpg) %in% gametic_cpg_ids,] 
+# colnames(wgbs_counts_ds) <- lookup[colnames(wgbs_counts_ds)]
+
+
+# wbgs_shared_cpg <- tdhia::alzheimer_study_wbgs_shared_cpg$count
+# colnames(wbgs_shared_cpg) <- lookup[colnames(wbgs_shared_cpg)]
+
+
+
+
+
+
 # all(rownames(wgbs_counts_ds) == rownames(pipelines_gametic$reference))
 
 # Arrange beta values for plotting, both imprintome and wgbs, paired by patient
@@ -571,8 +639,12 @@ cpg_white_list <- mft$Name[(mft$Design.Score >= 0.5) & !is.na(mft$Design.Score)]
 # Apply whitelist to all pipeline outputs and reference pipelines
 pipelines_design <- lapply(pipelines_out, function(x) x[rownames(x) %in% cpg_white_list,])
 # Apply whitelist to wgbs count matrix also so both have same dimensions/ rows
-wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
-wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% cpg_white_list,] 
+# wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
+wgbs_counts_ds <- wbgs_shared_cpg[rownames(wbgs_shared_cpg) %in% cpg_white_list,] 
+
+
+
+
 # all(rownames(wgbs_counts_ds) == rownames(pipelines_design$reference))
 
 # Arrange beta values for plotting, both imprintome and wgbs, paired by patient
@@ -627,9 +699,9 @@ df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_out))-1),
        function(x) group_by_patient(df_study = study_metadata, 
                                     df_cpg_imp = pipelines_out[[x]],   
                                     df_cpg_wgbs = pipelines_out$reference,
-                                    wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count,
+                                    wgbs_counts = wbgs_shared_cpg,
                                     col_label = names(pipelines_out)[x])))
-df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$treatment),
+df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$study_group),
                              yes= "control", no =  "ad")
 # Calculate pearson rho between imprintome and wgbs for each patient
 df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name, disease_state) %>% summarize(rho = cor(
@@ -665,16 +737,16 @@ Figure: Per-patient correlation between Imprintome and WGBS. WGBS CpG sites incl
 # Apply a count threshold to the wgbs output beta values (reference)
 #_______________________________________________________________________________
 pipelines_wgbs_thresh <- pipelines_out
-pipelines_wgbs_thresh$reference[tdhia::alzheimer_study_wbgs_shared_cpg$count<5]=NA
+pipelines_wgbs_thresh$reference[wbgs_shared_cpg<5]=NA
 
 # Grab and sort data from each technology, paired by patient
 df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_wgbs_thresh))-1), 
        function(x) group_by_patient(df_study = study_metadata, 
                                     df_cpg_imp = pipelines_wgbs_thresh[[x]],   
                                     df_cpg_wgbs = pipelines_wgbs_thresh$reference,
-                                    wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count,
+                                    wgbs_counts = wbgs_shared_cpg,
                                     col_label = names(pipelines_wgbs_thresh)[x])))
-df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$treatment),
+df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$study_group),
                              yes= "control", no =  "ad")
 # Calculate pearson rho between imprintome and wgbs for each patient
 df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name, disease_state) %>% summarize(rho = cor(
@@ -713,7 +785,7 @@ Figure: Per-patient correlation between Imprintome and WGBS. WGBS CpG sites filt
 # Apply a count threshold to the wgbs output beta values (reference)
 #_______________________________________________________________________________
 pipelines_wgbs_thresh <- pipelines_out
-pipelines_wgbs_thresh$reference[tdhia::alzheimer_study_wbgs_shared_cpg$count<5]=NA
+pipelines_wgbs_thresh$reference[wbgs_shared_cpg<5]=NA
 
 
 # Apply whitelist to all pipeline outputs and reference pipelines, and wgbs count data
@@ -728,9 +800,9 @@ df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_design))-1),
        function(x) group_by_patient(df_study = study_metadata, 
                                     df_cpg_imp = pipelines_design[[x]],   
                                     df_cpg_wgbs = pipelines_design$reference,
-                                    wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count,
+                                    wgbs_counts = wbgs_shared_cpg,
                                     col_label = names(pipelines_design)[x])))
-df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$treatment),
+df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$study_group),
                              yes= "control", no =  "ad")
 # Calculate pearson rho between imprintome and wgbs for each patient
 df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name, disease_state) %>% summarize(rho = cor(
@@ -767,14 +839,14 @@ Figure: Per-patient correlation between Imprintome and WGBS. WGBS CpG sites filt
 # Apply a count threshold to the wgbs output beta values (reference)
 #_______________________________________________________________________________
 pipelines_wgbs_thresh <- pipelines_out
-pipelines_wgbs_thresh$reference[tdhia::alzheimer_study_wbgs_shared_cpg$count<5]=NA
+pipelines_wgbs_thresh$reference[wbgs_shared_cpg<5]=NA
 
 # Get white list of high design score cpg sites
 cpg_white_list <- mft$Name[(mft$Design.Score >= 0.5) & !is.na(mft$Design.Score)]
 # Apply whitelist to all pipeline outputs, reference pipelines, and wgbs count data
 pipelines_design <- lapply(pipelines_wgbs_thresh, function(x) x[rownames(x) %in% cpg_white_list,])
-wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
-wgbs_counts_ds <- wgbs_counts[rownames(wgbs_counts) %in% cpg_white_list,] 
+# wgbs_counts <- tdhia::alzheimer_study_wbgs_shared_cpg$count
+wgbs_counts_ds <- wgbs_counts[rownames(wbgs_shared_cpg) %in% cpg_white_list,] 
 # all(rownames(wgbs_counts_ds) == rownames(pipelines_design$reference))
 
 # Grab and sort data from each technology, paired by patient
@@ -782,9 +854,9 @@ df_patients <- do.call(rbind, lapply(1:(length(names(pipelines_design))-1),
        function(x) group_by_patient(df_study = study_metadata, 
                                     df_cpg_imp = pipelines_design[[x]],   
                                     df_cpg_wgbs = pipelines_design$reference,
-                                    wgbs_counts = tdhia::alzheimer_study_wbgs_shared_cpg$count,
+                                    wgbs_counts = wbgs_shared_cpg,
                                     col_label = names(pipelines_design)[x])))
-df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$treatment),
+df_patients$disease_state = ifelse(test = grepl(pattern = "control", x = df_patients$study_group),
                              yes= "control", no =  "ad")
 # Calculate pearson rho between imprintome and wgbs for each patient
 df_patients_rho <- df_patients %>% group_by(sample_id, pipeline_name, disease_state) %>% summarize(rho = cor(
