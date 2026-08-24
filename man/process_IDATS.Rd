@@ -10,7 +10,8 @@ process_IDATS(
   mft,
   core_params,
   merge_replicates = NULL,
-  db_flag = FALSE
+  db_flag = FALSE,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -40,6 +41,8 @@ beta calculation).
 }}
 
 \item{db_flag}{todo}
+
+\item{verbose}{boolean, when true, prints extra info to console (default: TRUE).}
 }
 \value{
 a named list with the following fields:

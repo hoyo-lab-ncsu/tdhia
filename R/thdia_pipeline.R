@@ -25,10 +25,23 @@
 #' missing before the entire ICR is excluded from dataset.
 #' @param OVERWRITE_TEMP_DATA todo
 #' @param probe_data_cache_path todo
-#' @param max_patient_fail_rate todo
-#' @param merge_replicates todo
-#' @param enforce_req_idats todo
-#' @param min_design_score todo
+#' @param max_patient_fail_rate maximum number of imprintome cpg sites that fail
+#' the max_sig_pval threshold. Any patients with a higher fraction will be 
+#' discarded.
+#' @param merge_replicates string with the following possible values that
+#' determines how replicate probes are handled.
+#'  - NULL: the probe replicates are not merged (default value).
+#'  - pre_beta: replicates are merged by averaging fluorescent signal from
+#'   each channel individually, beta values are then calculated from these
+#'   averaged values (pre_beta = merging done before beta calculation).
+#'  - post_beta: beta value is calculated before replicates are merged and beta
+#'   values are averaged between replicates (post_beta = merging done before
+#'   beta calculation).
+#' @param enforce_req_idats check that all idat files requested in idat_basenames
+#'  argument are found on disk. Throws error if this is not the case.
+#' @param min_design_score discard probes below this design score threshold.
+#' Default: NA (don't discard any probes by design score). Design scores vary
+#' from 0-1, with a higher value being a better designed probe.
 #'
 #' @return named list with all of the output from each of the pipeline steps.
 #' @export
@@ -62,7 +75,6 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
 
   
   # 2) Filter probes that are not mapped and discard poor signal
-  # Output: rows: probe_id     x     columns: patient
   data_beta$filt_probe_beta <- filter_probes(
     probe_beta = data_beta$probe_beta, discard_unmapped_probes = discard_unmapped_probes,
     max_sig_pval = max_sig_pval, set_failed_betas_na = set_failed_betas_na, 
@@ -72,14 +84,12 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
   
   
   #3  Convert probe beta matrix to a cpg beta matrix
-  # Output: rows: cpg_id     x     columns: patient
   data_beta$cpg_beta <- convert_probes_to_cpgs(
     data_beta$filt_probe_beta, quantile_norm = FALSE,  db_flag = db_flag, 
     smooth_adj_cpgs = smooth_adj_cpgs)
   
   
   #4  Convert probe beta matrix to an icr beta matrix
-  # Output: rows: icr_id     x     columns: patient
   data_beta$icr_beta <- convert_cpgs_to_icrs(data_beta$cpg_beta, 
                                              max_icr_fail_rate = max_icr_fail_rate)
   

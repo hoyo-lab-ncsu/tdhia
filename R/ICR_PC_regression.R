@@ -39,6 +39,13 @@
 #'  variance, and PC4 for 88% of the cumulative variance, the PCs that will
 #'  be used for analysis are PC1, PC2 and PC3.
 #'
+#' @param n_pcs Optional positive integer specifying the exact number of
+#' principal components to include in each regression model. When `NULL`
+#' (default), the number of principal components is determined separately for
+#' each ICR using `pct_variance`. When supplied, `n_pcs` overrides
+#' `pct_variance`. If an ICR contains fewer available principal components than
+#' requested, all available principal components are used.
+#' 
 #' @param df_study dataframe of sample associated data to be used in linear
 #' models, (nrows = sample size). Columns should include those specified with
 #' 'outcome' and 'covariates' input arguments. There should be a column labeled
@@ -73,9 +80,10 @@
 
 
 pc_regression_test <- function (cpg_beta,
-                                m_value_transform= TRUE,
+                                m_value_transform = TRUE,
                                 data_norm_type="n1",
                                 pct_variance = 0.80,
+                                n_pcs = NULL,
                                 df_study,
                                 outcome,
                                 covariates,
@@ -91,6 +99,16 @@ pc_regression_test <- function (cpg_beta,
     dplyr::select(CpG_id, ICR_id) %>% # will select just the CpG and ICR ids from the icr_mapping file
     dplyr::distinct()
 
+  
+  if (!is.null(n_pcs)) {
+    if (length(n_pcs) != 1L || !is.numeric(n_pcs) || is.na(n_pcs) ||
+        !is.finite(n_pcs) || n_pcs < 1 ||  n_pcs != as.integer(n_pcs)) {
+      stop("`n_pcs` must be NULL or a single positive integer.")
+    }
+    n_pcs <- as.integer(n_pcs)
+  }
+  
+  
   # if icr_ids no supplied, scan for all icr_ids covered with cpg_ids
   if (is.null(icr_ids)) {
     icr_ids <- cpg_mapping %>%
@@ -139,7 +157,7 @@ pc_regression_test <- function (cpg_beta,
   # Helper function that processes ONE ICR (PCA + regression)
   # -------------------------------------------------------------------------
 
-  process_icr <- function(icr_id){
+  process_icr <- function(icr_id) {
     # Get the CpG IDs of the CpGs for an ICR
     subset_cpg_ids <- cpg_mapping %>%
       dplyr::filter(ICR_id == icr_id, CpG_id %in% colnames(cpg_beta)) %>%
@@ -159,13 +177,18 @@ pc_regression_test <- function (cpg_beta,
     eigenvalues <- icr.pca$sdev^2
     prop_var <- eigenvalues / sum(eigenvalues) #calculate the proportion variance of each eigenvalue
     cum_var <- cumsum(prop_var) #calculate the cumulative variance
-    # Select PCs contributing to pct_variance
-    if (length(cum_var) > 1) {
+    
+    # Select the number of PCs based on pct_variance or n_pcs
+    n_available_pcs <- ncol(icr.pca$x)
+    if (is.null(n_pcs)) {
+      # Default behavior: retain enough PCs to explain pct_variance
       cutoff_index <- which(cum_var >= pct_variance)[1]
     } else {
-      cutoff_index <- 1
+      # Override behavior: retain exactly n_pcs, subject to availability
+      cutoff_index <- min(n_pcs, n_available_pcs)
     }
     selected_pcs <- paste0("PC", seq_len(cutoff_index))
+    
     # Get PC scores
     pcs <- as.data.frame(icr.pca$x) %>%
       dplyr::select(dplyr::all_of(selected_pcs))
@@ -226,11 +249,8 @@ pc_regression_test <- function (cpg_beta,
     # -------------------------------------------------------------------------
 
     # SAVE RESULTS
-    tibble::tibble(
-      ICR_id = icr_id,
-      p_value = pval,
-      n_cpg = ncol(subset_cpg_beta)
-    )
+    tibble::tibble(ICR_id = icr_id, p_value = pval, n_cpg = ncol(subset_cpg_beta),
+      n_pc = cutoff_index, model_converged = model_full$converged, model_range = range(fitted(model_full)))
   }
 
 

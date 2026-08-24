@@ -51,6 +51,7 @@
 #'  - post_beta: beta value is calculated before replicates are merged and beta
 #'   values are averaged between replicates (post_beta = merging done before
 #'   beta calculation).
+#' @param verbose boolean, when true, prints extra info to console (default: TRUE).
 #' @returns a named list with the following fields:
 #'  - probe_beta_df: dataframe of beta values, probe_id x sample_id
 #'  - probe_pval_df: dataframe of signal p-values, probe_id x sample_id
@@ -62,7 +63,7 @@ load_idata_to_probes <-
            mft = NULL, multicore = 1,
            idat_basenames = NULL, quantile_norm = FALSE, mask = FALSE,
            db_flag = FALSE, enforce_req_idats = FALSE, enforce_idat_names = TRUE,
-           merge_replicates = NULL) {
+           merge_replicates = NULL, verbose = TRUE) {
     # Load manifest file if platform is true diagnostic imprintome array
     if (base::is.null(mft) && platform=="TruDx_imprintome") {mft = tdhia::manifest_v1A2_design_scores}
 
@@ -157,21 +158,33 @@ load_idata_to_probes <-
     if (!multicore || multicore==1) {
       core_params <- BiocParallel::SerialParam()
     } else if (.Platform$OS.type == "windows") {
-      core_params <- BiocParallel::SnowParam(multicore,)
+      core_params <- BiocParallel::SnowParam(
+        workers = multicore, type = "SOCK",
+        exportglobals = FALSE, progressbar = F)
+      # Clean startup and shutdown of snowparam
+      BiocParallel::bpstart(core_params)
+      on.exit(
+        {if (BiocParallel::bpisup(core_params)) {
+            BiocParallel::bpstop(core_params)
+          }}, add = TRUE)
     }  else {
-      core_params <- BiocParallel::MulticoreParam(multicore, progressbar = TRUE)
+      core_params <- BiocParallel::MulticoreParam(multicore, progressbar = F)
     }
 
 
+  
+    
+    
     # Load each of the IDAT file pairs, process with standard SeSame pipeline
-    cat(sprintf("Processing %.0f IDAT Files...", length(unq_obs_idat_basenames)))
+    cat(sprintf("Processing %.0f IDAT Files...\n", length(unq_obs_idat_basenames)))
     if (!is.null(core_params)) {
-      cat(sprintf(" (Using %i/%i cores.)...", core_params$workers, parallel::detectCores()))
+      cat(sprintf(" (Using %i/%i cores.)...\n", core_params$workers, parallel::detectCores()))
     }
 
     idat.out <- process_IDATS(unq_obs_idat_basenames, platform = platform,
                               mft = mft, core_params = core_params,
-                              db_flag = db_flag, merge_replicates = merge_replicates)
+                              db_flag = db_flag, merge_replicates = merge_replicates,
+                              verbose = verbose)
     probe_beta_matrix = idat.out$betas
     probe_pval_matrix = idat.out$p_vals
 
@@ -252,12 +265,13 @@ load_idata_to_probes <-
 #' @param core_params boolean flag, when true the max number of cores minus 1 is
 #' used for the current system.
 #' @param db_flag todo
+#' @param verbose boolean, when true, prints extra info to console (default: TRUE).
 #' @returns a named list with the following fields:
 #'  - betas: matrix of methylation beta values, probes x patients
 #'  - p_vals: matrix of signal p-values, probes x patients
 #'
 process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
-                          merge_replicates = NULL, db_flag = FALSE) {
+                          merge_replicates = NULL, db_flag = FALSE, verbose = TRUE) {
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
   # load(file = "process_IDATS.RData")
@@ -275,7 +289,7 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
   }
 
   
-  # Calculate sesame p-values for individual probes
+  if (verbose) cat("Calculate sesame p-values for individual probes...\n")
   p_vals <- do.call(cbind, BiocParallel::bplapply(ss, function(ss) {
     sesame::pOOBAH(return.pval = TRUE,
                    sdf =  sesame::dyeBiasNL(
@@ -284,7 +298,7 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
 
   # colnames(p_vals) <- basename(unq_obs_idat_basenames)
 
-  # Perform dye bias corection and background subtraction
+  if (verbose) cat("Performing dye bias corection and background subtraction...\n")
   ss_sig <- BiocParallel::bplapply(ss, function(ss) {
     ss_sig =  sesame::noob(
       sdf = sesame::dyeBiasNL(
@@ -300,6 +314,7 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
   if(db_flag) save(list = ls(all.names = TRUE), file = "process_IDATS.RData")
   # load(file = "process_IDATS.RData")
 
+  if (verbose) cat("Calculating and merging beta values...\n")
   if (!is.null(merge_replicates)) {
     # Get list of non-unique CPG IDs to be merged
     # Calculate merged beta (pre and post merge) for

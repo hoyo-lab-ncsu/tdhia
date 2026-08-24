@@ -9,6 +9,7 @@ pc_regression_test(
   m_value_transform = TRUE,
   data_norm_type = "n1",
   pct_variance = 0.8,
+  n_pcs = NULL,
   df_study,
   outcome,
   covariates,
@@ -39,6 +40,13 @@ For example, if PC1 accounts for 59\% of the cumulative variance, PC2 for
 72\% of the of the cumulative variance, PC3 for 81\% of the of the cumulative
 variance, and PC4 for 88\% of the cumulative variance, the PCs that will
 be used for analysis are PC1, PC2 and PC3.}
+
+\item{n_pcs}{Optional positive integer specifying the exact number of
+principal components to include in each regression model. When \code{NULL}
+(default), the number of principal components is determined separately for
+each ICR using \code{pct_variance}. When supplied, \code{n_pcs} overrides
+\code{pct_variance}. If an ICR contains fewer available principal components than
+requested, all available principal components are used.}
 
 \item{df_study}{dataframe of sample associated data to be used in linear
 models, (nrows = sample size). Columns should include those specified with

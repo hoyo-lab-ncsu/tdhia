@@ -15,7 +15,8 @@ load_idata_to_probes(
   db_flag = FALSE,
   enforce_req_idats = FALSE,
   enforce_idat_names = TRUE,
-  merge_replicates = NULL
+  merge_replicates = NULL,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -75,6 +76,8 @@ averaged values (pre_beta = merging done before beta calculation).
 values are averaged between replicates (post_beta = merging done before
 beta calculation).
 }}
+
+\item{verbose}{boolean, when true, prints extra info to console (default: TRUE).}
 }
 \value{
 a named list with the following fields:

@@ -73,14 +73,22 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
   model_str = paste0(response , " ~ ", paste(predictors, collapse = " + "))
   verbosecat(sprintf("> Model: %s\n", model_str))
 
+  
+  # Calculate SKAT null model
+  skat_null <- SKAT::SKAT_Null_Model(
+    formula =  stats::as.formula(model_str), data = df_study,
+    out_type = out_type, n.Resampling = 0, Adjustment = TRUE)
+  
   # packaged skat into function for single ICR to make parallel conversion easier in future
-  if (n.cores==1){ verbosecat("> SKAT processing on single core.\n")
+  if (n.cores==1) { verbosecat("> SKAT processing on single core.\n")
 
     out = list()
     for (n in 1:length(icr_ids)) {
 
-      out[[n]] <- skat_single_icr(icr_id = icr_ids[n], cpg_betas, df_study,
-                                  model_str, cpg_mapping, m_value_transform, scaling = scaling, method = method, out_type = out_type)
+      out[[n]] <- skat_single_icr(
+        icr_id = icr_ids[n], cpg_betas = cpg_betas, df_study = df_study, skat_null = skat_null,
+        cpg_mapping = cpg_mapping, m_value_transform = m_value_transform, scaling = scaling, 
+        method = method, out_type = out_type)
     }; df_results = do.call(rbind, out)
 
   } else {
@@ -90,8 +98,9 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
       param  = BiocParallel::SnowParam(workers = n.cores, exportglobals = FALSE)
       wrap_fun = function(x, fx) {suppressPackageStartupMessages({
         requireNamespace("dplyr"); requireNamespace("tibble")})
-        fx(icr_ids[x], cpg_betas, df_study, model_str,
-           cpg_mapping, m_value_transform, scaling = scaling, method = method, out_type = out_type)
+        fx(icr_ids[x], cpg_betas = cpg_betas, df_study = df_study, skat_null = skat_null,
+           cpg_mapping = cpg_mapping, m_value_transform = m_value_transform, scaling = scaling, 
+           method = method, out_type = out_type)
       }
       out <- BiocParallel::bplapply(X = 1:length(icr_ids), FUN = wrap_fun, fx = skat_single_icr, BPPARAM = param)
       df_results = do.call(rbind, out)
@@ -115,7 +124,7 @@ skat_icr_test <- function(cpg_betas, df_study, response, predictors,
 
 
 
-skat_single_icr <- function(icr_id, cpg_betas, df_study, model_str, cpg_mapping, m_value_transform, scaling, method, out_type) {
+skat_single_icr <- function(icr_id, cpg_betas, df_study, skat_null, cpg_mapping, m_value_transform, scaling, method, out_type) {
   # Get list of cpgs for a given ICR
   subset_cpg_ids <- cpg_mapping %>%
     dplyr::filter(.data$icr_id == .env$icr_id) %>% dplyr::pull(cpg_id)
@@ -131,10 +140,10 @@ skat_single_icr <- function(icr_id, cpg_betas, df_study, model_str, cpg_mapping,
   # Scaling (Center data)
   if (scaling) Zs <- scale(Zs, center = TRUE, scale = TRUE)
 
-  # Calculate SKAT null model
-  skat_null <- SKAT::SKAT_Null_Model(
-    formula =  stats::as.formula(model_str), data = df_study,
-    out_type = out_type, n.Resampling = 0, Adjustment = TRUE)
+  # # Calculate SKAT null model
+  # skat_null <- SKAT::SKAT_Null_Model(
+  #   formula =  stats::as.formula(model_str), data = df_study,
+  #   out_type = out_type, n.Resampling = 0, Adjustment = TRUE)
 
   # SKAT observed model
   skat_out<-SKAT::SKAT(Z = Zs, obj = skat_null, kernel = "linear", method = method)

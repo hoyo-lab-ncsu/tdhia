@@ -1,6 +1,6 @@
 ---
 title: "Analyzing TDHIA IDAT files"
-author: "Dereje Jima"
+author: "Bruce Corliss, Dereje Jima"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
@@ -10,7 +10,9 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE, purl = FALSE}
-knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>", eval = FALSE, purl = FALSE)
+knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>", eval = TRUE, purl = FALSE)
+
+if (!("tdhia" %in% .packages())) devtools::load_all()
 
 library(dplyr)
 # here::i_am("README.md")
@@ -31,9 +33,56 @@ session after installing the package and required annotation data.
 We begin by first generating simulated data. Sesame imports IDAT files into a SigSet data object. We are going to artificially generate SigSet files. Let's do a dataset of 10 SigSets (IDATS).
 
 
-```{r simulate, eval=FALSE}
-n_patients = 20
-ss <- tdhia::simulate_idat_data(n_patients)
+```{r load dataset, eval=TRUE}
+
+
+
+# Download dataset and cache from GEO
+local_download <- tdhia::download_geo_methylation("GSE268075", quiet = T)
+# Correct IDAT filenames to match SeSame assumed importation convention
+correct_idat_names(file.path(local_download$directory, "idat"), rename = T)
+
+
+# Load metadata from GEO
+study_metadata <- read.csv(file.path(local_download$metadata_files))
+
+# Define 
+study_metadata <- study_metadata %>% dplyr::select(geo_accession, data_row_count, race.ch1, tissue.ch1, disease.ch1, supplementary_file)
+study_metadata$Patient.ID <- study_metadata$supplementary_file %>%
+  basename() %>% stringr::str_replace("_grn.IDAT.gz", "") 
+study_metadata <- study_metadata %>% select(-supplementary_file)
+study_metadata <- study_metadata %>% rename(race = race.ch1, tissue = tissue.ch1,  disease =  disease.ch1)
+study_metadata$race = recode(study_metadata$race, "black" = "NHB", "white" = "NHW")
+
+# Loading additional AD study data 
+study_metadata2 <- tdhia::alzheimer_study_wbgs_shared_cpg_metadata
+patient_id_geo_lookup  <- setNames(study_metadata$Patient.ID, study_metadata$Patient.ID %>%
+   sub(pattern="GSM[0-9]*_", replacement = ""))
+study_metadata2$Patient.ID <- patient_id_geo_lookup[study_metadata2$Patient.ID]
+
+# Joining tables together
+study_metadata <- study_metadata %>% left_join(study_metadata2 %>% select(
+  Patient.ID, Ethnicity, Age, Sex, Brain.Region, Time, AD.Neuropathologic.changes, 
+  wgbs_base_names), by = join_by(Patient.ID) )
+
+# Add patient_ids with GEO numbers as IDs for patients across datasets
+rownames(study_metadata) <- study_metadata$Patient.ID
+
+# Custom variables for convenience
+study_metadata$is_control = study_metadata$disease == "Control"
+study_metadata$disease_state = study_metadata$disease == "Alzheimer Disease"
+study_metadata$study_group = paste0(
+  ifelse(study_metadata$race=="NHB", "Black", "White"), " " ,
+  ifelse(study_metadata$disease=="Control", "Ctrl", "AD"))
+
+# Remove incomplete rows
+study_metadata <- filter(study_metadata, !is.na(wgbs_base_names))
+ 
+# Remove extraneous variables
+study_metadata <- study_metadata %>% select(-c(data_row_count, Brain.Region, Time))
+
+
+
 ```
 
 We can now load this data into tdhia and calculate the beta values and signal 
@@ -45,37 +94,37 @@ detection p-values. This is returned in a named list, with the following fields:
   
 
 
-```{r probes, eval=FALSE}
-probe_beta <-
-    tdhia::load_idata_to_probes(idat_dir_paths = ss, multicore = 2, 
-                         quantile_norm = FALSE, db_flag = TRUE)
+```{r probes, eval=TRUE}
+
+
+data_cache_path = file.path(local_download$directory, "data_cache")
+dir.create(data_cache_path, showWarnings = F, recursive = T)
+
+data <- tdhia::tdhia_pipeline(idat_dir_paths = file.path(local_download$directory, "idat"), 
+                      OVERWRITE_TEMP_DATA = T, idat_basenames = study_metadata$Patient.ID,
+                      probe_data_cache_path = file.path(data_cache_path, "AD_probe_data.rda"), 
+                      multicore = T, discard_unmapped_probes = T, set_failed_betas_na = T, 
+                      discard_failed_probes = T, db_flag = F)
+
+
 ```
   
 You can access the probe beta matrix with the **probe_beta_df** field.
-```{r visualize, eval=FALSE}
+
+```{r visualize, eval=TRUE}
 # Access probe beta matrix
-head(probe_beta$probe_beta_df)
+head(data$probe_beta$probe_beta_df)
+
 ```
 
 
+After importation, some probes are filtered out due to poor probe performance, patient data quality, or individual measurement queality thresholds. You can access the filtered probe data in *filt_probe_beta* field.
 We can filter out low quality probes with the filt_probe_beta(). This function 
 returns a named list with the same format as *probe_beta* above.  
 
-
-```{r filter, eval=FALSE}
-# 2) Filter probes that are not mapped and discard poor signal
-# Output: rows: probe_id     x     columns: patient
-filt_probe_beta <-
-  tdhia::filter_probes(probe_beta = probe_beta, discard_unmapped_probes = TRUE ,
-                max_sig_pval = 0.2, set_failed_betas_na = FALSE, 
-                max_probe_fail_rate = 0.25,
-                discard_failed_probes = TRUE, db_flag = FALSE)
-```
-
-You can access the filtered probe beta matrix with the **probe_beta_df** field.
-```{r filter_visualize, eval=FALSE}
+```{r filter_visualize, eval=TRUE}
 # Access filtered probe beta matrix
-head(filt_probe_beta$probe_beta_df)
+head(data$filt_probe_beta$probe_beta_df)
 ```
 
 
@@ -89,17 +138,10 @@ matrix, stored in a named list of the form:
   
 Probe beta values that belong to the same cpg site for a given patient are averaged.  
 
-```{r cpg, eval=FALSE}
-#3  Convert probe beta matrix to a cpg beta matrix
-# Output: rows: cpg_id     x     columns: patient
-cpg_beta <- tdhia::convert_probes_to_cpgs(filt_probe_beta, quantile_norm = FALSE, 
-                                   db_flag = TRUE, smooth_adj_cpgs = FALSE, multicore = 2)
-```
-
 You can access the filtered probe beta matrix with the **cpg_beta_df** field.
-```{r cpg_visualize, eval=FALSE}
+```{r cpg_visualize, eval=TRUE}
 # Access filtered probe beta matrix
-head(cpg_beta$cpg_beta_df)
+head(data$cpg_beta$cpg_beta_df)
 ```
 
 ## Generate QC Report
@@ -111,20 +153,15 @@ correlation heatmap, and PCA plots. When the relevant matrices are present, the
 report also includes detection p-value QC, retention counts, design score
 summaries, ICR coverage, replicate-probe agreement, and sample outlier flags.
 
-```{r qc_report, eval=FALSE}
+```{r qc_report, eval=TRUE}
 data_beta <- list(
-  filt_probe_beta = filt_probe_beta,
-  cpg_beta = cpg_beta
+  filt_probe_beta = data$filt_probe_beta,
+  cpg_beta = data$cpg_beta
 )
 
-qc_cpg <- tdhia::tdhia_qc_report(
-  data_beta = data_beta,
-  output_dir_path = "tdhia_results",
-  level = "cpg",
-  show_plots = TRUE,
-  save_pdf = TRUE,
-  save_metrics = TRUE
-)
+qc_cpg <- tdhia::tdhia_qc_report( data_beta = data_beta,
+  output_dir_path = "tdhia_results", level = "cpg", show_plots = TRUE,
+  save_pdf = F, save_metrics = FALSE)
 
 qc_cpg$sample_metrics
 qc_cpg$feature_metrics
@@ -141,73 +178,54 @@ returned in a named list of the form:
   
 Probe beta values that belong to the same cpg site for a given patient are averaged.  
 
-
-```{r icr, eval=FALSE}
-
-#4  Convert probe beta matrix to an icr beta matrix
-# Output: rows: icr_id     x     columns: patient
-icr_beta <- tdhia::convert_cpgs_to_icrs(cpg_beta, max_icr_fail_rate = 0.2)
-
-```
-
 You can access the filtered probe beta matrix with the **probe_beta_df** field.
-```{r eval=FALSE}
+```{r eval=TRUE}
 # Access filtered probe beta matrix
-head(icr_beta$icr_beta_df)
-```
-
-Let's simulate a case control analysis, where we will test for differences in CpG methylation state between a control group and an treatment group.
-
-```{r eval=FALSE}
-
-groud_id = c(rep(0,floor(n_patients/2)), rep(1,n_patients - floor(n_patients/2)))
-
-# Test for significant cpgs, corrected for number of ICRs
-df_res <- tdhia::analyze_case_control(cpg_beta$cpg_beta_df, groud_id, n_adjust = nrow(icr_beta$icr_beta_df))
-sum(df_res$adj_sig)
-
-# Test for significant ICRs
-df_res <- tdhia::analyze_case_control(icr_beta$icr_beta_df, groud_id)
-sum(df_res$adj_sig)
-
-```
-
-Now we can simulate a associate study, where we check if there is a correlation 
-between cpg methylation state and other patient variables.
-
-First, a data frame is created with patient information, including any response 
-variables or predictors. For actual analysis, this data is usually imported from
-a csv file or similiar format.
-
-```{r eval=FALSE}
-
-df_study = data.frame(id = 1:n_patients)
-df_study$race <- as.factor(sample(c(0,1,2), size = n_patients, replace = TRUE))
-df_study$exposure<- runif(n = n_patients, min = 0, max= 10)
-df_study$smoked <- as.factor(sample(c(0,1), size = n_patients, replace = TRUE))
-df_study$Bead = factor(sample(x = c("83279", "83249", "72794", "5449"), size = n_patients, replace = T))
-df_study$Col = factor(sample(x = 1:3, size = n_patients, replace = T))
-df_study$Row = factor(sample(x = 1:6, size = n_patients, replace = T))
-df_study$Patient_ID <- colnames(cpg_beta$cpg_beta_df)
-df_study
-
-rownames(df_study) <- colnames(cpg_beta$cpg_beta_df)
+head(data$icr_beta$icr_beta_df)
 ```
 
 
 
+We can perform an association study between individual CpG sites in the imprintomeon Alzheimer disease status. We specify the response variable as disease state, the predictor as CpG methylation state, and adjust for Age, Sex, and ethnicity as covariates. This method of analysis is the weakest statically because it does not look for coordinated effects across ICRs, but there is more flexibility with this method for model design. Methylation state can be specified as a response variable or predictor, unlike the other approaches available for analysis. This approach also has support for imputation with MICE, and 
+
+disease_state ~ cpg_methylation + age + sec + ethnicity
+
+We analyze all patients initially, and then separate patients by ethnicity in case of nonlinear responses.
 
 
-```{r eval=FALSE}
 
+
+
+```{r association, eval=TRUE,results = 'hide'}
+set.seed(1)
 n.cores <- max(c(parallel::detectCores()-2,1))
+association_cpg_beta <- data$cpg_beta$cpg_beta_df
 
-df_complete <- tdhia::analyze_association(R = select(df_study, exposure),
-                                   P = as.data.frame(t(cpg_beta$cpg_beta_df)),
-                                   Pe = select(df_study, -exposure),
-                                   family = "gaussian", n_p_adj = nrow(icr_beta$icr_beta_df), db_flag = FALSE,
-                                   rm.na.all = FALSE, verbose = TRUE, impute_na = TRUE,
-                                   max_p_val = 0.05, n.cores = n.cores)
+# disease_state ~ cpg + Age + Sex, All patients
+df_all <- analyze_association(
+  R = select(study_metadata, disease_state), P = as.data.frame(t(association_cpg_beta)),
+  Pe = select(study_metadata, c(Age, Sex, Ethnicity)), family = "binomial", 
+  n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = FALSE, 
+  verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
+
+# disease_state ~ cpg + Age + Sex, Non-hispanic white only
+ix_white <- study_metadata$Ethnicity == "NHW"
+df_white <- analyze_association(
+  R = select(study_metadata[ix_white,], disease_state), 
+  P = as.data.frame(t(select(association_cpg_beta, study_metadata$Patient.ID[ix_white]))),
+  Pe = select(study_metadata[ix_white,], c(Age, Sex)), family = "binomial", 
+  n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
+  verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
+
+# disease_state ~ cpg + Age + Sex, Non-hispanic black patients
+ix_black <- study_metadata$Ethnicity == "NHB"
+df_black <- analyze_association(
+  R = select(study_metadata[ix_black,], disease_state), 
+  P = as.data.frame(t(select(association_cpg_beta, study_metadata$Patient.ID[ix_black]))),
+  Pe = select(study_metadata[ix_black,], c(Age, Sex)), family = "binomial", 
+  n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
+  verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
+
 
 ```
 
@@ -225,19 +243,19 @@ set the reference group before modeling. The examples below use the simulated
 `family = "continuous"` in `pc_regression_test()` and `out_type = "C"` in
 `skat_icr_test()`.
 
-```{r eval=FALSE}
+```{r eval=TRUE}
 # Prepare analysis metadata and keep complete cases for the selected model.
-icr_study <- df_study %>%
-  dplyr::select(Patient_ID, smoked, exposure, race) %>%
-  tidyr::drop_na()
-
-rownames(icr_study) <- icr_study$Patient_ID
-icr_study$smoked <- stats::relevel(as.factor(icr_study$smoked), ref = "0")
+# icr_study <- study_metadata %>%
+#   dplyr::select(Patient_ID, smoked, exposure, race) %>%
+#   tidyr::drop_na()
+# 
+# rownames(icr_study) <- icr_study$Patient_ID
+# icr_study$smoked <- stats::relevel(as.factor(icr_study$smoked), ref = "0")
 
 # Keep the same samples in the methylation matrix and study metadata.
-shared_ids <- intersect(colnames(cpg_beta$cpg_beta_df), rownames(icr_study))
-cpg_beta_icr <- cpg_beta$cpg_beta_df[, shared_ids, drop = FALSE]
-icr_study <- icr_study[shared_ids, , drop = FALSE]
+# shared_ids <- intersect(colnames(data$cpg_beta$cpg_beta_df), rownames(study_metadata))
+# cpg_beta_icr <- data$cpg_beta$cpg_beta_df[, shared_ids, drop = FALSE]
+# icr_study <- icr_study[shared_ids, , drop = FALSE]
 ```
 
 ### Principal component regression
@@ -247,25 +265,24 @@ principal components to explain the requested fraction of methylation variance.
 It then compares a full model that includes those methylation PCs to a reduced
 model with only the covariates.
 
-```{r eval=FALSE}
+```{r eval=TRUE}
 # pc_regression_test() expects samples as rows and CpGs as columns.
-cpg_beta_pc <- as.data.frame(t(cpg_beta_icr))
+
+data_no_na <- tdhia::tdhia_pipeline(idat_dir_paths = file.path(local_download$directory, "idat"), 
+                      OVERWRITE_TEMP_DATA = F, idat_basenames = study_metadata$Patient.ID,
+                      probe_data_cache_path = file.path(data_cache_path, "AD_probe_data_no_na.rda"), 
+                      multicore = T,discard_unmapped_probes = T, set_failed_betas_na = F, 
+                      discard_failed_probes = T, db_flag = F)
+
+
 
 pc_icr_results <- tdhia::pc_regression_test(
-  cpg_beta = cpg_beta_pc,
-  m_value_transform = TRUE,
-  data_norm_type = "n1",
-  pct_variance = 0.80,
-  df_study = icr_study,
-  outcome = "smoked",
-  covariates = c("exposure", "race"),
-  Patient_ID = "Patient_ID",
-  family = "binomial",
-  icr_ids = NULL,
-  min_cpg = 3,
-  verbose = TRUE,
-  n.cores = 1
-)
+  cpg_beta = Matrix::t(data_no_na$cpg_beta$cpg_beta_df) %>% as.data.frame(),
+  m_value_transform = TRUE,  data_norm_type = "n1", pct_variance = 0.80, n_pcs = 1,
+  df_study = study_metadata %>% rename(Patient_ID = Patient.ID),
+  outcome = "disease_state",  covariates = c("Sex"),
+  Patient_ID = "Patient_ID",  family = "binomial",  icr_ids = NULL,
+  min_cpg = 3,  verbose = TRUE,  n.cores = 1)
 
 pc_icr_results <- pc_icr_results %>%
   dplyr::left_join(
@@ -281,21 +298,14 @@ head(pc_icr_results)
 SKAT tests each ICR as a set of CpG methylation values. It is useful when the
 CpGs inside an ICR may have heterogeneous effects.
 
-```{r eval=FALSE}
+```{r eval=TRUE}
 skat_icr_results <- tdhia::skat_icr_test(
-  cpg_betas = as.data.frame(cpg_beta_icr),
-  df_study = icr_study,
-  response = "smoked",
-  predictors = c("exposure", "race"),
-  method = "optimal.adj",
-  out_type = "D",
-  icr_ids = NULL,
-  min_cpg = 3,
-  db_flag = FALSE,
-  m_value_transform = TRUE,
-  scaling = TRUE,
-  verbose = TRUE,
-  n.cores = 1
+  cpg_betas = as.data.frame(data_no_na$cpg_beta$cpg_beta_df),
+  df_study = study_metadata,  response = "disease_state",
+  predictors = c("Sex", "Age", "Ethnicity"),  method = "optimal.adj",
+  out_type = "D",  icr_ids = NULL,  min_cpg = 3,  db_flag = FALSE,
+  m_value_transform = TRUE,  scaling = TRUE,  verbose = TRUE,
+  n.cores = max(c(parallel::detectCores()-2, 1))
 )
 
 skat_icr_results <- skat_icr_results %>%
@@ -318,35 +328,40 @@ annotation helpers, so it is shown but not evaluated during package checks. Run
 it interactively when network access and annotation resources are available.
 
 
-```{r eval=FALSE}
+```{r eval=TRUE}
 
-# Differential CpG analysis with LIMMA.
-out_cpg <- tdhia::cpg_dml_test(
-  df_study = df_study,
-  predictors = c("smoked", "exposure", "race"),
-  sample_name = "Patient_ID",
-  cpg_beta = cpg_beta$cpg_beta_df,
-  beadchip_correction = TRUE,
-  db_flag = FALSE
-)
+cpg_dml_out <- tdhia::cpg_dml_test(
+  df_study = study_metadata, predictors = c("disease_state", "Age", "Sex", "Ethnicity"), cpg_beta = data$cpg_beta$cpg_beta_df,
+  pvalue_threshold = 0.001, db_flag = F, sample_name = "Patient.ID", correlation_check = F,
+  beadchip_correction = F, verbose = T, write_plots = F,
+  output_dir_path = getwd())
 
-out_cpg$plots$qq_p_value
-out_cpg$plots$volcano
-out_cpg$plots$manhattan
+
+cpg_dml_out$plots$qq_p_value
+cpg_dml_out$plots$volcano
+cpg_dml_out$plots$manhattan
 
 ```
+
+```{r, include = TRUE, echo = TRUE}
+knitr::kable(cpg_dml_out$df_dml, format = "html") %>% kableExtra::kable_styling()
+```
+
 
 The ICR level analyses uses Lancaster p-value aggregation procedure to test for
 altered methylation state in ICRs.
 
 
-```{r eval=FALSE}
+```{r eval=TRUE}
 
 # Differential icr analysis
-out_icr <- tdhia::icr_dmr_test(df_dml = out_cpg$df_dml, chr_lens = out_cpg$chr_lens)
+# ICR Lancaster test using LIMMA p-values
+icr_dmr_test <-  tdhia::icr_dmr_test(df_dml = cpg_dml_out$df_dml, chr_lens = cpg_dml_out$chr_lens, 
+                                     pval_threshold = 0.05,
+                         fdr_sig_threshold = 0.0001,
+                         verbose = T, db_flag = F)
 
-out_icr$plots$manhplot_icr
-
+icr_dmr_test$plots$manhplot_icr
 ```
 
 ## Package Information
@@ -359,7 +374,7 @@ summaries, and running CpG- and ICR-level methylation association workflows.
 For reproducibility, record the package and R session versions used for each
 analysis run.
 
-```{r package_info, eval=FALSE}
+```{r package_info, eval=TRUE}
 packageVersion("tdhia")
 sessionInfo()
 ```

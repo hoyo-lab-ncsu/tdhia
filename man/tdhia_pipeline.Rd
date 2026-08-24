@@ -51,7 +51,9 @@ values set to NA).}
 \item{discard_failed_probes}{boolean when true, the probes that fail the
 max_probe_fail_rate are removed entirely.}
 
-\item{max_patient_fail_rate}{todo}
+\item{max_patient_fail_rate}{maximum number of imprintome cpg sites that fail
+the max_sig_pval threshold. Any patients with a higher fraction will be
+discarded.}
 
 \item{smooth_adj_cpgs}{boolean, when true, adjacent cpg beta values within an
 ICR are smoothed with a sliding window average.}
@@ -61,11 +63,24 @@ missing before the entire ICR is excluded from dataset.}
 
 \item{db_flag}{flag for saving function work space for debugging.}
 
-\item{merge_replicates}{todo}
+\item{merge_replicates}{string with the following possible values that
+determines how replicate probes are handled.
+\itemize{
+\item NULL: the probe replicates are not merged (default value).
+\item pre_beta: replicates are merged by averaging fluorescent signal from
+each channel individually, beta values are then calculated from these
+averaged values (pre_beta = merging done before beta calculation).
+\item post_beta: beta value is calculated before replicates are merged and beta
+values are averaged between replicates (post_beta = merging done before
+beta calculation).
+}}
 
-\item{enforce_req_idats}{todo}
+\item{enforce_req_idats}{check that all idat files requested in idat_basenames
+argument are found on disk. Throws error if this is not the case.}
 
-\item{min_design_score}{todo}
+\item{min_design_score}{discard probes below this design score threshold.
+Default: NA (don't discard any probes by design score). Design scores vary
+from 0-1, with a higher value being a better designed probe.}
 }
 \value{
 named list with all of the output from each of the pipeline steps.
