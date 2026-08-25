@@ -4,7 +4,12 @@
 \alias{correct_idat_names}
 \title{correct_idat_names}
 \usage{
-correct_idat_names(idat_dir_path, rename = TRUE, failcheck_error = TRUE)
+correct_idat_names(
+  idat_dir_path,
+  rename = TRUE,
+  failcheck_error = TRUE,
+  verbose = FALSE
+)
 }
 \arguments{
 \item{idat_dir_path}{either a full filesystem path to the directory of idats

@@ -1,18 +1,26 @@
 ---
-title: "Analyzing TDHIA IDAT files"
-author: "Bruce Corliss, Dereje Jima"
+title: "Introduction to TDHIA R Package"
+author: "Bruce Corliss"
 date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Analyzing TDHIA IDAT files}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+output: 
+  html_document:
+    toc: true # table of content true
+    number_sections: true  ## if you want number sections at each table header
+    highlight: tango  # specifies the syntax highlighting style
+    theme: united 
+    toc_float: true
+    code_folding: hide
+    toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
 ---
 
-```{r setup, include = FALSE, purl = FALSE}
-knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>", eval = TRUE, purl = FALSE)
 
-# if (!("tdhia" %in% .packages())) devtools::load_all()
+```{r setup, include = FALSE, purl = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+if (!("tdhia" %in% .packages())) devtools::load_all()
 
 library(dplyr)
 
@@ -31,9 +39,8 @@ Some additional patient metadata are also added for us to complete this analysis
 ```{r load dataset, eval=TRUE}
 
 
-
 # Download dataset and cache from GEO
-local_download <- tdhia::download_geo_methylation("GSE268075", quiet = T)
+local_download <- tdhia::download_geo_methylation("GSE268075", quiet = F)
 # Correct IDAT filenames to match SeSame assumed importation convention
 idat_renames <- tdhia::correct_idat_names(file.path(local_download$directory, "idat"), rename = T)
 
@@ -171,7 +178,7 @@ data_beta <- list(
 
 qc_cpg <- tdhia::tdhia_qc_report( data_beta = data_beta,
   output_dir_path = "tdhia_results", level = "cpg", show_plots = F,
-  save_pdf = F, save_metrics = FALSE)
+  save_pdf = F, save_metrics = F)
 
 qc_cpg$sample_metrics
 qc_cpg$feature_metrics
@@ -211,7 +218,7 @@ set.seed(1)
 n.cores <- max(c(parallel::detectCores()-2,1))
 
 # disease_state ~ cpg + Age + Sex, All patients
-df_all <- imprintome_glm(
+df_all <- tdhia::imprintome_glm(
   model_str = "disease_state ~ beta + Age + Sex + Ethnicity", study_data = study_metadata,
   betas = data$cpg_beta$cpg_beta_df, family = "binomial", m_value_transform = T,
   n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = FALSE, 
@@ -222,7 +229,7 @@ df_all <- imprintome_glm(
 ```{r association2, eval=TRUE,results = 'hide'}
 # disease_state ~ cpg + Age + Sex, Non-hispanic white only
 ids_white <- study_metadata$Patient.ID[study_metadata$Ethnicity == "NHW"]
-df_white <- imprintome_glm(
+df_white <- tdhia::imprintome_glm(
   model_str = "disease_state ~ beta + Age + Sex",
   study_data = study_metadata %>% filter(Patient.ID %in% ids_white),
   betas = data$cpg_beta$cpg_beta_df, family = "binomial", m_value_transform = T,
@@ -235,7 +242,7 @@ df_white <- imprintome_glm(
 ```{r association3, eval=TRUE,results = 'hide'}
 # disease_state ~ cpg + Age + Sex, Non-hispanic black patients
 ids_black <- study_metadata$Patient.ID[study_metadata$Ethnicity == "NHB"]
-df_black <- imprintome_glm(
+df_black <- tdhia::imprintome_glm(
   model_str = "disease_state ~ beta + Age + Sex",
   study_data = study_metadata %>% filter(Patient.ID %in% ids_black),
   betas = data$cpg_beta$cpg_beta_df, family = "binomial", m_value_transform = T,
@@ -346,10 +353,6 @@ cpg_dml_out <- tdhia::cpg_dml_test(
   pvalue_threshold = 0.001, db_flag = F, sample_name = "Patient.ID", correlation_check = F,
   beadchip_correction = F, verbose = T, write_plots = F,
   output_dir_path = getwd())
-
-
-
-
 
 
 ```

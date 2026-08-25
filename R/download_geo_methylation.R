@@ -106,6 +106,7 @@ download_geo_methylation <- function(
     )
 
     for (directory in dirs) {
+      if (!quiet) cat(paste0(directory, "\n"))
         if (!dir.exists(directory) &&
             !dir.create(directory, recursive = TRUE, showWarnings = FALSE)) {
             stop("Could not create directory: ", directory, call. = FALSE)

@@ -27,10 +27,12 @@ imprintome_glm(
 and the term "beta" to reference the beta methylation data. Beta must either
 be a response or primary predictor.}
 
-\item{study_data}{dataframe of study variables (each row is a sample).}
+\item{study_data}{dataframe of study variables (each row is a sample).
+Rownames should be patient labels that match columns in betas.}
 
 \item{betas}{beta matrix, each row is imprintome site (cpg or ICR), each
-column is a sample (patient).}
+column is a sample (patient). Column names should be patient labels that match
+rownames in study_data.}
 
 \item{family}{string for family model argument for glm(). (ex. 'binomial', 'gaussian')}
 

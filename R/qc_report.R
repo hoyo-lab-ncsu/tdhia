@@ -69,8 +69,8 @@ tdhia_qc_report <- function(data_beta,
                             output_dir_path = getwd(),
                             level = c("cpg", "probe", "icr"),
                             show_plots = interactive(),
-                            save_pdf = TRUE,
-                            save_metrics = TRUE,
+                            save_pdf = F,
+                            save_metrics = F,
                             max_density_samples = 50,
                             detection_pvalue_threshold = 0.2,
                             outlier_z_threshold = 3,
@@ -88,9 +88,11 @@ tdhia_qc_report <- function(data_beta,
     colnames(beta_m) <- paste0("sample_", seq_len(ncol(beta_m)))
   }
 
-  qc_dir <- file.path(output_dir_path, "QC")
-  dir.create(qc_dir, recursive = TRUE, showWarnings = FALSE)
-
+  if (!save_pdf && !save_metrics) {
+    qc_dir <- file.path(output_dir_path, "QC")
+     dir.create(qc_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  
   sample_metrics <- data.frame(
     Sample = colnames(beta_m),
     NA_fraction = colMeans(is.na(beta_m)),
