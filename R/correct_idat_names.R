@@ -14,7 +14,7 @@
 #'
 #' @return results with fitted coefficients from the glm, sorted by p-value
 #' @export
-correct_idat_names <- function (idat_dir_path, rename = TRUE, failcheck_error = TRUE) {
+correct_idat_names <- function (idat_dir_path, rename = TRUE, failcheck_error = TRUE, verbose = FALSE) {
 
   if (length(idat_dir_path)==1) {
     # Get all idat files in target directory
@@ -40,7 +40,7 @@ correct_idat_names <- function (idat_dir_path, rename = TRUE, failcheck_error = 
     }
 
   } else {
-    cat("Renaming IDAT Files...\n")
+    if (verbose) cat("Renaming IDAT Files...\n")
     # For IDAT extention lower case
     new_idat_fullnames = stringr::str_replace(idat_fullnames, '.IDAT$', '.idat')
     # Force green camel case
@@ -57,6 +57,8 @@ correct_idat_names <- function (idat_dir_path, rename = TRUE, failcheck_error = 
     # Rename files
     file.rename(from = df_log$old_name, to = df_log$new_name)
   }
+  
+  return(NULL)
 
 }
 

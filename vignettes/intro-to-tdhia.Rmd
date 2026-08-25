@@ -12,26 +12,21 @@ vignette: >
 ```{r setup, include = FALSE, purl = FALSE}
 knitr::opts_chunk$set(echo = TRUE, collapse = TRUE, comment = "#>", eval = TRUE, purl = FALSE)
 
-if (!("tdhia" %in% .packages())) devtools::load_all()
+# if (!("tdhia" %in% .packages())) devtools::load_all()
 
 library(dplyr)
-# here::i_am("README.md")
-# devtools::load_all()
-# library(tdhia)
+
 ```
 
 Here we will demonstrate how to process IDAT files from the True Diagnostic Human
 Imprintome Array (TDHIA) with the tdhia package.
 
-The code is not evaluated during package checks because several steps require
-annotation resources and Sesame/Bioconductor cache files that may not be
-available on offline build systems. Copy the chunks into an interactive R
-session after installing the package and required annotation data.
 
-## Dataset generation
+# Dataset generation
 
-We begin by first generating simulated data. Sesame imports IDAT files into a SigSet data object. We are going to artificially generate SigSet files. Let's do a dataset of 10 SigSets (IDATS).
+We will use a small dataset of imprintome methylation samples obtained from brain tissue, split between patients with and with Alzheimer disease. The data will be downloaded from [GSE268075]https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE268075. We can use a built-in GEO downloader in tdhia which will cache the data in a user directory associated with the package.
 
+Some additional patient metadata are also added for us to complete this analysis.
 
 ```{r load dataset, eval=TRUE}
 
@@ -40,7 +35,7 @@ We begin by first generating simulated data. Sesame imports IDAT files into a Si
 # Download dataset and cache from GEO
 local_download <- tdhia::download_geo_methylation("GSE268075", quiet = T)
 # Correct IDAT filenames to match SeSame assumed importation convention
-correct_idat_names(file.path(local_download$directory, "idat"), rename = T)
+idat_renames <- tdhia::correct_idat_names(file.path(local_download$directory, "idat"), rename = T)
 
 
 # Load metadata from GEO
@@ -82,15 +77,24 @@ study_metadata <- filter(study_metadata, !is.na(wgbs_base_names))
 study_metadata <- study_metadata %>% select(-c(data_row_count, Brain.Region, Time))
 
 
-
+head(study_metadata)
 ```
+
+
+We specified rownames for our study data frame to be the patient identifiers. These are also used as basenames for the IDAT files storing the imprintome methylation data.
+For example, the identifier "GSM8285531_207344530004_R01C01" refers to the red and green idat files for this patient.
+
+1) GSM8285531_207344530004_R01C01_Grn.idat
+2) GSM8285531_207344530004_R01C01_Red.idat
+
+Please use this convention for you analysis since all of the downstream statisticall analysis assumes that rownames of study data will match column names in the output beta methylation matrix.
 
 We can now load this data into tdhia and calculate the beta values and signal 
 detection p-values. This is returned in a named list, with the following fields:  
-**probe_beta_df**: dataframe of beta values, probe_id x sample_id.  
-**probe_pval_df**: dataframe of signal p-values, probe_id x sample_id.  
-**platform**: string that describes platform for methylation array.  
-**manifest**: dataframe of the manifest file used for SeSame processing.  
+**data$probe_beta_df**: dataframe of beta values, probe_id x sample_id.  
+**data$probe_pval_df**: dataframe of signal p-values, probe_id x sample_id.  
+**data$platform**: string that describes platform for methylation array.  
+**data$manifest**: dataframe of the manifest file used for SeSame processing.  
   
 
 
@@ -103,13 +107,14 @@ dir.create(data_cache_path, showWarnings = F, recursive = T)
 data <- tdhia::tdhia_pipeline(idat_dir_paths = file.path(local_download$directory, "idat"), 
                       OVERWRITE_TEMP_DATA = T, idat_basenames = study_metadata$Patient.ID,
                       probe_data_cache_path = file.path(data_cache_path, "AD_probe_data.rda"), 
-                      multicore = T, discard_unmapped_probes = T, set_failed_betas_na = T, 
+                      multicore = T, discard_unmapped_probes = T, set_failed_betas_na = T, merge_replicates = "pre_beta",
+                      
                       discard_failed_probes = T, db_flag = F)
 
 
 ```
   
-You can access the probe beta matrix with the **probe_beta_df** field.
+You can access the probe beta matrix with the **probe_beta_df** field. The number of rows for this matrix will depend on whether merging replicates was specified. If `merge_replicates = NULL`, then the number of rows will match the number of rows in the array manifest. Otherwise probes are are replicates are merged together.
 
 ```{r visualize, eval=TRUE}
 # Access probe beta matrix
@@ -118,7 +123,7 @@ head(data$probe_beta$probe_beta_df)
 ```
 
 
-After importation, some probes are filtered out due to poor probe performance, patient data quality, or individual measurement queality thresholds. You can access the filtered probe data in *filt_probe_beta* field.
+After importation, some probes are filtered out due to poor probe performance, patient data quality, or individual measurement quality thresholds. You can access the filtered probe data in *filt_probe_beta* field.
 We can filter out low quality probes with the filt_probe_beta(). This function 
 returns a named list with the same format as *probe_beta* above.  
 
@@ -131,10 +136,10 @@ head(data$filt_probe_beta$probe_beta_df)
 
 Once probe data has been filtered convert the probe beta matrix to a cpg data 
 matrix, stored in a named list of the form:  
-**cpg_beta_df**: dataframe of beta values, probe_id x sample_id.  
-**platform**: string that describes platform for methylation array.  
-**manifest**: dataframe of the manifest file used for SeSame processing.  
-**cpg_n_probes**: number of probes for each cpg site.
+**data$cpg_beta_df**: dataframe of beta values, probe_id x sample_id.  
+**data$platform**: string that describes platform for methylation array.  
+**data$manifest**: dataframe of the manifest file used for SeSame processing.  
+**data$cpg_n_probes**: number of probes for each cpg site.
   
 Probe beta values that belong to the same cpg site for a given patient are averaged.  
 
@@ -144,7 +149,7 @@ You can access the filtered probe beta matrix with the **cpg_beta_df** field.
 head(data$cpg_beta$cpg_beta_df)
 ```
 
-## Generate QC Report
+# Generate QC Report
 
 After the CpG matrix has been created, a QC report can be generated. This report
 summarizes missingness and beta-value distributions by sample and feature, and
@@ -153,6 +158,11 @@ correlation heatmap, and PCA plots. When the relevant matrices are present, the
 report also includes detection p-value QC, retention counts, design score
 summaries, ICR coverage, replicate-probe agreement, and sample outlier flags.
 
+**qc_cpg**: dataframe of beta values, probe_id x sample_id.  
+**qc_cpg**: string that describes platform for methylation array.  
+**qc_cpg**: dataframe of the manifest file used for SeSame processing.  
+**qc_cpg**: number of probes for each cpg site.
+
 ```{r qc_report, eval=TRUE}
 data_beta <- list(
   filt_probe_beta = data$filt_probe_beta,
@@ -160,7 +170,7 @@ data_beta <- list(
 )
 
 qc_cpg <- tdhia::tdhia_qc_report( data_beta = data_beta,
-  output_dir_path = "tdhia_results", level = "cpg", show_plots = TRUE,
+  output_dir_path = "tdhia_results", level = "cpg", show_plots = F,
   save_pdf = F, save_metrics = FALSE)
 
 qc_cpg$sample_metrics
@@ -178,13 +188,13 @@ returned in a named list of the form:
   
 Probe beta values that belong to the same cpg site for a given patient are averaged.  
 
-You can access the filtered probe beta matrix with the **probe_beta_df** field.
+You can access the filtered probe beta matrix with the **data$probe_beta_df** field.
 ```{r eval=TRUE}
 # Access filtered probe beta matrix
 head(data$icr_beta$icr_beta_df)
 ```
 
-
+# CpG Level Association Study {.tabset}
 
 We can perform an association study between individual CpG sites in the imprintomeon Alzheimer disease status. We specify the response variable as disease state, the predictor as CpG methylation state, and adjust for Age, Sex, and ethnicity as covariates. This method of analysis is the weakest statically because it does not look for coordinated effects across ICRs, but there is more flexibility with this method for model design. Methylation state can be specified as a response variable or predictor, unlike the other approaches available for analysis. This approach also has support for imputation with MICE, and 
 
@@ -193,44 +203,50 @@ disease_state ~ cpg_methylation + age + sec + ethnicity
 We analyze all patients initially, and then separate patients by ethnicity in case of nonlinear responses.
 
 
+## All Patients
 
 
-
-```{r association, eval=TRUE,results = 'hide'}
+```{r association1, eval=TRUE,results = 'hide'}
 set.seed(1)
 n.cores <- max(c(parallel::detectCores()-2,1))
-association_cpg_beta <- data$cpg_beta$cpg_beta_df
 
 # disease_state ~ cpg + Age + Sex, All patients
-df_all <- analyze_association(
-  R = select(study_metadata, disease_state), P = as.data.frame(t(association_cpg_beta)),
-  Pe = select(study_metadata, c(Age, Sex, Ethnicity)), family = "binomial", 
+df_all <- imprintome_glm(
+  model_str = "disease_state ~ beta + Age + Sex + Ethnicity", study_data = study_metadata,
+  betas = data$cpg_beta$cpg_beta_df, family = "binomial", m_value_transform = T,
   n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
+```
 
+## Non-hispanic White
+```{r association2, eval=TRUE,results = 'hide'}
 # disease_state ~ cpg + Age + Sex, Non-hispanic white only
-ix_white <- study_metadata$Ethnicity == "NHW"
-df_white <- analyze_association(
-  R = select(study_metadata[ix_white,], disease_state), 
-  P = as.data.frame(t(select(association_cpg_beta, study_metadata$Patient.ID[ix_white]))),
-  Pe = select(study_metadata[ix_white,], c(Age, Sex)), family = "binomial", 
-  n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
+ids_white <- study_metadata$Patient.ID[study_metadata$Ethnicity == "NHW"]
+df_white <- imprintome_glm(
+  model_str = "disease_state ~ beta + Age + Sex",
+  study_data = study_metadata %>% filter(Patient.ID %in% ids_white),
+  betas = data$cpg_beta$cpg_beta_df, family = "binomial", m_value_transform = T,
+  n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
+```
 
+
+## Non-hispanic Black
+```{r association3, eval=TRUE,results = 'hide'}
 # disease_state ~ cpg + Age + Sex, Non-hispanic black patients
-ix_black <- study_metadata$Ethnicity == "NHB"
-df_black <- analyze_association(
-  R = select(study_metadata[ix_black,], disease_state), 
-  P = as.data.frame(t(select(association_cpg_beta, study_metadata$Patient.ID[ix_black]))),
-  Pe = select(study_metadata[ix_black,], c(Age, Sex)), family = "binomial", 
-  n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE,rm.na.all = FALSE, 
+ids_black <- study_metadata$Patient.ID[study_metadata$Ethnicity == "NHB"]
+df_black <- imprintome_glm(
+  model_str = "disease_state ~ beta + Age + Sex",
+  study_data = study_metadata %>% filter(Patient.ID %in% ids_black),
+  betas = data$cpg_beta$cpg_beta_df, family = "binomial", m_value_transform = T,
+  n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = FALSE, 
   verbose = TRUE, impute_na = TRUE, max_p_val = 0.05, n.cores = n.cores)
 
 
 ```
 
 
-## ICR-level regression tests
+# ICR-level regression tests
 
 TDHIA also includes regression tools for testing ICR-level methylation patterns.
 Two direct ICR-level options are principal component regression and SKAT. A third
@@ -243,38 +259,31 @@ set the reference group before modeling. The examples below use the simulated
 `family = "continuous"` in `pc_regression_test()` and `out_type = "C"` in
 `skat_icr_test()`.
 
-```{r eval=TRUE}
-# Prepare analysis metadata and keep complete cases for the selected model.
-# icr_study <- study_metadata %>%
-#   dplyr::select(Patient_ID, smoked, exposure, race) %>%
-#   tidyr::drop_na()
-# 
-# rownames(icr_study) <- icr_study$Patient_ID
-# icr_study$smoked <- stats::relevel(as.factor(icr_study$smoked), ref = "0")
+These tests do not currently support missing data, so we must reprocess the array data and not filter individual beta measurements with poor measurement quality `set_failed_betas_na = F` (although poor performing probes can still be filtered across all patients).
+These tests also are restricted with the model design, where beta values can only be the response variable or predictor. Currently only the CpG-level analysis supports missing data imputation and beta values being a response or predictor.
 
-# Keep the same samples in the methylation matrix and study metadata.
-# shared_ids <- intersect(colnames(data$cpg_beta$cpg_beta_df), rownames(study_metadata))
-# cpg_beta_icr <- data$cpg_beta$cpg_beta_df[, shared_ids, drop = FALSE]
-# icr_study <- icr_study[shared_ids, , drop = FALSE]
-```
-
-### Principal component regression
-
-Principal component regression summarizes the CpGs inside each ICR with enough
-principal components to explain the requested fraction of methylation variance.
-It then compares a full model that includes those methylation PCs to a reduced
-model with only the covariates.
-
-```{r eval=TRUE}
-# pc_regression_test() expects samples as rows and CpGs as columns.
-
+```{r eval=TRUE, results = FALSE}
+# Reprocess array data with 
 data_no_na <- tdhia::tdhia_pipeline(idat_dir_paths = file.path(local_download$directory, "idat"), 
                       OVERWRITE_TEMP_DATA = F, idat_basenames = study_metadata$Patient.ID,
                       probe_data_cache_path = file.path(data_cache_path, "AD_probe_data_no_na.rda"), 
                       multicore = T,discard_unmapped_probes = T, set_failed_betas_na = F, 
                       discard_failed_probes = T, db_flag = F)
 
+```
 
+## Principal component regression
+
+Principal component regression summarizes the CpGs inside each ICR with enough
+principal components to explain the requested fraction of methylation variance.
+It then compares a full model that includes those methylation PCs to a reduced
+model with only the covariates.
+
+This analysis method is not designed for small datasets, and leads to overfitting and overspecification. For this vignette, we limit the number of principle components to 1 (`n_pcs = 1`) and only use one of the covariates in order the for the code to run. For an actual analysis, we would use all covariates and set `n_pcs = 1`.
+
+We recommend to set `m_value_transform = TRUE` in so beta values are transformed to M-values in order to stabilize the variance and make the data more homoscedastic.
+
+```{r eval=TRUE}
 
 pc_icr_results <- tdhia::pc_regression_test(
   cpg_beta = Matrix::t(data_no_na$cpg_beta$cpg_beta_df) %>% as.data.frame(),
@@ -293,10 +302,12 @@ pc_icr_results <- pc_icr_results %>%
 head(pc_icr_results)
 ```
 
-### SKAT ICR regression
+## SKAT ICR regression
 
 SKAT tests each ICR as a set of CpG methylation values. It is useful when the
-CpGs inside an ICR may have heterogeneous effects.
+CpGs inside an ICR may have heterogeneous effects. A drawback to SKAT is there no effect size measure reported for ICRs, only statistical significance.
+
+We recommend to set `m_value_transform = TRUE` in so beta values are transformed to M-values in order to stabilize the variance and make the data more homoscedastic.
 
 ```{r eval=TRUE}
 skat_icr_results <- tdhia::skat_icr_test(
@@ -317,7 +328,7 @@ skat_icr_results <- skat_icr_results %>%
 head(skat_icr_results)
 ```
 
-### LIMMA followed by Lancaster aggregation
+## LIMMA followed by Lancaster aggregation {.tabset}
 
 Next we can perform a CpG-level DML analysis and ICR-level DMR analysis using a
 LIMMA-based workflow.
@@ -337,10 +348,28 @@ cpg_dml_out <- tdhia::cpg_dml_test(
   output_dir_path = getwd())
 
 
-cpg_dml_out$plots$qq_p_value
-cpg_dml_out$plots$volcano
-cpg_dml_out$plots$manhattan
 
+
+
+
+```
+
+### QQ plot
+
+```{r, include = TRUE, echo = TRUE}
+cpg_dml_out$plots$qq_p_value
+```
+
+### Volcano plot
+
+```{r, include = TRUE, echo = TRUE}
+cpg_dml_out$plots$volcano
+```
+
+### Manhattan plot
+
+```{r, include = TRUE, echo = TRUE}
+cpg_dml_out$plots$manhattan
 ```
 
 ```{r, include = TRUE, echo = TRUE}
@@ -363,6 +392,8 @@ icr_dmr_test <-  tdhia::icr_dmr_test(df_dml = cpg_dml_out$df_dml, chr_lens = cpg
 
 icr_dmr_test$plots$manhplot_icr
 ```
+
+
 
 ## Package Information
 
