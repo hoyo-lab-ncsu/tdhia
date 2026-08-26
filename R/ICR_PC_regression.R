@@ -178,16 +178,16 @@ pc_regression_test <- function (cpg_beta,
     #combined_data <- cbind(df_study, pcs[rownames(df_study), , drop = FALSE])
     # HARD ENFORCE alignment
 
-    pcs$Patient_ID <- rownames(pcs)
+    pcs[[Patient_ID]] <- rownames(pcs)
     combined_data <- dplyr::inner_join(
       df_study,
       pcs,
-      by = "Patient_ID"
+      by = Patient_ID
     )
 
     stopifnot(nrow(combined_data) == nrow(df_study) || nrow(combined_data) == nrow(pcs))
-    rownames(combined_data) <- combined_data$Patient_ID
-    combined_data$Patient_ID <- NULL
+    rownames(combined_data) <- combined_data[[Patient_ID]]
+    combined_data[[Patient_ID]] <- NULL
 
     predictor_cpg_names <- selected_pcs
 
