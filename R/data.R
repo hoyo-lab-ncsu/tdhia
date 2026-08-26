@@ -141,19 +141,6 @@
 "manifest_v1A2_design_scores"
 
 
-#' Study data for alzheimer brain samples
-#'
-#'
-#'
-#' @format none
-#' \describe{
-#'   \item{patient_id}{base name of truediagnostic files   }
-#'   \item{group}{either control group or those with alzheimers}
-#'   \item{race}{race of patient (black or white)}
-#' }
-#' @source none
-"df_alzheimer_brain_study_data"
-
 
 
 
@@ -274,34 +261,5 @@
 "imprintome_gametic_icrs"
 
 
-#' List of epicV2 cpg sites that are shared with imprintome
-#'
-#' @name epicv2_shared_cpg_sites
-#' @docType data
-#' @keywords datasets
-#' @format A dataframe with sample ID for wgbs data
-#' \describe{
-#'   \item{ch}{ Chromosome number.}
-#'   \item{start}{ genomic position start of ICR}
-#'   \item{end}{ genomic position end of ICR}
-#'   \item{icr_id}{ ICR identifier}
-#' }
-"epicv2_shared_cpg_sites"
-
-
-#' Table of ICR's that were experimentally validated with differential gametic 
-#' methylation from sperm and oocyte samples.
-#'
-#' @name df_gametic_icrs
-#' @docType data
-#' @keywords datasets
-#' @format A dataframe with sample ID for wgbs data
-#' \describe{
-#'   \item{ch}{ Chromosome number.}
-#'   \item{start}{ genomic position start of ICR}
-#'   \item{finish}{ genomic position end of ICR}
-#'   \item{icr}{ ICR identifier}
-#' }
-"df_gametic_icrs"
 
  

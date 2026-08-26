@@ -47,11 +47,13 @@
 cpg_dml_test <- function(df_study, predictors, cpg_beta,
                          pvalue_threshold = 0.0001, db_flag = F, sample_name = "Patient.ID",
                          beadchip_correction = T, verbose = T, write_plots = F,
+                         m_value_transform = T,
                          correlation_check = F,
                          output_dir_path = getwd(), label = predictors[1]) {
   
   if (db_flag) {save(list = ls(all.names = TRUE), file = "cpg_dml_test.RData")}
   # load(file = "cpg_dml_test.RData")
+  
   vsprintf <- \(x, ...) if (verbose) cat(sprintf(x, ...))
   plots = list()
   if (!sample_name %in% colnames(df_study)) {
@@ -66,6 +68,15 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   }
   df_study <- df_study[match(shared_patients, df_study[[sample_name]]), , drop = FALSE]
   cpg_beta <- cpg_beta[, shared_patients, drop = FALSE]
+  
+  
+  # Transform cpg_beta
+  # Use M-values for LIMMA inference when requested
+  cpg_model_values <- if (m_value_transform) {
+    sesame::BetaValueToMValue(cpg_beta)
+  } else {
+    cpg_beta
+  }
   
   # Assemble predictor list
   if (beadchip_correction) {
@@ -134,13 +145,58 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   }
   vsprintf(">> LIMMA coefficient tested: %s\n", coef_name)
 
-
+  # Determine reference and comparison groups
+  #_____________________________________________________________________________
+  primary_predictor <- predictors[1]
+  primary_variable <- df_study[[primary_predictor]]
+  if (all(primary_variable %in% 0:1)) primary_variable <- as.factor(primary_variable)
+  beta_effects <- NULL
+  
+  if (is.factor(primary_variable) && nlevels(primary_variable) == 2L) {
+    
+    group_levels <- levels(primary_variable)
+    reference_level <- group_levels[1]
+    comparison_level <- group_levels[2]
+    
+    reference_samples <- df_study[[sample_name]][primary_variable == reference_level]
+    
+    comparison_samples <- df_study[[sample_name]][
+      primary_variable == comparison_level
+    ]
+    
+    mean_beta_reference <- rowMeans(
+      cpg_beta[, reference_samples, drop = FALSE], na.rm = TRUE)
+    
+    mean_beta_comparison <- rowMeans(
+      cpg_beta[, comparison_samples, drop = FALSE], na.rm = TRUE)
+    
+    beta_effects <- data.frame(
+      CpG_Probe = rownames(cpg_beta),
+      mean_beta_reference = mean_beta_reference,
+      mean_beta_comparison = mean_beta_comparison,
+      delta_beta = mean_beta_comparison - mean_beta_reference,
+      stringsAsFactors = FALSE
+    )
+    
+    names(beta_effects)[2:3] <- c(
+      paste0("mean_beta_", make.names(reference_level)),
+      paste0("mean_beta_", make.names(comparison_level))
+    )
+  }
+  
   # Limma Analysis                                                  ############
   #_____________________________________________________________________________
-  fit = limma::lmFit(cpg_beta, design)
+  fit = limma::lmFit(cpg_model_values, design)
   fit = limma::eBayes(fit)
-  df_dml = limma::topTable(fit, adjust.method="fdr", number=nrow(cpg_beta), coef=coef_name)
+  df_dml = limma::topTable(fit, adjust.method="fdr", number=nrow(cpg_meth), coef=coef_name)
   df_dml$CpG_Probe = rownames(df_dml)
+  
+  if (!is.null(beta_effects)) {
+    df_dml <- df_dml %>%
+      dplyr::left_join(beta_effects, by = "CpG_Probe")
+  }
+  
+  
   df_dml = df_dml %>% dplyr::left_join(ICR_CpG, by = dplyr::join_by(CpG_Probe == CpG_id)) %>% 
     dplyr::arrange(adj.P.Val)
   df_dml$diffMeth = "no"
@@ -281,11 +337,25 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   
   cpgs_annotated <- merge(cpgs, all_annotations, by = "CpG_Probe", all.x = TRUE)
   
-  cpgs_show <- cpgs_annotated %>% 
-    dplyr::mutate(perc_diff = ifelse(logFC >= 0, paste0("+", round(logFC * 100, 2), "%"), 
-                                     paste0("-", round(abs(logFC * 100), 2), "%"))) %>% 
-    dplyr::relocate(perc_diff, .after = logFC)
+  cpgs_show <- cpgs_annotated 
   
+  
+  
+  if ("delta_beta" %in% names(cpgs_show)) {
+    cpgs_show <- cpgs_show %>%
+      dplyr::mutate(
+        beta_difference_percent = sprintf(
+          "%+.2f%%",
+          delta_beta * 100
+        )
+      ) %>%
+      dplyr::relocate(
+        delta_beta,
+        beta_difference_percent,
+        .after = logFC
+      )
+  }
+
   
   # Export figures and data
   out <- list(df_dml = df_dml, chr_lens = chr_lens, cpgs_show = cpgs_show, 
@@ -350,6 +420,12 @@ icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
   
   promoters_gr <- GenomicRanges::promoters(genes_gr, upstream = 1500, downstream = 500)
   
+  
+  if (!"delta_beta" %in% names(df_dml)) {
+    df_dml$delta_beta <- NA_real_
+  }
+  
+  
   ICR_summary <- df_dml %>% 
     dplyr::group_by(ICR_id ) %>% 
     dplyr::summarise(ICR_n = dplyr::n(), 
@@ -357,6 +433,11 @@ icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
               ICR_start = min(ICR_start), 
               ICR_stop = max(ICR_stop), 
               mean_logFC = mean(logFC, na.rm = TRUE), 
+              mean_delta_beta = if (all(is.na(delta_beta))) {
+                NA_real_
+              } else {
+                mean(delta_beta, na.rm = TRUE)
+              },
               pval_combined = if (dplyr::n() > 1) {
                 aggregation::lancaster(pvalues = P.Value, weights = abs(logFC))
               } else { 
@@ -395,6 +476,7 @@ icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
   ICR_annotated <- merge(ICR_summary, all_annotations, by = "ICR_id", all.x = TRUE)
   
   ICR_annotated$Gene[ICR_annotated$Gene == ""] <- NA
+
   
   ICR_annotated_plot <- ICR_annotated %>% 
     dplyr::group_by(ICR_id, ICR_n, ICR_chr, ICR_start, ICR_stop, mean_logFC, direction, n_hyper, n_hypo, perc_signif, FDR) %>% 
