@@ -1,49 +1,176 @@
 
 
-
-#' cpg_dml_test
+#' Test CpG-wise differential methylation using limma
 #'
-#' @description test for associations between cpg beta values and study variables.
-#' 
-#' The model equation is assumed to be:
-#' cpg_beta ~ predictors
+#' @description
+#' Tests associations between CpG methylation and study variables using
+#' CpG-wise linear models fitted with \code{limma}.
 #'
-#' With beadchip_correction = T, then:
-#' cpg_beta ~ predictors + Bead + Col + Row
+#' By default, input beta values are transformed to M-values before model
+#' fitting because M-values generally have more appropriate variance properties
+#' for linear-model inference. The original beta values are retained for
+#' calculation of interpretable methylation effect sizes.
 #'
-#' @param df_study a dataframe of study variables, where rows are patients/ 
-#' samples. Columns are expected to be correct data type (factor variables 
-#' declared as factors, etc.). The columns specified in predictors must exist in 
-#' the dataframe, and if beadchip_correction = T, then the columns:
-#'    Bead, Col, and Row 
-#' must also exist in the dataframe (they are expected to contain the IDs
-#' for the chip, and row and column of the probe). The dataframe must also have
-#'  the column specified in sample_name, which contains the basenames for the 
-#'  IDAT methylation data files.
-#' @param predictors a vector of strings of column names within df_study that 
-#' are used as predictors for LIMMA linear models. First entry is assumed to be 
-#' primary predictor of interest.
-#' @param cpg_beta matrix of beta values, where rows are cpg sites and columns are 
-#' patients. Column names must be the same ones found in the entries of the column specified by
-#' sample_name input argument contained within df_study.
-#' @param pvalue_threshold max p-value threshold for significance from LIMMA 
-#' analysis for calling hyper or hypo methylation.
-#' @param sample_name name of column that specified the unique identifier for the 
-#' sample in df_study, which also must be used for the column names of 
-#' cpg_beta (default = "sample_name").
-#' @param beadchip_correction boolean, when true adds the following columns as '
-#' predictors to LIMMA linear model (if they are not already listed as predictors): 
-#' Bead + Col + Row. (detault = TRUE). These columsn must already exist in study_data.
-#' @param write_plots boolean, when TRUE, writes plots to disk.
-#' @param output_dir_path directory path to write plots to disk.
-#' @param label optional label used when writing plot files. Defaults to the
-#' primary predictor name.
-#' @param correlation_check perform pairwise correlation test between predictors. 
-#' Sometimes errors if the number of observations is too small (default = TRUE).
-#' @param verbose boolean, when true, prints output to console.
-#' @param db_flag boolean, when true, save environment variables to disk.
+#' The fitted model has the general form:
+#'
+#' \deqn{methylation \sim primary\ predictor + covariates}
+#'
+#' When \code{beadchip_correction = TRUE}, the variables \code{Bead},
+#' \code{Col}, and \code{Row} are added to the model:
+#'
+#' \deqn{methylation \sim primary\ predictor + covariates + Bead + Col + Row}
+#'
+#' @details
+#' The first entry in \code{predictors} is treated as the primary predictor of
+#' interest. All remaining entries are included as adjustment covariates.
+#'
+#' The primary predictor must correspond to exactly one column in the model
+#' matrix. This generally means it must be either:
+#'
+#' \itemize{
+#'   \item a numeric variable, or
+#'   \item a factor with exactly two levels.
+#' }
+#'
+#' Predictors that expand to multiple model coefficients, such as factors with
+#' more than two levels, are not currently supported unless an explicit contrast
+#' is constructed outside this function.
+#'
+#' When the primary predictor is a two-level factor, the function calculates:
+#'
+#' \itemize{
+#'   \item the mean beta value in the reference group,
+#'   \item the mean beta value in the comparison group, and
+#'   \item \code{delta_beta}, defined as comparison minus reference.
+#' }
+#'
+#' A numeric primary predictor does not have natural reference and comparison
+#' groups, so \code{delta_beta} is not calculated.
+#'
+#' When \code{m_value_transform = TRUE}, the \code{logFC} column returned by
+#' \code{limma::topTable()} is on the M-value scale. It must not be interpreted
+#' as a percentage methylation difference. For two-level factors,
+#' \code{delta_beta} provides the corresponding effect size on the beta-value
+#' scale.
+#'
+#' Samples are restricted to those present in both \code{df_study} and
+#' \code{cpg_beta}. The methylation matrix is reordered to match the retained
+#' metadata rows.
+#'
+#' CpGs are labeled \code{"Hyper"} or \code{"Hypo"} according to the sign of
+#' \code{logFC} when the raw limma p-value is below
+#' \code{pvalue_threshold}. Otherwise, they are labeled \code{"no"}.
+#'
+#' @param df_study A data frame containing one row per sample and columns for
+#'   the sample identifier, primary predictor, covariates, and any requested
+#'   beadchip adjustment variables. Categorical variables should be represented
+#'   as factors with the intended reference level set before calling the
+#'   function.
+#'
+#' @param predictors A character vector naming columns in \code{df_study} to
+#'   include in the limma model. The first entry is the primary predictor tested;
+#'   subsequent entries are adjustment covariates.
+#'
+#' @param cpg_beta A numeric matrix of methylation beta values, with CpG probes
+#'   in rows and samples in columns. Row names must identify CpG probes. Column
+#'   names must match sample identifiers in \code{df_study[[sample_name]]}.
+#'
+#' @param pvalue_threshold A numeric scalar between 0 and 1 giving the raw
+#'   limma p-value threshold used to label CpGs as hypermethylated or
+#'   hypomethylated and to select CpGs for annotation and plot labeling.
+#'   Default is \code{0.0001}.
+#'
+#' @param db_flag Logical. If \code{TRUE}, saves the current function
+#'   environment to \file{cpg_dml_test.RData} for debugging. Default is
+#'   \code{FALSE}.
+#'
+#' @param sample_name A character scalar naming the sample-identifier column in
+#'   \code{df_study}. Values in this column must match the column names of
+#'   \code{cpg_beta}. Default is \code{"Patient.ID"}.
+#'
+#' @param beadchip_correction Logical. If \code{TRUE}, adds \code{Bead},
+#'   \code{Col}, and \code{Row} to the model if they are not already included
+#'   in \code{predictors}. These columns must exist in \code{df_study}. Default
+#'   is \code{TRUE}.
+#'
+#' @param verbose Logical. If \code{TRUE}, prints progress and model information
+#'   to the console. Default is \code{TRUE}.
+#'
+#' @param write_plots Logical. If \code{TRUE}, writes generated plots to
+#'   \code{output_dir_path}. Default is \code{FALSE}.
+#'
+#' @param m_value_transform Logical. If \code{TRUE}, transforms beta values to
+#'   M-values using \code{sesame::BetaValueToMValue()} before fitting the limma
+#'   model. Beta values are still used to calculate group means and
+#'   \code{delta_beta}. If \code{FALSE}, limma is fitted directly to beta
+#'   values. Default is \code{TRUE}.
+#'
+#' @param correlation_check Logical. If \code{TRUE}, calculates and plots
+#'   pairwise correlations among model predictors after converting
+#'   non-numeric predictors to numeric factor codes. Default is \code{FALSE}.
+#'
+#' @param output_dir_path A character scalar giving the directory in which plot
+#'   files are written when \code{write_plots = TRUE}. Default is the current
+#'   working directory.
+#'
+#' @param label A character scalar used in output plot filenames. By default,
+#'   the name of the primary predictor is used.
+#'
+#' @return A named list containing:
+#'
+#' \describe{
+#'   \item{\code{df_dml}}{
+#'     A data frame containing the complete
+#'     \code{limma::topTable()} output for all tested CpGs, CpG and ICR
+#'     annotations, differential-methylation labels, and genomic plotting
+#'     coordinates. For a two-level primary predictor, the table also contains
+#'     group-specific mean beta values and \code{delta_beta}.
+#'   }
+#'   \item{\code{chr_lens}}{
+#'     A data frame containing chromosome plotting ranges and cumulative
+#'     offsets used to construct the Manhattan plot.
+#'   }
+#'   \item{\code{cpgs_show}}{
+#'     An annotated data frame restricted to CpGs with raw p-values below
+#'     \code{pvalue_threshold}. When \code{delta_beta} is available, it also
+#'     contains \code{beta_difference_percent}, which is
+#'     \code{100 * delta_beta} formatted as an absolute percentage-point
+#'     difference.
+#'   }
+#'   \item{\code{plots}}{
+#'     A named list containing generated plot objects, including the p-value
+#'     QQ plot, volcano plot, Manhattan plot, and optionally the predictor
+#'     correlation plot.
+#'   }
+#' }
+#'
+#' @seealso
+#' \code{\link[limma]{lmFit}},
+#' \code{\link[limma]{eBayes}},
+#' \code{\link[limma]{topTable}},
+#' \code{\link[sesame]{BetaValueToMValue}},
+#' \code{\link{icr_dmr_test}}
+#'
+#' @examples
+#' \dontrun{
+#' df_study$disease_state <- relevel(
+#'   factor(df_study$disease_state),
+#'   ref = "Control"
+#' )
+#'
+#' dml_result <- cpg_dml_test(
+#'   df_study = df_study,
+#'   predictors = c("disease_state", "age", "sex"),
+#'   cpg_beta = cpg_beta,
+#'   sample_name = "Patient.ID",
+#'   beadchip_correction = TRUE,
+#'   m_value_transform = TRUE
+#' )
+#'
+#' head(dml_result$df_dml)
+#' }
+#'
 #' @export
-#' @author author
 cpg_dml_test <- function(df_study, predictors, cpg_beta,
                          pvalue_threshold = 0.0001, db_flag = F, sample_name = "Patient.ID",
                          beadchip_correction = T, verbose = T, write_plots = F,
@@ -188,7 +315,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   #_____________________________________________________________________________
   fit = limma::lmFit(cpg_model_values, design)
   fit = limma::eBayes(fit)
-  df_dml = limma::topTable(fit, adjust.method="fdr", number=nrow(cpg_meth), coef=coef_name)
+  df_dml = limma::topTable(fit, adjust.method="fdr", number=nrow(cpg_model_values), coef=coef_name)
   df_dml$CpG_Probe = rownames(df_dml)
   
   if (!is.null(beta_effects)) {
@@ -367,34 +494,129 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
 
 
 
-#' icr_dmr_test
+#' Aggregate CpG-level methylation results by imprinting control region
 #'
-#' @description analyze for changes in cpg methylation in a DMR-like region (ICR) 
-#' via a p-values aggregation test.
+#' @description
+#' Performs an imprinting control region-level analysis by aggregating
+#' CpG-level differential methylation results produced by
+#' \code{cpg_dml_test()}.
 #'
-#' @param df_dml a dataframe output from the cpg_dml_test output, 
-#'  one row for each cpg site. Contains standard output from limma plus metadata
-#'  specifying associated ICR, closest gene etc. 
-#'  Required columns:
-#'   ICR_id
-#'   ICR_chr
-#'   ICR_start
-#'   ICR_stop
-#'   logFC
-#'   P.Value: raw DML p-value.
-#'   adj.P.Val: adjusted p-value from DML.
-#' @param chr_lens a dataframe of ranges covering ICRs on each chromosome. 
-#' This object is found in the cpg_dml_test output. Each 
-#' row is a separate chromosome number. Expected to contain the following fields:
-#'   chr_num: chromosome number
-#'   chr_len: total length of each chromosome
-#'   offset offset of start of each chromosome.
-#' @param pval_threshold max value for significant p-value from test (0-1 singleton).
-#' @param fdr_sig_threshold max value for fdr corrected p-values.
-#' @param db_flag todo
-#' @param verbose todo
+#' CpGs are grouped by imprinting control region (ICR). Within each ICR,
+#' CpG-level p-values are combined using the Lancaster method, with the absolute
+#' CpG-level \code{logFC} values used as weights.
+#'
+#' @details
+#' The function summarizes each ICR using:
+#'
+#' \itemize{
+#'   \item the number of represented CpGs,
+#'   \item the mean CpG-level \code{logFC},
+#'   \item the mean \code{delta_beta}, when available,
+#'   \item the number of CpGs with positive and negative coefficients,
+#'   \item the percentage of CpGs with raw p-values below
+#'     \code{pval_threshold},
+#'   \item a Lancaster combined p-value, and
+#'   \item a Benjamini-Hochberg FDR-adjusted combined p-value.
+#' }
+#'
+#' The regional direction is labeled \code{"Hyper"} when more CpGs have
+#' positive than negative \code{logFC} values. Otherwise, the region is labeled
+#' \code{"Hypo"}. Ties are therefore labeled \code{"Hypo"} by the current
+#' implementation.
+#'
+#' When CpG-level models were fitted to M-values, \code{mean_logFC} is also on
+#' the M-value scale and must not be interpreted as a percentage methylation
+#' difference. When available, \code{mean_delta_beta} provides the average
+#' CpG-level difference on the beta-value scale.
+#'
+#' ICRs are annotated using overlapping, promoter-associated, and nearby
+#' protein-coding genes. Nearby genes are identified using an ICR interval
+#' extended by 10,000 base pairs in each direction.
+#'
+#' The function also creates a regional Manhattan plot using the chromosome
+#' offsets supplied in \code{chr_lens}.
+#'
+#' @param df_dml A data frame containing CpG-level differential methylation
+#'   results, normally the \code{df_dml} component returned by
+#'   \code{cpg_dml_test()}.
+#'
+#'   The data frame must contain at least:
+#'
+#'   \itemize{
+#'     \item \code{ICR_id}: imprinting control region identifier;
+#'     \item \code{ICR_chr}: ICR chromosome;
+#'     \item \code{ICR_start}: ICR start coordinate;
+#'     \item \code{ICR_stop}: ICR end coordinate;
+#'     \item \code{logFC}: CpG-level limma coefficient;
+#'     \item \code{P.Value}: raw CpG-level p-value; and
+#'     \item \code{adj.P.Val}: FDR-adjusted CpG-level p-value.
+#'   }
+#'
+#'   An optional \code{delta_beta} column may contain beta-value differences
+#'   for a two-level primary predictor. If it is absent, the function adds it
+#'   internally with missing values.
+#'
+#' @param chr_lens A data frame of chromosome plotting ranges, normally the
+#'   \code{chr_lens} component returned by \code{cpg_dml_test()}. It must
+#'   contain:
+#'
+#'   \itemize{
+#'     \item \code{chr_num}: numeric chromosome identifier;
+#'     \item \code{chr_len}: plotting extent for the chromosome; and
+#'     \item \code{offset}: cumulative genomic-coordinate offset.
+#'   }
+#'
+#' @param pval_threshold A numeric scalar between 0 and 1. Within each ICR, the
+#'   percentage of significant CpGs is calculated as the percentage with raw
+#'   \code{P.Value < pval_threshold}. Default is \code{0.05}.
+#'
+#' @param fdr_sig_threshold A numeric scalar between 0 and 1 giving the
+#'   ICR-level FDR threshold used to label regions in the Manhattan plot.
+#'   Default is \code{0.0001}.
+#'
+#' @param verbose Logical. Reserved for progress reporting. Default is
+#'   \code{TRUE}.
+#'
+#' @param db_flag Logical. If \code{TRUE}, saves the current function
+#'   environment to \file{icr_dmr_test.RData} for debugging. Default is
+#'   \code{FALSE}.
+#'
+#' @return A named list containing:
+#'
+#' \describe{
+#'   \item{\code{ICR_summary}}{
+#'     One row per ICR, containing regional coordinates, CpG count,
+#'     \code{mean_logFC}, \code{mean_delta_beta}, combined p-value, FDR,
+#'     direction, counts of positive and negative CpG coefficients, and the
+#'     percentage of CpGs passing \code{pval_threshold}.
+#'   }
+#'   \item{\code{ICR_collapsed}}{
+#'     A gene-annotated table of prioritized ICRs after application of the
+#'     regional filtering criteria defined in the function.
+#'   }
+#'   \item{\code{plots}}{
+#'     A named list containing the regional Manhattan plot in
+#'     \code{manhplot_icr}.
+#'   }
+#' }
+#'
+#' @seealso
+#' \code{\link{cpg_dml_test}},
+#' \code{\link[aggregation]{lancaster}}
+#'
+#' @examples
+#' \dontrun{
+#' dmr_result <- icr_dmr_test(
+#'   df_dml = dml_result$df_dml,
+#'   chr_lens = dml_result$chr_lens,
+#'   pval_threshold = 0.05,
+#'   fdr_sig_threshold = 0.0001
+#' )
+#'
+#' head(dmr_result$ICR_summary)
+#' }
+#'
 #' @export
-#' @author author
 icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
                          fdr_sig_threshold = 0.0001,
                          verbose = T, db_flag = F) {
@@ -478,14 +700,18 @@ icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
   ICR_annotated$Gene[ICR_annotated$Gene == ""] <- NA
 
   
-  ICR_annotated_plot <- ICR_annotated %>% 
-    dplyr::group_by(ICR_id, ICR_n, ICR_chr, ICR_start, ICR_stop, mean_logFC, direction, n_hyper, n_hypo, perc_signif, FDR) %>% 
-    dplyr::summarise(Gene = paste(na.omit(unique(Gene)), collapse = ", "), .groups = "drop") %>% 
-    dplyr::arrange(FDR) %>% 
-    dplyr::mutate(perc_signif = paste0(round(perc_signif, 1), "%"),
-           perc_diff = ifelse(mean_logFC >= 0, paste0("+", round(mean_logFC * 100, 2), "%"),
-                              paste0("-", round(abs(mean_logFC * 100), 2), "%"))) %>% 
-    dplyr::relocate(perc_diff, .after = mean_logFC)
+  ICR_annotated_plot <- ICR_annotated %>%
+    dplyr::group_by(ICR_id, ICR_n, ICR_chr, ICR_start, ICR_stop, mean_logFC,
+                    mean_delta_beta, direction, n_hyper, n_hypo,  perc_signif, 
+                    FDR ) %>%
+    dplyr::summarise( Gene = paste(stats::na.omit(unique(Gene)), collapse = ", "),
+      .groups = "drop") %>%
+    dplyr::arrange(FDR) %>%
+    dplyr::mutate(  perc_signif = paste0(round(perc_signif, 1), "%"),
+      beta_difference_percent = dplyr::if_else(  is.na(mean_delta_beta),
+        NA_character_, sprintf("%+.2f%%", mean_delta_beta * 100)  )) %>%
+    dplyr::relocate(  mean_delta_beta,  beta_difference_percent,
+      .after = mean_logFC )
   
   ICR_annotated_plot$ICR_chr[ICR_annotated_plot$ICR_chr == "chrX"] <- "chr23"
   ICR_annotated_plot$chr_num <- as.numeric(stringr::str_remove(ICR_annotated_plot$ICR_chr, "chr"))
@@ -548,16 +774,17 @@ icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
   ICR_prioritized$Gene[ICR_prioritized$Gene == ""] <- NA
   
   ICR_collapsed <- ICR_prioritized %>%
-    dplyr::group_by(ICR_id, ICR_n, ICR_chr, ICR_start, ICR_stop, mean_logFC, direction, n_hyper, n_hypo, perc_signif, FDR) %>%
-    dplyr::summarise(Gene = paste(na.omit(unique(Gene)), collapse = ", "), .groups = "drop") %>%
+    dplyr::group_by(ICR_id, ICR_n, ICR_chr, ICR_start, ICR_stop, mean_logFC,
+                    mean_delta_beta, direction, n_hyper, n_hypo,  perc_signif, 
+                    FDR ) %>%
+    dplyr::summarise( Gene = paste(stats::na.omit(unique(Gene)), collapse = ", "),
+                      .groups = "drop") %>%
     dplyr::arrange(FDR) %>%
-    dplyr::mutate(
-      perc_signif = paste0(round(perc_signif, 1), "%"),
-      perc_diff = ifelse(mean_logFC >= 0,
-                         paste0("+", round(mean_logFC * 100, 2), "%"),
-                         paste0("-", round(abs(mean_logFC * 100), 2), "%"))
-    ) %>%
-    dplyr::relocate(perc_diff, .after = mean_logFC)
+    dplyr::mutate(  perc_signif = paste0(round(perc_signif, 1), "%"),
+                    beta_difference_percent = dplyr::if_else(  is.na(mean_delta_beta),
+                                                               NA_character_, sprintf("%+.2f%%", mean_delta_beta * 100)  )) %>%
+    dplyr::relocate(  mean_delta_beta,  beta_difference_percent,
+                      .after = mean_logFC )
   
   
   out <- list(ICR_summary = ICR_summary, ICR_collapsed = ICR_collapsed,
@@ -572,12 +799,55 @@ icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
 
 
 
-#' get_gene_info_biomart
+#' Retrieve and cache human protein-coding gene annotations
 #'
-#' @description Cache biomart results in path associated with this package, this avoids
-#' querying biomart every time the code is run (will results with timeout/ blocks
-#' from too many requests)
-#' @return table of genes and associated metadata used in DML/ DMR analysis
+#' @description
+#' Retrieves human protein-coding gene annotations from Ensembl BioMart and
+#' returns them as a \code{GenomicRanges::GRanges} object.
+#'
+#' @details
+#' On the first call, the function queries the
+#' \code{ENSEMBL_MART_ENSEMBL} mart using the
+#' \code{hsapiens_gene_ensembl} dataset. It retrieves chromosome, start
+#' position, end position, HGNC symbol, and gene biotype for protein-coding
+#' genes.
+#'
+#' The resulting \code{GRanges} object is saved as
+#' \file{biomart_genelist.rds} in the package-specific user data directory
+#' returned by:
+#'
+#' \preformatted{
+#' tools::R_user_dir(utils::packageName(), which = "data")
+#' }
+#'
+#' Subsequent calls load the cached object instead of querying BioMart again.
+#' This reduces execution time and avoids repeated requests that may trigger
+#' connection timeouts or server-side request limits.
+#'
+#' Chromosome names are prefixed with \code{"chr"}. Gene symbols are stored in
+#' the \code{gene_name} metadata column, and gene biotypes are stored in the
+#' \code{gene_biotype} metadata column.
+#'
+#' Because the BioMart result is cached without an expiration date, the returned
+#' annotations may not reflect later Ensembl updates unless the cached file is
+#' manually removed.
+#'
+#' @return A \code{GenomicRanges::GRanges} object containing human
+#'   protein-coding gene intervals. Metadata columns include
+#'   \code{gene_name} and \code{gene_biotype}.
+#'
+#' @seealso
+#' \code{\link[biomaRt]{useMart}},
+#' \code{\link[biomaRt]{getBM}},
+#' \code{\link[tools]{R_user_dir}}
+#'
+#' @examples
+#' \dontrun{
+#' genes_gr <- get_gene_info_biomart()
+#' genes_gr
+#' S4Vectors::mcols(genes_gr)
+#' }
+#'
 #' @export
 get_gene_info_biomart <- function() {
   
@@ -604,23 +874,47 @@ get_gene_info_biomart <- function() {
   return(genes_gr)
 }
 
-#' get_icr_metadata_table
+
+#' Retrieve CpG-to-ICR mapping metadata
 #'
-#' @description Cache biomart results in path associated with this package, this avoids
-#' querying biomart every time the code is run (will results with timeout/ blocks
-#' from too many requests)
-#' @return table of icr metadata with the following column names:
-#'   X 
-#'   CpG_chr 
-#'   CpG_start  
-#'   CpG_stop 
-#'   ICR_chr 
-#'   ICR_start  
-#'   ICR_stop       
-#'   CpG_Probe  
-#'   ICR_id     
-#'   CpG_id 
-#'   chr_num
+#' @description
+#' Returns the package's CpG-to-imprinting-control-region mapping table and adds
+#' a numeric chromosome identifier for plotting and chromosome-based
+#' operations.
+#'
+#' @details
+#' The function derives its output from
+#' \code{tdhia::mapping_cpg_icr_ids}. The \code{"chr"} prefix is removed from
+#' \code{ICR_chr} to create \code{chr_num}. Chromosome X is encoded as 23 and
+#' chromosome Y is encoded as 24 before conversion to numeric.
+#'
+#' The original chromosome fields are retained unchanged.
+#'
+#' @return A data frame containing CpG probe and imprinting control region
+#'   annotations. Expected columns include:
+#'
+#' \describe{
+#'   \item{\code{CpG_chr}}{Chromosome containing the CpG probe.}
+#'   \item{\code{CpG_start}}{CpG start coordinate.}
+#'   \item{\code{CpG_stop}}{CpG end coordinate.}
+#'   \item{\code{ICR_chr}}{Chromosome containing the associated ICR.}
+#'   \item{\code{ICR_start}}{ICR start coordinate.}
+#'   \item{\code{ICR_stop}}{ICR end coordinate.}
+#'   \item{\code{CpG_Probe}}{CpG probe identifier, when present in the source
+#'     table.}
+#'   \item{\code{CpG_id}}{CpG identifier used to join the metadata to
+#'     CpG-level limma results.}
+#'   \item{\code{ICR_id}}{Imprinting control region identifier.}
+#'   \item{\code{chr_num}}{Numeric ICR chromosome identifier, with X encoded
+#'     as 23 and Y encoded as 24.}
+#' }
+#'
+#' Additional columns present in \code{mapping_cpg_icr_ids} are retained.
+#'
+#' @examples
+#' icr_metadata <- get_icr_metadata_table()
+#' head(icr_metadata)
+#'
 #' @export
 get_icr_metadata_table <- function() {
   ICR_CpG <- tdhia::mapping_cpg_icr_ids %>%
