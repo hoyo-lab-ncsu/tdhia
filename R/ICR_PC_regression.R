@@ -80,7 +80,7 @@ pc_regression_test <- function (cpg_beta,
                                 outcome,
                                 covariates,
                                 Patient_ID,
-                                family,
+                                family = "binomial",
                                 icr_ids = NULL,
                                 min_cpg = 3,
                                 verbose = TRUE,
@@ -185,7 +185,12 @@ pc_regression_test <- function (cpg_beta,
       by = Patient_ID
     )
 
-    stopifnot(nrow(combined_data) == nrow(df_study) || nrow(combined_data) == nrow(pcs))
+    stopifnot(
+      nrow(combined_data) == nrow(df_study),
+      nrow(combined_data) == nrow(pcs),
+      !anyDuplicated(df_study[[Patient_ID]]),
+      !anyDuplicated(pcs[[Patient_ID]])
+    )
     rownames(combined_data) <- combined_data[[Patient_ID]]
     combined_data[[Patient_ID]] <- NULL
 
@@ -261,7 +266,7 @@ pc_regression_test <- function (cpg_beta,
   # REGARDLESS OF BINOMIAL OR CONTINUOUS OUTCOME, COMBINE RESULTS AND CALCUALTE ADJ-P/Q VALUES
   df_results = do.call(rbind, out)
   df_results$adj_p_value <- p.adjust(p = df_results$p_value, method = "fdr")
-  df_results$q_value <- qvalue::qvalue(p = df_results$p_value, fdr.level = 0.05)$qvalues
+  df_results$q_value <- qvalue::qvalue(p = df_results$p_value)$qvalues
   df_results <- df_results %>% dplyr::arrange(adj_p_value)
 
   verbosecat(sprintf("> Filtering out ICRs with < %d cpg sites...\n", min_cpg))
