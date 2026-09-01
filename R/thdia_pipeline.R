@@ -59,9 +59,12 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "tdhia_pipeline.RData")
   # load(file = "tdhia_pipeline.RData")
+  dir.create(dirname(probe_data_cache_path), showWarnings = F, recursive = T)
   
+  
+  # Store all data in fields of list
   data = list()
-
+  
   if (!file.exists(probe_data_cache_path) || OVERWRITE_TEMP_DATA) {
     data_beta = list()
     data_beta$probe_beta <-

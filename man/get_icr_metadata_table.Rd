@@ -2,26 +2,47 @@
 % Please edit documentation in R/test_limma_lancaster.R
 \name{get_icr_metadata_table}
 \alias{get_icr_metadata_table}
-\title{get_icr_metadata_table}
+\title{Retrieve CpG-to-ICR mapping metadata}
 \usage{
 get_icr_metadata_table()
 }
 \value{
-table of icr metadata with the following column names:
-X
-CpG_chr
-CpG_start
-CpG_stop
-ICR_chr
-ICR_start
-ICR_stop
-CpG_Probe
-ICR_id
-CpG_id
-chr_num
+A data frame containing CpG probe and imprinting control region
+annotations. Expected columns include:
+
+\describe{
+\item{\code{CpG_chr}}{Chromosome containing the CpG probe.}
+\item{\code{CpG_start}}{CpG start coordinate.}
+\item{\code{CpG_stop}}{CpG end coordinate.}
+\item{\code{ICR_chr}}{Chromosome containing the associated ICR.}
+\item{\code{ICR_start}}{ICR start coordinate.}
+\item{\code{ICR_stop}}{ICR end coordinate.}
+\item{\code{CpG_Probe}}{CpG probe identifier, when present in the source
+table.}
+\item{\code{CpG_id}}{CpG identifier used to join the metadata to
+CpG-level limma results.}
+\item{\code{ICR_id}}{Imprinting control region identifier.}
+\item{\code{chr_num}}{Numeric ICR chromosome identifier, with X encoded
+as 23 and Y encoded as 24.}
+}
+
+Additional columns present in \code{mapping_cpg_icr_ids} are retained.
 }
 \description{
-Cache biomart results in path associated with this package, this avoids
-querying biomart every time the code is run (will results with timeout/ blocks
-from too many requests)
+Returns the package's CpG-to-imprinting-control-region mapping table and adds
+a numeric chromosome identifier for plotting and chromosome-based
+operations.
+}
+\details{
+The function derives its output from
+\code{tdhia::mapping_cpg_icr_ids}. The \code{"chr"} prefix is removed from
+\code{ICR_chr} to create \code{chr_num}. Chromosome X is encoded as 23 and
+chromosome Y is encoded as 24 before conversion to numeric.
+
+The original chromosome fields are retained unchanged.
+}
+\examples{
+icr_metadata <- get_icr_metadata_table()
+head(icr_metadata)
+
 }

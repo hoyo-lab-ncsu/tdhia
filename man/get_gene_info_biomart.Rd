@@ -2,15 +2,56 @@
 % Please edit documentation in R/test_limma_lancaster.R
 \name{get_gene_info_biomart}
 \alias{get_gene_info_biomart}
-\title{get_gene_info_biomart}
+\title{Retrieve and cache human protein-coding gene annotations}
 \usage{
 get_gene_info_biomart()
 }
 \value{
-table of genes and associated metadata used in DML/ DMR analysis
+A \code{GenomicRanges::GRanges} object containing human
+protein-coding gene intervals. Metadata columns include
+\code{gene_name} and \code{gene_biotype}.
 }
 \description{
-Cache biomart results in path associated with this package, this avoids
-querying biomart every time the code is run (will results with timeout/ blocks
-from too many requests)
+Retrieves human protein-coding gene annotations from Ensembl BioMart and
+returns them as a \code{GenomicRanges::GRanges} object.
+}
+\details{
+On the first call, the function queries the
+\code{ENSEMBL_MART_ENSEMBL} mart using the
+\code{hsapiens_gene_ensembl} dataset. It retrieves chromosome, start
+position, end position, HGNC symbol, and gene biotype for protein-coding
+genes.
+
+The resulting \code{GRanges} object is saved as
+\file{biomart_genelist.rds} in the package-specific user data directory
+returned by:
+
+\preformatted{
+tools::R_user_dir(utils::packageName(), which = "data")
+}
+
+Subsequent calls load the cached object instead of querying BioMart again.
+This reduces execution time and avoids repeated requests that may trigger
+connection timeouts or server-side request limits.
+
+Chromosome names are prefixed with \code{"chr"}. Gene symbols are stored in
+the \code{gene_name} metadata column, and gene biotypes are stored in the
+\code{gene_biotype} metadata column.
+
+Because the BioMart result is cached without an expiration date, the returned
+annotations may not reflect later Ensembl updates unless the cached file is
+manually removed.
+}
+\examples{
+\dontrun{
+genes_gr <- get_gene_info_biomart()
+genes_gr
+S4Vectors::mcols(genes_gr)
+}
+
+}
+\seealso{
+\code{\link[biomaRt]{useMart}},
+\code{\link[biomaRt]{getBM}},
+\code{\link[tools]{R_user_dir}}
 }

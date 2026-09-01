@@ -2,7 +2,7 @@
 % Please edit documentation in R/test_limma_lancaster.R
 \name{cpg_dml_test}
 \alias{cpg_dml_test}
-\title{cpg_dml_test}
+\title{Test CpG-wise differential methylation using limma}
 \usage{
 cpg_dml_test(
   df_study,
@@ -21,58 +21,173 @@ cpg_dml_test(
 )
 }
 \arguments{
-\item{df_study}{a dataframe of study variables, where rows are patients/
-samples. Columns are expected to be correct data type (factor variables
-declared as factors, etc.). The columns specified in predictors must exist in
-the dataframe, and if beadchip_correction = T, then the columns:
-Bead, Col, and Row
-must also exist in the dataframe (they are expected to contain the IDs
-for the chip, and row and column of the probe). The dataframe must also have
-the column specified in sample_name, which contains the basenames for the
-IDAT methylation data files.}
+\item{df_study}{A data frame containing one row per sample and columns for
+the sample identifier, primary predictor, covariates, and any requested
+beadchip adjustment variables. Categorical variables should be represented
+as factors with the intended reference level set before calling the
+function.}
 
-\item{predictors}{a vector of strings of column names within df_study that
-are used as predictors for LIMMA linear models. First entry is assumed to be
-primary predictor of interest.}
+\item{predictors}{A character vector naming columns in \code{df_study} to
+include in the limma model. The first entry is the primary predictor tested;
+subsequent entries are adjustment covariates.}
 
-\item{cpg_beta}{matrix of beta values, where rows are cpg sites and columns are
-patients. Column names must be the same ones found in the entries of the column specified by
-sample_name input argument contained within df_study.}
+\item{cpg_beta}{A numeric matrix of methylation beta values, with CpG probes
+in rows and samples in columns. Row names must identify CpG probes. Column
+names must match sample identifiers in \code{df_study[[sample_name]]}.}
 
-\item{pvalue_threshold}{max p-value threshold for significance from LIMMA
-analysis for calling hyper or hypo methylation.}
+\item{pvalue_threshold}{A numeric scalar between 0 and 1 giving the raw
+limma p-value threshold used to label CpGs as hypermethylated or
+hypomethylated and to select CpGs for annotation and plot labeling.
+Default is \code{0.0001}.}
 
-\item{db_flag}{boolean, when true, save environment variables to disk.}
+\item{db_flag}{Logical. If \code{TRUE}, saves the current function
+environment to \file{cpg_dml_test.RData} for debugging. Default is
+\code{FALSE}.}
 
-\item{sample_name}{name of column that specified the unique identifier for the
-sample in df_study, which also must be used for the column names of
-cpg_beta (default = "sample_name").}
+\item{sample_name}{A character scalar naming the sample-identifier column in
+\code{df_study}. Values in this column must match the column names of
+\code{cpg_beta}. Default is \code{"Patient.ID"}.}
 
-\item{beadchip_correction}{boolean, when true adds the following columns as '
-predictors to LIMMA linear model (if they are not already listed as predictors):
-Bead + Col + Row. (detault = TRUE). These columsn must already exist in study_data.}
+\item{beadchip_correction}{Logical. If \code{TRUE}, adds \code{Bead},
+\code{Col}, and \code{Row} to the model if they are not already included
+in \code{predictors}. These columns must exist in \code{df_study}. Default
+is \code{TRUE}.}
 
-\item{verbose}{boolean, when true, prints output to console.}
+\item{verbose}{Logical. If \code{TRUE}, prints progress and model information
+to the console. Default is \code{TRUE}.}
 
-\item{write_plots}{boolean, when TRUE, writes plots to disk.}
+\item{write_plots}{Logical. If \code{TRUE}, writes generated plots to
+\code{output_dir_path}. Default is \code{FALSE}.}
 
-\item{correlation_check}{perform pairwise correlation test between predictors.
-Sometimes errors if the number of observations is too small (default = TRUE).}
+\item{m_value_transform}{Logical. If \code{TRUE}, transforms beta values to
+M-values using \code{sesame::BetaValueToMValue()} before fitting the limma
+model. Beta values are still used to calculate group means and
+\code{delta_beta}. If \code{FALSE}, limma is fitted directly to beta
+values. Default is \code{TRUE}.}
 
-\item{output_dir_path}{directory path to write plots to disk.}
+\item{correlation_check}{Logical. If \code{TRUE}, calculates and plots
+pairwise correlations among model predictors after converting
+non-numeric predictors to numeric factor codes. Default is \code{FALSE}.}
 
-\item{label}{optional label used when writing plot files. Defaults to the
-primary predictor name.}
+\item{output_dir_path}{A character scalar giving the directory in which plot
+files are written when \code{write_plots = TRUE}. Default is the current
+working directory.}
+
+\item{label}{A character scalar used in output plot filenames. By default,
+the name of the primary predictor is used.}
+}
+\value{
+A named list containing:
+
+\describe{
+\item{\code{df_dml}}{
+A data frame containing the complete
+\code{limma::topTable()} output for all tested CpGs, CpG and ICR
+annotations, differential-methylation labels, and genomic plotting
+coordinates. For a two-level primary predictor, the table also contains
+group-specific mean beta values and \code{delta_beta}.
+}
+\item{\code{chr_lens}}{
+A data frame containing chromosome plotting ranges and cumulative
+offsets used to construct the Manhattan plot.
+}
+\item{\code{cpgs_show}}{
+An annotated data frame restricted to CpGs with raw p-values below
+\code{pvalue_threshold}. When \code{delta_beta} is available, it also
+contains \code{beta_difference_percent}, which is
+\code{100 * delta_beta} formatted as an absolute percentage-point
+difference.
+}
+\item{\code{plots}}{
+A named list containing generated plot objects, including the p-value
+QQ plot, volcano plot, Manhattan plot, and optionally the predictor
+correlation plot.
+}
+}
 }
 \description{
-test for associations between cpg beta values and study variables.
+Tests associations between CpG methylation and study variables using
+CpG-wise linear models fitted with \code{limma}.
 
-The model equation is assumed to be:
-cpg_beta ~ predictors
+By default, input beta values are transformed to M-values before model
+fitting because M-values generally have more appropriate variance properties
+for linear-model inference. The original beta values are retained for
+calculation of interpretable methylation effect sizes.
 
-With beadchip_correction = T, then:
-cpg_beta ~ predictors + Bead + Col + Row
+The fitted model has the general form:
+
+\deqn{methylation \sim primary\ predictor + covariates}
+
+When \code{beadchip_correction = TRUE}, the variables \code{Bead},
+\code{Col}, and \code{Row} are added to the model:
+
+\deqn{methylation \sim primary\ predictor + covariates + Bead + Col + Row}
 }
-\author{
-author
+\details{
+The first entry in \code{predictors} is treated as the primary predictor of
+interest. All remaining entries are included as adjustment covariates.
+
+The primary predictor must correspond to exactly one column in the model
+matrix. This generally means it must be either:
+
+\itemize{
+\item a numeric variable, or
+\item a factor with exactly two levels.
+}
+
+Predictors that expand to multiple model coefficients, such as factors with
+more than two levels, are not currently supported unless an explicit contrast
+is constructed outside this function.
+
+When the primary predictor is a two-level factor, the function calculates:
+
+\itemize{
+\item the mean beta value in the reference group,
+\item the mean beta value in the comparison group, and
+\item \code{delta_beta}, defined as comparison minus reference.
+}
+
+A numeric primary predictor does not have natural reference and comparison
+groups, so \code{delta_beta} is not calculated.
+
+When \code{m_value_transform = TRUE}, the \code{logFC} column returned by
+\code{limma::topTable()} is on the M-value scale. It must not be interpreted
+as a percentage methylation difference. For two-level factors,
+\code{delta_beta} provides the corresponding effect size on the beta-value
+scale.
+
+Samples are restricted to those present in both \code{df_study} and
+\code{cpg_beta}. The methylation matrix is reordered to match the retained
+metadata rows.
+
+CpGs are labeled \code{"Hyper"} or \code{"Hypo"} according to the sign of
+\code{logFC} when the raw limma p-value is below
+\code{pvalue_threshold}. Otherwise, they are labeled \code{"no"}.
+}
+\examples{
+\dontrun{
+df_study$disease_state <- relevel(
+  factor(df_study$disease_state),
+  ref = "Control"
+)
+
+dml_result <- cpg_dml_test(
+  df_study = df_study,
+  predictors = c("disease_state", "age", "sex"),
+  cpg_beta = cpg_beta,
+  sample_name = "Patient.ID",
+  beadchip_correction = TRUE,
+  m_value_transform = TRUE
+)
+
+head(dml_result$df_dml)
+}
+
+}
+\seealso{
+\code{\link[limma]{lmFit}},
+\code{\link[limma]{eBayes}},
+\code{\link[limma]{topTable}},
+\code{\link[sesame]{BetaValueToMValue}},
+\code{\link{icr_dmr_test}}
 }

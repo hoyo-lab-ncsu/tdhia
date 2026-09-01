@@ -2,7 +2,7 @@
 % Please edit documentation in R/test_limma_lancaster.R
 \name{icr_dmr_test}
 \alias{icr_dmr_test}
-\title{icr_dmr_test}
+\title{Aggregate CpG-level methylation results by imprinting control region}
 \usage{
 icr_dmr_test(
   df_dml,
@@ -14,37 +14,125 @@ icr_dmr_test(
 )
 }
 \arguments{
-\item{df_dml}{a dataframe output from the cpg_dml_test output,
-one row for each cpg site. Contains standard output from limma plus metadata
-specifying associated ICR, closest gene etc.
-Required columns:
-ICR_id
-ICR_chr
-ICR_start
-ICR_stop
-logFC
-P.Value: raw DML p-value.
-adj.P.Val: adjusted p-value from DML.}
+\item{df_dml}{A data frame containing CpG-level differential methylation
+results, normally the \code{df_dml} component returned by
+\code{cpg_dml_test()}.
 
-\item{chr_lens}{a dataframe of ranges covering ICRs on each chromosome.
-This object is found in the cpg_dml_test output. Each
-row is a separate chromosome number. Expected to contain the following fields:
-chr_num: chromosome number
-chr_len: total length of each chromosome
-offset offset of start of each chromosome.}
+The data frame must contain at least:
 
-\item{pval_threshold}{max value for significant p-value from test (0-1 singleton).}
+\itemize{
+\item \code{ICR_id}: imprinting control region identifier;
+\item \code{ICR_chr}: ICR chromosome;
+\item \code{ICR_start}: ICR start coordinate;
+\item \code{ICR_stop}: ICR end coordinate;
+\item \code{logFC}: CpG-level limma coefficient;
+\item \code{P.Value}: raw CpG-level p-value; and
+\item \code{adj.P.Val}: FDR-adjusted CpG-level p-value.
+}
 
-\item{fdr_sig_threshold}{max value for fdr corrected p-values.}
+An optional \code{delta_beta} column may contain beta-value differences
+for a two-level primary predictor. If it is absent, the function adds it
+internally with missing values.}
 
-\item{verbose}{todo}
+\item{chr_lens}{A data frame of chromosome plotting ranges, normally the
+\code{chr_lens} component returned by \code{cpg_dml_test()}. It must
+contain:
 
-\item{db_flag}{todo}
+\itemize{
+\item \code{chr_num}: numeric chromosome identifier;
+\item \code{chr_len}: plotting extent for the chromosome; and
+\item \code{offset}: cumulative genomic-coordinate offset.
+}}
+
+\item{pval_threshold}{A numeric scalar between 0 and 1. Within each ICR, the
+percentage of significant CpGs is calculated as the percentage with raw
+\code{P.Value < pval_threshold}. Default is \code{0.05}.}
+
+\item{fdr_sig_threshold}{A numeric scalar between 0 and 1 giving the
+ICR-level FDR threshold used to label regions in the Manhattan plot.
+Default is \code{0.0001}.}
+
+\item{verbose}{Logical. Reserved for progress reporting. Default is
+\code{TRUE}.}
+
+\item{db_flag}{Logical. If \code{TRUE}, saves the current function
+environment to \file{icr_dmr_test.RData} for debugging. Default is
+\code{FALSE}.}
+}
+\value{
+A named list containing:
+
+\describe{
+\item{\code{ICR_summary}}{
+One row per ICR, containing regional coordinates, CpG count,
+\code{mean_logFC}, \code{mean_delta_beta}, combined p-value, FDR,
+direction, counts of positive and negative CpG coefficients, and the
+percentage of CpGs passing \code{pval_threshold}.
+}
+\item{\code{ICR_collapsed}}{
+A gene-annotated table of prioritized ICRs after application of the
+regional filtering criteria defined in the function.
+}
+\item{\code{plots}}{
+A named list containing the regional Manhattan plot in
+\code{manhplot_icr}.
+}
+}
 }
 \description{
-analyze for changes in cpg methylation in a DMR-like region (ICR)
-via a p-values aggregation test.
+Performs an imprinting control region-level analysis by aggregating
+CpG-level differential methylation results produced by
+\code{cpg_dml_test()}.
+
+CpGs are grouped by imprinting control region (ICR). Within each ICR,
+CpG-level p-values are combined using the Lancaster method, with the absolute
+CpG-level \code{logFC} values used as weights.
 }
-\author{
-author
+\details{
+The function summarizes each ICR using:
+
+\itemize{
+\item the number of represented CpGs,
+\item the mean CpG-level \code{logFC},
+\item the mean \code{delta_beta}, when available,
+\item the number of CpGs with positive and negative coefficients,
+\item the percentage of CpGs with raw p-values below
+\code{pval_threshold},
+\item a Lancaster combined p-value, and
+\item a Benjamini-Hochberg FDR-adjusted combined p-value.
+}
+
+The regional direction is labeled \code{"Hyper"} when more CpGs have
+positive than negative \code{logFC} values. Otherwise, the region is labeled
+\code{"Hypo"}. Ties are therefore labeled \code{"Hypo"} by the current
+implementation.
+
+When CpG-level models were fitted to M-values, \code{mean_logFC} is also on
+the M-value scale and must not be interpreted as a percentage methylation
+difference. When available, \code{mean_delta_beta} provides the average
+CpG-level difference on the beta-value scale.
+
+ICRs are annotated using overlapping, promoter-associated, and nearby
+protein-coding genes. Nearby genes are identified using an ICR interval
+extended by 10,000 base pairs in each direction.
+
+The function also creates a regional Manhattan plot using the chromosome
+offsets supplied in \code{chr_lens}.
+}
+\examples{
+\dontrun{
+dmr_result <- icr_dmr_test(
+  df_dml = dml_result$df_dml,
+  chr_lens = dml_result$chr_lens,
+  pval_threshold = 0.05,
+  fdr_sig_threshold = 0.0001
+)
+
+head(dmr_result$ICR_summary)
+}
+
+}
+\seealso{
+\code{\link{cpg_dml_test}},
+\code{\link[aggregation]{lancaster}}
 }
