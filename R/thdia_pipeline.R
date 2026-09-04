@@ -4,6 +4,8 @@
 #'
 #' @description runs standard tdhia pipeline in a single step.
 #'
+#' TODO: this function does not check if the cached data with probe_data matches
+#'  the settings of the current function cell, need to add in future.
 #' @param idat_dir_paths a vector of strings specifying full directory paths
 #' where IDAT files are located.
 #' @param multicore boolean, when true uses n.cores processing in sesame.
@@ -42,7 +44,10 @@
 #' @param min_design_score discard probes below this design score threshold.
 #' Default: NA (don't discard any probes by design score). Design scores vary
 #' from 0-1, with a higher value being a better designed probe.
-#'
+#' @param probe_beta provide probe data from a previously processed function call
+#'  of load_idata_to_probes. This is useful to provide when you want different
+#'   settings downstead of probe beta culations (such as setting individual beta 
+#'   values to NA if the sesame p-valu threshold is not met).
 #' @return named list with all of the output from each of the pipeline steps.
 #' @export
 tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
@@ -55,7 +60,8 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
                            smooth_adj_cpgs = FALSE,
                            max_icr_fail_rate = 0.2, db_flag = FALSE,
                            merge_replicates = "pre_beta", enforce_req_idats = TRUE,
-                           min_design_score = NA) {
+                           min_design_score = NA,
+                           probe_beta = NULL) {
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "tdhia_pipeline.RData")
   # load(file = "tdhia_pipeline.RData")
@@ -65,7 +71,7 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
   # Store all data in fields of list
   data = list()
   
-  if (!file.exists(probe_data_cache_path) || OVERWRITE_TEMP_DATA) {
+  if (!file.exists(probe_data_cache_path) || OVERWRITE_TEMP_DATA || ~is.null(probe_beta)) {
     data_beta = list()
     data_beta$probe_beta <-
       load_idata_to_probes(idat_dir_paths = idat_dir_paths, multicore = multicore,
@@ -74,6 +80,8 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
                            merge_replicates = merge_replicates, 
                            enforce_req_idats = enforce_req_idats)
     save(data_beta, file = probe_data_cache_path)
+  } else if (~is.null(probe_beta)) {
+    data_beta$probe_beta <- probe_beta
   } else {load(probe_data_cache_path)}
 
   

@@ -230,12 +230,13 @@ load_idata_to_probes <-
                        probe_pval_df = probe_pval_df,
                        platform = platform,
                        manifest = mft,
-                       idat_filepaths = unq_obs_idat_basenames)
+                       idat_filepaths = unq_obs_idat_basenames,
+                       input_args =  mget(names(formals()), envir = environment()))
     return(probe_beta)
 
 }
 
-
+# mget(setdiff(names(formals()), c("x", "verbose")), envir = environment())
 
 #' process_idats
 #' @description

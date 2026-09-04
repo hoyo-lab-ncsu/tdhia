@@ -194,10 +194,10 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
   }
 
   # Export data
-  cpg_beta <- list(cpg_beta_df = as.data.frame(cpg_beta_df),
-                   platform = probe_beta$platform,
-                   manifest = probe_beta$manifest,
-                   cpg_n_probes = n_probes)
+  cpg_beta <- list(
+    cpg_beta_df = as.data.frame(cpg_beta_df), platform = probe_beta$platform,
+    manifest = probe_beta$manifest, cpg_n_probes = n_probes,
+    input_args = mget(setdiff(names(formals()), c("probe_beta")), envir = environment()))
 
   return(cpg_beta)
 }

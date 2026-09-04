@@ -92,7 +92,8 @@ convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRU
                    platform = cpg_beta$platform,
                    manifest = cpg_beta$manifest,
                    n_CpGs = n_CpGs,
-                   cpg_icr_mapping = icr_mapping)
+                   cpg_icr_mapping = icr_mapping,
+                   input_args = mget(setdiff(names(formals()), c("cpg_beta")), envir = environment()))
 
   return(icr_beta)
 }
