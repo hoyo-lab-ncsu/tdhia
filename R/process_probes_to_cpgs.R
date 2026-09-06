@@ -154,7 +154,7 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
 
   # Perform rolling average on beta values with adjacent cpgs
   if (smooth_adj_cpgs) {
-    cat("CpG Filter: Sorting and smoothing cpg beta values between adjacent ICR sites.\n")
+    cat("CpG Filter: Sorting and smoothing adjacent cpg beta values.\n")
 
     # Sort cpgs
     cpg_mappings <- cpg_sort_fun(cpg_beta_df)
@@ -169,22 +169,23 @@ convert_probes_to_cpgs <- function(probe_beta, quantile_norm = FALSE,
 
     # Grab all cpgs for each ICR, do column wise smoothing
     n=NULL # Prevent a devtools::check() warning
-    sm_cpg_df <- foreach::foreach(n = seq_along(unq_icr_ids), .combine = 'rbind',
-                                  .packages = c("dplyr","zoo")) %dopar% {
-                                    ix <- unq_icr_ids[n]==cpg_mappings$ICR_id
-                                    cpg_sub <- cpg_mappings[unq_icr_ids[n]==cpg_mappings$ICR_id,] %>%
-                                      dplyr::select(-c("CpG_id", "ICR_id", "CpG_start"))
-                                    rownames(cpg_sub)
-
-                                    sm_cpg_sub <-
-                                      zoo::rollapply(cpg_sub, width=3, FUN = function(x) mean(x, na.rm = TRUE),
-                                                     by = 1, by.column = TRUE, fill = NA, align ="center",
-                                                     partial = TRUE)
-                                    rownames(sm_cpg_sub)  <- cpg_mappings$CpG_id[unq_icr_ids[n] == cpg_mappings$ICR_id]
-                                    sm_cpg_sub <- as.data.frame(sm_cpg_sub)
-
-                                    sm_cpg_sub
-                                  }
+    sm_cpg_df <- foreach::foreach(
+      n = seq_along(unq_icr_ids), .combine = 'rbind',
+      .packages = c("dplyr","zoo")) %dopar% {
+        ix <- unq_icr_ids[n]==cpg_mappings$ICR_id
+        cpg_sub <- cpg_mappings[unq_icr_ids[n]==cpg_mappings$ICR_id,] %>%
+          dplyr::select(-c("CpG_id", "ICR_id", "CpG_start"))
+        rownames(cpg_sub)
+        
+        sm_cpg_sub <-
+          zoo::rollapply(cpg_sub, width=3, FUN = function(x) mean(x, na.rm = TRUE),
+                         by = 1, by.column = TRUE, fill = NA, align ="center",
+                         partial = TRUE)
+        rownames(sm_cpg_sub)  <- cpg_mappings$CpG_id[unq_icr_ids[n] == cpg_mappings$ICR_id]
+        sm_cpg_sub <- as.data.frame(sm_cpg_sub)
+        
+        sm_cpg_sub
+      }
     #stop cluster
     parallel::stopCluster(cl)
 

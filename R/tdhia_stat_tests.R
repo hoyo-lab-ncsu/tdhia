@@ -1,8 +1,19 @@
 
 
 
-
-tdha_stat_tests <- function(
+#' tdha_stat_tests
+#' 
+#' 
+#' @param model_str todo
+#' @param beta_data todo
+#' @param study_data todo
+#' @param transform_to_m todo
+#' @param model_prefix todo
+#' @param impute_na todo
+#' @param n.cores todo
+#' 
+#' @export
+tdhia_stat_tests <- function(
     model_str, beta_data, study_data, transform_to_m = T, cache_path, 
     model_prefix = "", impute_na = TRUE, n.cores = max(c(parallel::detectCores()-1, 1))) {
   
@@ -16,9 +27,9 @@ tdha_stat_tests <- function(
   # 4) cpg_limma
   # 5) icr_lancaster
   
-  if (impute_na) {
-    beta_data_na <- 
-  } else {beta_data_na = beta_data}
+  # if (impute_na) {
+  #   beta_data_na <- 
+  # } else {beta_data_na = beta_data}
  
       
       
@@ -34,9 +45,6 @@ tdha_stat_tests <- function(
     betas = beta_data$icr_beta$icr_beta_df, family = "binomial", m_value_transform = m_value_transform,
     n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = !impute_na, 
     verbose = TRUE, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
-  
-  
-  
   
   
   

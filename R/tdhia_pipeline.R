@@ -8,6 +8,12 @@
 #'  the settings of the current function cell, need to add in future.
 #' @param idat_dir_paths a vector of strings specifying full directory paths
 #' where IDAT files are located.
+#' @param probe_data_cache either a probe_data object, a filepath to processed data, or NULL.
+#'   1) probe_data: the initial processing of idat files to probe_data is
+#'    skipped. All donstream processing still occurs.
+#'   2) filepath: a path where probe data is saved. If the file exists, the 
+#'   probe data is loaded from there instead of reprocessing.
+#'   3) NULL: the probe data is processed and not cached to disk.
 #' @param multicore boolean, when true uses n.cores processing in sesame.
 #' @param idat_basenames rename idat_basenames to a patient/ study id
 #' @param discard_unmapped_probes boolean, when true, probe_ids
@@ -25,8 +31,7 @@
 #' ICR are smoothed with a sliding window average.
 #' @param max_icr_fail_rate maximum allowable fraction of samples that can be
 #' missing before the entire ICR is excluded from dataset.
-#' @param OVERWRITE_TEMP_DATA todo
-#' @param probe_data_cache_path todo
+#' @param overwrite_probe_cache todo
 #' @param max_patient_fail_rate maximum number of imprintome cpg sites that fail
 #' the max_sig_pval threshold. Any patients with a higher fraction will be 
 #' discarded.
@@ -50,8 +55,8 @@
 #'   values to NA if the sesame p-valu threshold is not met).
 #' @return named list with all of the output from each of the pipeline steps.
 #' @export
-tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
-                           probe_data_cache_path = getwd(),
+tdhia_pipeline <- function(idat_dir_paths = NULL, overwrite_probe_cache = F,
+                           probe_data_cache = NULL,
                            multicore = TRUE, idat_basenames = NULL,
                            discard_unmapped_probes = TRUE , max_sig_pval = 0.2,
                            set_failed_betas_na = FALSE, max_probe_fail_rate = 0.2,
@@ -60,29 +65,38 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
                            smooth_adj_cpgs = FALSE,
                            max_icr_fail_rate = 0.2, db_flag = FALSE,
                            merge_replicates = "pre_beta", enforce_req_idats = TRUE,
-                           min_design_score = NA,
-                           probe_beta = NULL) {
+                           min_design_score = NA) {
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "tdhia_pipeline.RData")
   # load(file = "tdhia_pipeline.RData")
-  dir.create(dirname(probe_data_cache_path), showWarnings = F, recursive = T)
+  if (is.character(probe_data_cache)) dir.create(dirname(probe_data_cache), showWarnings = F, recursive = T)
   
   
   # Store all data in fields of list
-  data = list()
+  data_beta = list()
   
-  if (!file.exists(probe_data_cache_path) || OVERWRITE_TEMP_DATA || ~is.null(probe_beta)) {
-    data_beta = list()
+  # 1) process idat files to probe data
+  if ( is.null(probe_data_cache) ||
+       (is.character(probe_data_cache) && !file.exists(probe_data_cache)) ||
+       overwrite_probe_cache) {
+    # If probe_data_cache is null, OR is a path and does not exist, then process
     data_beta$probe_beta <-
       load_idata_to_probes(idat_dir_paths = idat_dir_paths, multicore = multicore,
                            idat_basenames = idat_basenames, 
                            quantile_norm = FALSE, db_flag = db_flag, 
                            merge_replicates = merge_replicates, 
                            enforce_req_idats = enforce_req_idats)
-    save(data_beta, file = probe_data_cache_path)
-  } else if (~is.null(probe_beta)) {
-    data_beta$probe_beta <- probe_beta
-  } else {load(probe_data_cache_path)}
+    
+    # Save data to disk if probe_data_cache is a path
+    if (is.character(probe_data_cache)) saveRDS(data_beta$probe_beta, file = probe_data_cache)
+    
+  } else if (is.list(probe_data_cache)) {
+    # If probe_data_cache is a probe_data object, then assign
+    data_beta$probe_beta <- probe_data_cache
+  } else if (is.character(probe_data_cache)) { 
+    # Load if probe_data_cache is a path
+    data_beta$probe_beta <-readRDS(probe_data_cache)
+  } else { stop("probe_beta_cache logic flawed, something went wrong")}
 
   
   # 2) Filter probes that are not mapped and discard poor signal
@@ -104,6 +118,8 @@ tdhia_pipeline <- function(idat_dir_paths = NULL, OVERWRITE_TEMP_DATA = F,
   data_beta$icr_beta <- convert_cpgs_to_icrs(data_beta$cpg_beta, 
                                              max_icr_fail_rate = max_icr_fail_rate)
   
+  # document input args for reproducibility
+  data_beta$input_args = input_args = mget(names(formals()), envir = environment())
   
   return(data_beta)
   
