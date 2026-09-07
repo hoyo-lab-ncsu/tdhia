@@ -8,7 +8,7 @@ tdhia_stat_tests(
   model_str,
   beta_data,
   study_data,
-  transform_to_m = T,
+  m_value_transform = T,
   cache_path,
   model_prefix = "",
   impute_na = TRUE,
@@ -22,13 +22,13 @@ tdhia_stat_tests(
 
 \item{study_data}{todo}
 
-\item{transform_to_m}{todo}
-
 \item{model_prefix}{todo}
 
 \item{impute_na}{todo}
 
 \item{n.cores}{todo}
+
+\item{transform_to_m}{todo}
 }
 \description{
 tdha_stat_tests

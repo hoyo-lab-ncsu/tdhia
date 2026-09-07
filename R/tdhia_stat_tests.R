@@ -14,10 +14,11 @@
 #' 
 #' @export
 tdhia_stat_tests <- function(
-    model_str, beta_data, study_data, transform_to_m = T, cache_path, 
-    model_prefix = "", impute_na = TRUE, n.cores = max(c(parallel::detectCores()-1, 1))) {
+    model_str, beta_data, study_data, m_value_transform = T, cache_path, 
+    model_prefix = "", impute_na = TRUE, n.cores = max(c(parallel::detectCores()-1, 1)),
+    verbose = T) {
   
-  
+  impute_na = T
   # Loop through each model
   # Process all stats tests
   # 1) cpg_glm
@@ -31,20 +32,25 @@ tdhia_stat_tests <- function(
   #   beta_data_na <- 
   # } else {beta_data_na = beta_data}
  
+  if (impute_na) {
+    verbosecat("Filtering Individual beta values that fail sesame p-value threshold")
+  
+    
+    }
       
       
   df_cpg_glm <- tdhia::imprintome_glm(
     model_str = model_str, study_data = study_data,
     betas = beta_data$cpg_beta$cpg_beta_df, family = "binomial", m_value_transform = m_value_transform,
     n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = !impute_na, 
-    verbose = TRUE, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
+    verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   
   
   df_icr_glm <- tdhia::imprintome_glm(
     model_str = model_str, study_data = study_data,
     betas = beta_data$icr_beta$icr_beta_df, family = "binomial", m_value_transform = m_value_transform,
     n_p_adj = nrow(data$icr_beta$icr_beta_df), db_flag = FALSE, rm.na.all = !impute_na, 
-    verbose = TRUE, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
+    verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   
   
   
@@ -53,7 +59,7 @@ tdhia_stat_tests <- function(
      df_study = study_metadata,  response = "disease_state",
      predictors = c("Sex", "Age", "Ethnicity"),  method = "optimal.adj",
      out_type = "D",  icr_ids = NULL,  min_cpg = 3,  db_flag = FALSE,
-     m_value_transform = m_value_transform,  scaling = TRUE,  verbose = TRUE,
+     m_value_transform = m_value_transform,  scaling = TRUE,  verbose = verbose,
      n.cores = n.cores)
      
      
@@ -63,7 +69,7 @@ tdhia_stat_tests <- function(
     df_study = study_metadata %>% rename(Patient_ID = Patient.ID),
     outcome = "disease_state",  covariates = c("Sex"),
     Patient_ID = "Patient_ID",  family = "binomial",  icr_ids = NULL,
-    min_cpg = 3,  verbose = TRUE,  n.cores = 1)
+    min_cpg = 3,  verbose = verbose,  n.cores = 1)
   
    
    df_cpg_limma <- tdhia::cpg_dml_test(

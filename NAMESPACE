@@ -40,16 +40,20 @@ export(tdhia_qc_report)
 export(tdhia_stat_tests)
 import(ggplot2)
 importFrom(foreach,"%dopar%")
-importFrom(grDevices,dev.off)
-importFrom(grDevices,pdf)
+importFrom(grDevices,
+  dev.off,
+  pdf
+)
 importFrom(magrittr,"%>%")
 importFrom(reshape2,melt)
 importFrom(rlang,.data)
-importFrom(stats,cor)
-importFrom(stats,density)
-importFrom(stats,median)
-importFrom(stats,na.omit)
-importFrom(stats,p.adjust)
-importFrom(stats,prcomp)
-importFrom(stats,sd)
+importFrom(stats,
+  cor,
+  density,
+  median,
+  na.omit,
+  p.adjust,
+  prcomp,
+  sd
+)
 importFrom(utils,write.csv)
