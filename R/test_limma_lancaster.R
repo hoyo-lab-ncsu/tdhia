@@ -96,9 +96,6 @@
 #' @param verbose Logical. If \code{TRUE}, prints progress and model information
 #'   to the console. Default is \code{TRUE}.
 #'
-#' @param write_plots Logical. If \code{TRUE}, writes generated plots to
-#'   \code{output_dir_path}. Default is \code{FALSE}.
-#'
 #' @param m_value_transform Logical. If \code{TRUE}, transforms beta values to
 #'   M-values using \code{sesame::BetaValueToMValue()} before fitting the limma
 #'   model. Beta values are still used to calculate group means and
@@ -110,8 +107,8 @@
 #'   non-numeric predictors to numeric factor codes. Default is \code{FALSE}.
 #'
 #' @param output_dir_path A character scalar giving the directory in which plot
-#'   files are written when \code{write_plots = TRUE}. Default is the current
-#'   working directory.
+#'   files are written when \code{!is.null(output_dir_path) = TRUE}. Default is the current
+#'   working directory. Default = NULL, data is not saved to disk.
 #'
 #' @param label A character scalar used in output plot filenames. By default,
 #'   the name of the primary predictor is used.
@@ -173,10 +170,10 @@
 #' @export
 cpg_dml_test <- function(df_study, predictors, cpg_beta,
                          pvalue_threshold = 0.0001, db_flag = F, sample_name = "Patient.ID",
-                         beadchip_correction = T, verbose = T, write_plots = F,
+                         beadchip_correction = T, verbose = T, 
                          m_value_transform = T,
                          correlation_check = F,
-                         output_dir_path = getwd(), label = predictors[1]) {
+                         output_dir_path = NULL, label = predictors[1]) {
   
   if (db_flag) {save(list = ls(all.names = TRUE), file = "cpg_dml_test.RData")}
   # load(file = "cpg_dml_test.RData")
@@ -234,7 +231,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
       M,p.mat = corr_result$p, insig = 'label_sig',
       sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9)
     
-    if (write_plots) {
+    if (!is.null(output_dir_path)) {
       grDevices::png(file.path(output_dir_path, paste0("corr_matrix_", label, ".png")),
           res = 300, width = 10, height = 10, units = "in")
       corrplot::corrplot(M,p.mat = corr_result$p, insig = 'label_sig',
@@ -376,7 +373,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
     ggplot2::theme(axis.ticks = element_line(linewidth = 0.5),
           panel.grid = element_blank())
   
-  if (write_plots) {
+  if (!is.null(output_dir_path)) {
     grDevices::png(file.path(output_dir_path, paste0("qqplot_", label, ".png")), res = 300, width = 10, height = 10, units = "in")
     print(plots$qq_p_value)
     grDevices::dev.off()
@@ -387,7 +384,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
     ggrepel::geom_text_repel(data = df_dml[df_dml$P.Value < pvalue_threshold,], ggplot2::aes(
       label=paste0(CpG_Probe, " (", ICR_id , ")")), size=3  )
   
-  if (write_plots) {
+  if (!is.null(output_dir_path)) {
     grDevices::png(file.path(output_dir_path, paste0("VolcanoPlot_", label, ".png")), res = 300, width = 12, height = 8, units = "in")
     print(plots$volcano)
     grDevices::dev.off()
@@ -425,7 +422,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
       box.padding = 0.5, point.padding = 0.3, max.overlaps = 10, size = 3.5, nudge_x = 0.05, 
       nudge_y = 0.05)
   
-  if (write_plots) {
+  if (!is.null(output_dir_path)) {
     grDevices::png(file.path(output_dir_path, paste0("Manhattan_", label, ".png")), res = 300, width = 15, height = 5, units = "in")
     print(plots$manhattan)
     grDevices::dev.off()

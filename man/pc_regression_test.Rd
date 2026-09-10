@@ -18,7 +18,8 @@ pc_regression_test(
   icr_ids = NULL,
   min_cpg = 3,
   verbose = TRUE,
-  n.cores = 1
+  n.cores = 1,
+  db_flag = T
 )
 }
 \arguments{

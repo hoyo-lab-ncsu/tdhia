@@ -13,10 +13,9 @@ cpg_dml_test(
   sample_name = "Patient.ID",
   beadchip_correction = T,
   verbose = T,
-  write_plots = F,
   m_value_transform = T,
   correlation_check = F,
-  output_dir_path = getwd(),
+  output_dir_path = NULL,
   label = predictors[1]
 )
 }
@@ -56,9 +55,6 @@ is \code{TRUE}.}
 \item{verbose}{Logical. If \code{TRUE}, prints progress and model information
 to the console. Default is \code{TRUE}.}
 
-\item{write_plots}{Logical. If \code{TRUE}, writes generated plots to
-\code{output_dir_path}. Default is \code{FALSE}.}
-
 \item{m_value_transform}{Logical. If \code{TRUE}, transforms beta values to
 M-values using \code{sesame::BetaValueToMValue()} before fitting the limma
 model. Beta values are still used to calculate group means and
@@ -70,8 +66,8 @@ pairwise correlations among model predictors after converting
 non-numeric predictors to numeric factor codes. Default is \code{FALSE}.}
 
 \item{output_dir_path}{A character scalar giving the directory in which plot
-files are written when \code{write_plots = TRUE}. Default is the current
-working directory.}
+files are written when \code{!is.null(output_dir_path) = TRUE}. Default is the current
+working directory. Default = NULL, data is not saved to disk.}
 
 \item{label}{A character scalar used in output plot filenames. By default,
 the name of the primary predictor is used.}

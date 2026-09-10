@@ -6,19 +6,21 @@
 \usage{
 tdhia_stat_tests(
   model_str,
-  beta_data,
+  betas,
   study_data,
   m_value_transform = T,
-  cache_path,
+  data_cache_path,
   model_prefix = "",
   impute_na = TRUE,
-  n.cores = max(c(parallel::detectCores() - 1, 1))
+  n.cores = max(c(parallel::detectCores() - 4, 1)),
+  verbose = T,
+  family = NULL,
+  db_flag = T,
+  overwrite_cache = F
 )
 }
 \arguments{
 \item{model_str}{todo}
-
-\item{beta_data}{todo}
 
 \item{study_data}{todo}
 
@@ -27,6 +29,8 @@ tdhia_stat_tests(
 \item{impute_na}{todo}
 
 \item{n.cores}{todo}
+
+\item{beta_data}{todo}
 
 \item{transform_to_m}{todo}
 }

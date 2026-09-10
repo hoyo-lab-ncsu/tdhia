@@ -21,7 +21,8 @@ tdhia_pipeline(
   db_flag = FALSE,
   merge_replicates = "pre_beta",
   enforce_req_idats = TRUE,
-  min_design_score = NA
+  min_design_score = NA,
+  verbose = T
 )
 }
 \arguments{
@@ -41,7 +42,8 @@ probe data is loaded from there instead of reprocessing.
 
 \item{multicore}{boolean, when true uses n.cores processing in sesame.}
 
-\item{idat_basenames}{rename idat_basenames to a patient/ study id}
+\item{idat_basenames}{vector of basenames for idat files, may be a subset of
+files that are stored in the cache saved in probe_data_cache.}
 
 \item{discard_unmapped_probes}{boolean, when true, probe_ids}
 

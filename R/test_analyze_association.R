@@ -1,5 +1,50 @@
 
 
+
+
+#' Parse a Linear Model Formula
+#'
+#' Parses a model formula into its response variable, primary predictor, and
+#' covariates. The first term on the right-hand side of the formula is treated
+#' as the primary predictor, and all remaining right-hand-side terms are
+#' returned as covariates.
+#'
+#' The input may be supplied either as a formula object or as a character
+#' string that can be converted to a formula.
+#'
+#' @param formula A model formula or character string specifying a model.
+#' The first term on the right-hand side is interpreted as the primary
+#' predictor, while any subsequent terms are interpreted as covariates.
+#'
+#' @return A named list with the following elements:
+#' \describe{
+#' \item{response}{Character vector containing the variable name(s) appearing
+#' in the response expression.}
+#' \item{primary_predictor}{Character string containing the first
+#' right-hand-side term, or \code{NULL} if no right-hand-side terms are
+#' present.}
+#' \item{covariates}{Character vector containing all right-hand-side terms
+#' after the primary predictor. Returns \code{character(0)} if no
+#' covariates are present.}
+#' }
+#'
+#' @details
+#' Right-hand-side terms are obtained from \code{stats::terms()}. Consequently,
+#' compound terms such as interactions are retained using their model-term
+#' representation (for example, \code{"x"}).
+#'
+#' The response is extracted using \code{all.vars()}, so a transformed response
+#' such as \code{log(y)} is returned as \code{"y"} rather than
+#' \code{"log(y)"}.
+#'
+#' @examples
+#' parse_lm_formula(y ~ x + age + sex)
+#'
+#' parse_lm_formula("y ~ treatment + age + sex")
+#'
+#' parse_lm_formula(y ~ x)
+#'
+#' @export
 parse_lm_formula <- function(formula) {
   # Accept either a character string or a formula
   if (is.character(formula)) {
@@ -20,7 +65,8 @@ parse_lm_formula <- function(formula) {
   list(
     response = response,
     primary_predictor = primary_predictor,
-    covariates = covariates
+    covariates = covariates,
+    all = c(response, primary_predictor, covariates)
   )
 }
 
@@ -212,7 +258,7 @@ imprintome_glm <- function (
                                              db_flag = db_flag, verbose = verbose)
   }
   test_run <- foreach_fun(1)
-  verbosecat(sprintf("Formula: %s\n", test_run$Formula))
+  verbosecat(sprintf("Formula: %s\n", test_run$Formula[1]))
   
   
   # Identify parallel index processing
@@ -225,18 +271,12 @@ imprintome_glm <- function (
   }
   
   # Determine number of workers
-  if (is.null(n.cores)) {
-    n.cores <- max(1L, parallel::detectCores() - 1L)
-  }
-  
+  if (is.null(n.cores)) {n.cores <- max(1L, parallel::detectCores() - 1L)  }
   # Create cluster
   cl <- snow::makeCluster(n.cores)
   
   # Ensure that the cluster is stopped even if an error occurs
-  on.exit(
-    try(snow::stopCluster(cl), silent = TRUE),
-    add = TRUE
-  )
+  on.exit(try(snow::stopCluster(cl), silent = TRUE),add = TRUE  )
   
   doSNOW::registerDoSNOW(cl)
   
@@ -252,10 +292,7 @@ imprintome_glm <- function (
     )
     
     # Ensure that the progress bar is closed if an error occurs
-    on.exit(
-      try(close(pb), silent = TRUE),
-      add = TRUE
-    )
+    on.exit(try(close(pb), silent = TRUE), add = TRUE )
     
     opts <- list(
       progress = function(n) {
@@ -279,11 +316,7 @@ imprintome_glm <- function (
   # Guarantee a data frame for downstream `$` operations
   df_fits <- as.data.frame(df_fits, stringsAsFactors = FALSE)
   
-  if (verbose) {
-    close(pb)
-    pb <- NULL
-    cat("\n")
-  }
+  if (verbose) {close(pb); pb <- NULL; cat("\n")}
   
   snow::stopCluster(cl)
   cl <- NULL
@@ -302,13 +335,13 @@ imprintome_glm <- function (
   if (!is.null(P) ) {model_vars <- model_vars[2:length(model_vars)]}
   model_vars <- model_vars[!is.na(model_vars)]
   
-  # Go through each model variable and extract results
+  # Go through each model variable and extract fit and stats
   dfs_sep <- list()
   for (n in seq_along(model_vars)) {
     dfs_sep[[n]] <- df_fits[df_fits$Variable == model_vars[n],]
   }
   names(dfs_sep) <- model_vars
-  # If cpg or ICR sites are a predictor, name the dataframe "imp_site"
+  # If cpg or ICR sites are a predictor, label the dataframe "imp_site"
   if (!is.null(P)) {
     df_temp <- list(df_fits[df_fits$Variable %in% colnames(P),])
     names(df_temp) <- "imp_site"
@@ -330,7 +363,8 @@ imprintome_glm <- function (
   dfs_sorted <- lapply(dfs_sep, na_fun)
   dfs_sorted <- lapply(dfs_sorted, sort_fun)
   dfs_corr   <- lapply(dfs_sorted, adj_p_val)
-  dfs_corr$example_formula <- test_run$Formula[1]
+  attr(dfs_corr, "example_formula") <- test_run$Formula[1]
+
   
   # Print out results of analysis
   try(expr = {
@@ -341,6 +375,68 @@ imprintome_glm <- function (
   
   return(dfs_corr)
 }
+
+
+
+
+
+
+#' summarize_study
+#'
+#' @description Prints out results of a study analysis from analyze_association.
+#' @param dfs a list of dataframes that give model output results for each
+#' variable in model.
+#' @param varnames vector of strings specifying which variables to cummarize.
+#' @param max_p_val maximum p-value threshold for reported results. Both
+#' adjusted and unadjusted p-values are reported.
+#' @param print_sites boolean, when true, will print all cpg/icr sites that are
+#' statistically significant (adjust p-value)
+#' @param print_confounders boolean, when true, will print out statistical
+#' summary of confoudner variables
+#' @export
+summarize_study <- function(dfs, varnames = NULL, max_p_val = 0.05,
+                            print_sites = TRUE, print_confounders = FALSE) {
+  cat(sprintf("Formula: %s \n", dfs$example_formula))
+  
+  if (is.null(varnames)) varnames <- names(dfs)
+  
+  sig_list = list()
+  for (n in seq_along(varnames)) {
+    if (dfs[[n]]$Confounder[1] == 0 || print_confounders ) {
+      cat(sprintf("%s:\n", varnames[n]))
+      cat(sprintf(">>  %.0f imprint sites have p_val < %.2f\n",
+                  sum(dfs[[n]]$P_VAL < max_p_val), max_p_val))
+      cat(sprintf(">>  %.0f imprint sites have adj_p_val < %.2f\n",
+                  sum(dfs[[n]]$ADJ_P_VAL < max_p_val), max_p_val))
+      if (sum(dfs[[n]]$ADJ_P_VAL < max_p_val)>0 && print_sites) {
+        
+        print(dfs[[n]][dfs[[n]]$ADJ_P_VAL < max_p_val,] %>%
+                dplyr::select(,-c("Formula", "Model_Id")))
+      }
+      
+      # Print ho wmany model fittings failed
+      cat(sprintf("%.0f/ %.0f of model fits failed.\n", sum(is.na(dfs[[n]]$Estimate)), 
+                  nrow(dfs[[n]])))
+      cat("\n")
+    }
+    
+    sig_list[[n]] <- dfs[[n]][ dfs[[n]]$ADJ_P_VAL < max_p_val, ]
+  }
+  
+  df_sig = do.call(rbind, sig_list)
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

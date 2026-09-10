@@ -100,7 +100,7 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
   coefs <- stringr::str_extract_all(formula_string, stringr::regex("[^\\s-\\+~]+"))[[1]][-1]
   cf = data.frame(Estimate = rep(NA, length(coefs)+1), StdError = NA, 
                   Statistic = NA, P_VAL = 1, row.names = c("(Intercept)",coefs))
-  aic<- NA; model_out <-  NULL
+  aic <- NA; model_out <-  NULL
   tryCatch({
     # fdsdf(fdsfsd)
     model_out <- .fit_model(model_data, formula_string, family, impute_na, n_imputes)
