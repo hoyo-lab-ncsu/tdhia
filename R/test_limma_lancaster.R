@@ -66,15 +66,12 @@
 #'   beadchip adjustment variables. Categorical variables should be represented
 #'   as factors with the intended reference level set before calling the
 #'   function.
-#'
 #' @param predictors A character vector naming columns in \code{df_study} to
 #'   include in the limma model. The first entry is the primary predictor tested;
 #'   subsequent entries are adjustment covariates.
-#'
 #' @param cpg_beta A numeric matrix of methylation beta values, with CpG probes
 #'   in rows and samples in columns. Row names must identify CpG probes. Column
 #'   names must match sample identifiers in \code{df_study[[sample_name]]}.
-#'
 #' @param pvalue_threshold A numeric scalar between 0 and 1 giving the raw
 #'   limma p-value threshold used to label CpGs as hypermethylated or
 #'   hypomethylated and to select CpGs for annotation and plot labeling.
@@ -198,9 +195,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   # Use M-values for LIMMA inference when requested
   cpg_model_values <- if (m_value_transform) {
     sesame::BetaValueToMValue(cpg_beta)
-  } else {
-    cpg_beta
-  }
+  } else { cpg_beta }
   
   # Assemble predictor list
   if (beadchip_correction) {
@@ -269,7 +264,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   }
   vsprintf(">> LIMMA coefficient tested: %s\n", coef_name)
 
-  # Determine reference and comparison groups
+  # Determine reference and comparison groups                           #########
   #_____________________________________________________________________________
   primary_predictor <- predictors[1]
   primary_variable <- df_study[[primary_predictor]]
@@ -321,7 +316,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   }
   
   
-  df_dml = df_dml %>% dplyr::left_join(ICR_CpG, by = dplyr::join_by(CpG_Probe == CpG_id)) %>% 
+  df_dml = df_dml %>% dplyr::left_join(ICR_CpG %>% select(-CpG_Probe), by = dplyr::join_by(CpG_Probe == CpG_id), keep = F,multiple = "first") %>% 
     dplyr::arrange(adj.P.Val)
   df_dml$diffMeth = "no"
   df_dml$diffMeth[df_dml$P.Value < pvalue_threshold & df_dml$logFC > 0] = "Hyper"
@@ -358,7 +353,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   inflation = function(ps) {
     chisq = stats::qchisq(1 - ps, 1)
     lambda = stats::median(chisq) / stats::qchisq(0.5, 1)
-    lambda
+    return(lambda)
   }
   
   
@@ -467,17 +462,8 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
   
   if ("delta_beta" %in% names(cpgs_show)) {
     cpgs_show <- cpgs_show %>%
-      dplyr::mutate(
-        beta_difference_percent = sprintf(
-          "%+.2f%%",
-          delta_beta * 100
-        )
-      ) %>%
-      dplyr::relocate(
-        delta_beta,
-        beta_difference_percent,
-        .after = logFC
-      )
+      dplyr::mutate( beta_difference_percent = sprintf( "%+.2f%%", delta_beta * 100 )
+      ) %>% dplyr::relocate( delta_beta, beta_difference_percent, .after = logFC)
   }
 
   

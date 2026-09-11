@@ -35,7 +35,7 @@ tdhia_stat_tests <- function(
   study_columns <- c(parsed_model$all[parsed_model$all != "beta"])#,"patient_id")
   
   
-  # Create beta data and study_data with NAs
+  # Create beta data and study_data with NAs                                 ####
   #_____________________________________________________________________________
   # Set p_val threshold to NA
   study_data_na <- study_data %>% select(all_of(study_columns))
@@ -50,7 +50,8 @@ tdhia_stat_tests <- function(
     filter(patient_id %in% colnames(betas_na$cpg_beta$cpg_beta_df))
   rownames(study_data_na) <- study_data_na$patient_id
   
-  # Create complete data with no NAs
+  # Create complete data with no NAs                                        ####
+  #_____________________________________________________________________________
   study_data_complete <- study_data %>% select(all_of(study_columns)) %>% na.omit()
   betas_complete <- betas
   # Only include patient columns that are found in complete records in study data
@@ -68,7 +69,6 @@ tdhia_stat_tests <- function(
  
   
   df_cpg <- data.frame(cpg_id = tdhia::manifest_v1A2_design_scores$cpg_id) %>% filter(!is.na(cpg_id))
-  
   df_icr <- data.frame(icr_id = tdhia::manifest_v1A2_design_scores$icr_id) %>% filter(!is.na(icr_id))
   
   # Parse model string, test if response is binomial or not
@@ -158,7 +158,7 @@ tdhia_stat_tests <- function(
    df_cpg_limma <- tdhia::cpg_dml_test(
      df_study = study_data_complete, predictors = c(out$response,out$covariatesr), 
      cpg_beta = betas_complete$cpg_beta$cpg_beta_df,
-     pvalue_threshold = 0.001, db_flag = F, sample_name = "patient_id", correlation_check = F,
+     pvalue_threshold = 0.001, db_flag = T, sample_name = "patient_id", correlation_check = F,
      m_value_transform = m_value_transform,
      beadchip_correction = F, verbose = T)
    saveRDS(object = df_cpg_limma,  file = df_cpg_limma_path)
@@ -177,11 +177,14 @@ tdhia_stat_tests <- function(
    df_icr_lancaster <-  tdhia::icr_dmr_test(
      df_dml = df_cpg_limma$df_dml, chr_lens = df_cpg_limma$chr_lens,
      pval_threshold = 0.05, fdr_sig_threshold = 0.0001, verbose = T, db_flag = F)
-   saveRDS(object = df_icr_pcr,  file = df_icr_lancaster_path)
+   saveRDS(object = df_icr_lancaster,  file = df_icr_lancaster_path)
   } else { 
     df_icr_lancaster <- readRDS(file = df_icr_lancaster_path)
   }
-   
+  df_icr <- df_icr %>% left_join( 
+    df_icr_lancaster$ICR_summary %>% rename(icr_id = ICR_id) %>% 
+      rename_with(~ paste0("pcr_", .), -icr_id), by = join_by(icr_id)) 
+  
    
    
 }
