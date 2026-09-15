@@ -5,7 +5,8 @@
 \title{tdha_stat_tests}
 \usage{
 tdhia_stat_tests(
-  model_str,
+  primary_var,
+  predictor_vars,
   betas,
   study_data,
   m_value_transform = T,
@@ -16,12 +17,11 @@ tdhia_stat_tests(
   verbose = T,
   family = NULL,
   db_flag = T,
-  overwrite_cache = F
+  overwrite_cache = F,
+  add_genomic_metadata = T
 )
 }
 \arguments{
-\item{model_str}{todo}
-
 \item{study_data}{todo}
 
 \item{model_prefix}{todo}
@@ -29,6 +29,8 @@ tdhia_stat_tests(
 \item{impute_na}{todo}
 
 \item{n.cores}{todo}
+
+\item{model_str}{todo}
 
 \item{beta_data}{todo}
 

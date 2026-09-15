@@ -151,7 +151,7 @@ pc_regression_test <- function (
       X = icr_ids, FUN =  pcr_single_icr, cpg_beta = cpg_beta, df_icr_pcr = df_icr_pcr,
       data_norm_type = data_norm_type, cpg_mapping = cpg_mapping, n_pcs = n_pcs, 
       df_study = df_study, outcome = outcome, covariates= covariates, safe_fit = safe_fit,
-      pct_variance = pct_variance)
+      pct_variance = pct_variance, family = family)
 
   } else {
     verbosecat("> PC regression processing on multiple cores.\n")
@@ -166,7 +166,7 @@ pc_regression_test <- function (
       X = icr_ids, FUN = pcr_single_icr, cpg_beta = cpg_beta,df_icr_pcr = df_icr_pcr,
       data_norm_type = data_norm_type, cpg_mapping = cpg_mapping, n_pcs = n_pcs, 
       df_study= df_study,outcome = outcome,covariates = covariates, safe_fit = safe_fit,
-      pct_variance = pct_variance, BPPARAM = param)
+      pct_variance = pct_variance, family = family, BPPARAM = param)
   }
 
 
@@ -185,7 +185,7 @@ pc_regression_test <- function (
 
 
 
-pcr_single_icr <- function(icr_id, cpg_beta, df_icr_pcr, data_norm_type, cpg_mapping, n_pcs,df_study, outcome, covariates,safe_fit,pct_variance) {
+pcr_single_icr <- function(icr_id, cpg_beta, df_icr_pcr, data_norm_type, cpg_mapping, n_pcs,df_study, outcome, covariates,safe_fit,pct_variance, family) {
   # Get the CpG IDs of the CpGs for an ICR
   subset_cpg_ids <- cpg_mapping %>%
     dplyr::filter(ICR_id == icr_id, CpG_id %in% colnames(cpg_beta)) %>%
