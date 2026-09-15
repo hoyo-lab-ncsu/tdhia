@@ -9,7 +9,7 @@ cpg_dml_test(
   predictors,
   cpg_beta,
   pvalue_threshold = 1e-04,
-  db_flag = F,
+  db_flag = FALSE,
   sample_name = "Patient.ID",
   beadchip_correction = T,
   verbose = T,

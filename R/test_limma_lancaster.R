@@ -166,7 +166,7 @@
 #'
 #' @export
 cpg_dml_test <- function(df_study, predictors, cpg_beta,
-                         pvalue_threshold = 0.0001, db_flag = F, sample_name = "Patient.ID",
+                         pvalue_threshold = 0.0001, db_flag = FALSE, sample_name = "Patient.ID",
                          beadchip_correction = T, verbose = T, 
                          m_value_transform = T,
                          correlation_check = F,
@@ -602,7 +602,7 @@ cpg_dml_test <- function(df_study, predictors, cpg_beta,
 #' @export
 icr_dmr_test <- function(df_dml, chr_lens, pval_threshold = 0.05,
                          fdr_sig_threshold = 0.0001,
-                         verbose = T, db_flag = F) {
+                         verbose = T, db_flag = FALSE) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "icr_dmr_test.RData")}
   # load(file = "icr_dmr_test.RData")
   

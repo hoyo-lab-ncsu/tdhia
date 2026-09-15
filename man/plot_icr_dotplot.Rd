@@ -13,7 +13,7 @@ plot_icr_dotplot(
   plot_height_width = c(5, 3),
   output_path,
   max_sig_hwindow = NULL,
-  db_flag = F,
+  db_flag = FALSE,
   filter_na_group = T,
   legend.position = "none",
   ytext = "Mean Beta Value",

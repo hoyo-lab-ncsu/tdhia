@@ -7,7 +7,7 @@
 sigset_merge_replicates(
   sigset,
   merge_replicates = "post_merge",
-  db_flag = TRUE
+  db_flag = FALSE
 )
 }
 \arguments{

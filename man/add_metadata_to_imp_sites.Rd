@@ -4,7 +4,7 @@
 \alias{add_metadata_to_imp_sites}
 \title{Annotate CpG or ICR Identifiers}
 \usage{
-add_metadata_to_imp_sites(imp_ids, imp_type = "cpg", db_flag = T)
+add_metadata_to_imp_sites(imp_ids, imp_type = "cpg", db_flag = FALSE)
 }
 \arguments{
 \item{imp_ids}{Character vector of CpG IDs or ICR IDs to annotate.}
@@ -13,7 +13,7 @@ add_metadata_to_imp_sites(imp_ids, imp_type = "cpg", db_flag = T)
 "icr" uses the supplied ICR identifiers directly.}
 
 \item{db_flag}{Logical; save the initial environment to
-add_metadata_to_imp_sites.RData in the working directory. Defaults to TRUE.}
+add_metadata_to_imp_sites.RData in the working directory. Defaults to FALSE.}
 }
 \value{
 A data frame with icr_id and, for CpG input, cpg_id, plus:

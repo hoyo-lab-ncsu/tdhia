@@ -13,7 +13,7 @@ skat_icr_test(
   out_type = "C",
   icr_ids = NULL,
   min_cpg = 3,
-  db_flag = T,
+  db_flag = FALSE,
   m_value_transform = T,
   scaling = T,
   verbose = T,
@@ -45,7 +45,7 @@ by the supplied CpGs in manifest_v1A2_design_scores.}
 tested first, then filtered before p-value adjustment.}
 
 \item{db_flag}{Logical; save the initial environment to skat_icr_test.RData
-in the working directory. Defaults to TRUE.}
+in the working directory. Defaults to FALSE.}
 
 \item{m_value_transform}{Logical; convert beta values to M-values within
 each ICR before testing.}

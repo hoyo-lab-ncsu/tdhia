@@ -22,7 +22,7 @@
 #' @param min_cpg Minimum number of CpGs for retaining an ICR. Regions are
 #'   tested first, then filtered before p-value adjustment.
 #' @param db_flag Logical; save the initial environment to skat_icr_test.RData
-#'   in the working directory. Defaults to TRUE.
+#'   in the working directory. Defaults to FALSE.
 #' @param m_value_transform Logical; convert beta values to M-values within
 #'   each ICR before testing.
 #' @param scaling Logical; center and scale each CpG across samples.
@@ -47,7 +47,7 @@
 skat_icr_test <- function(cpg_betas, df_study, response, predictors,
                           method = "optimal.adj",
                           out_type="C", icr_ids = NULL,
-                          min_cpg = 3, db_flag = T, m_value_transform = T,
+                          min_cpg = 3, db_flag = FALSE, m_value_transform = T,
                           scaling = T,
                           verbose = T, n.cores = 1){
   if(db_flag) save(list = ls(all.names = TRUE), file = "skat_icr_test.RData")

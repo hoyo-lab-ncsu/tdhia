@@ -13,7 +13,7 @@ plot_icr_diffbar(
   plot_height_width = c(3, 2),
   output_path,
   max_sig_hwindow = NULL,
-  db_flag = F,
+  db_flag = FALSE,
   filter_na_group = T,
   legend.position = "none",
   sample_colname = "patient_id",

@@ -373,7 +373,7 @@ process_IDATS <- function(unq_obs_idat_basenames, platform, mft, core_params,
 #' @importFrom magrittr "%>%"
 #' @importFrom rlang .data
 #' @export
-sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_flag = TRUE) {
+sigset_merge_replicates <- function(sigset, merge_replicates = "post_merge", db_flag = FALSE) {
 
   if(db_flag) save(list = ls(all.names = TRUE), file = "sigset_merge_replicates.RData")
   # load(file = "sigset_merge_replicates.RData")

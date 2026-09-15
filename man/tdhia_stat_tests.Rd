@@ -16,7 +16,7 @@ tdhia_stat_tests(
   n.cores = max(c(parallel::detectCores() - 4, 1)),
   verbose = T,
   family = NULL,
-  db_flag = T,
+  db_flag = FALSE,
   overwrite_cache = F,
   add_genomic_metadata = T
 )
@@ -68,7 +68,7 @@ unique value in this inference. SKAT is always called with \code{out_type = "C"}
 (continuous response), independently of this argument.}
 
 \item{db_flag}{Logical; whether to save the function's initial environment
-to \code{tdhia_stat_tests.RData} in the working directory. Defaults to \code{TRUE}.
+to \code{tdhia_stat_tests.RData} in the working directory. Defaults to \code{FALSE}.
 Pipeline and GLM helpers are called with their own debug flags enabled
 even when this argument is \code{FALSE}.}
 

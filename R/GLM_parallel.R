@@ -49,7 +49,7 @@
 #' @export
 GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
                         family = "binomial", verbose = FALSE, impute_na = TRUE,
-                        db_flag = TRUE, .fit_model = fit_model) {
+                        db_flag = FALSE, .fit_model = fit_model) {
   if (db_flag) {save(list = ls(all.names = TRUE), file = "GLM_parallel.RData") }
   # load(file = "GLM_parallel.RData")
 

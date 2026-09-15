@@ -11,7 +11,7 @@
 #' @param imp_type Identifier type: "cpg" (default) maps CpGs to ICRs;
 #'   "icr" uses the supplied ICR identifiers directly.
 #' @param db_flag Logical; save the initial environment to
-#'   add_metadata_to_imp_sites.RData in the working directory. Defaults to TRUE.
+#'   add_metadata_to_imp_sites.RData in the working directory. Defaults to FALSE.
 #'
 #' @details
 #' For CpG input, the first matching ICR in mapping_cpg_icr_ids is used.
@@ -30,7 +30,7 @@
 #'     fields copied from imprintome_icr_nearest_transcripts.
 #' @importFrom rlang .data
 #' @export
-add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg", db_flag = T) {
+add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg", db_flag = FALSE) {
 
   if (db_flag) {save(list = ls(all.names = TRUE), file = "add_metadata_to_imp_sites.RData")}
   # load(file = "add_metadata_to_imp_sites.RData")

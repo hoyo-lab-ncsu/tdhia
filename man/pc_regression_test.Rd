@@ -19,7 +19,7 @@ pc_regression_test(
   min_cpg = 3,
   verbose = TRUE,
   n.cores = 1,
-  db_flag = T
+  db_flag = FALSE
 )
 }
 \arguments{
@@ -67,7 +67,7 @@ still be reported when FALSE.}
 BiocParallel with SnowParam on Windows and MulticoreParam elsewhere.}
 
 \item{db_flag}{Logical; save the initial environment to
-pc_regression_test.RData in the working directory. Defaults to TRUE.}
+pc_regression_test.RData in the working directory. Defaults to FALSE.}
 }
 \value{
 A table sorted by adj_p_value, with:

@@ -10,7 +10,7 @@ icr_dmr_test(
   pval_threshold = 0.05,
   fdr_sig_threshold = 1e-04,
   verbose = T,
-  db_flag = F
+  db_flag = FALSE
 )
 }
 \arguments{

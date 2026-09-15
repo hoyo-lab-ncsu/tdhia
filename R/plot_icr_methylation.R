@@ -38,7 +38,7 @@
 #'
 #' @export
 plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr_id, xlab_txt = "", 
-                                 plot_height_width = c(5,3), output_path, max_sig_hwindow = NULL, db_flag = F,
+                                 plot_height_width = c(5,3), output_path, max_sig_hwindow = NULL, db_flag = FALSE,
                                  filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value", 
                                  sample_colname = "patient_id", overwrite_plot = F) {
   # Create output folder
@@ -193,7 +193,7 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
 #'
 #' @export
 plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr_id, xlab_txt = "", 
-                             plot_height_width = c(3,2), output_path, max_sig_hwindow = NULL, db_flag = F,
+                             plot_height_width = c(3,2), output_path, max_sig_hwindow = NULL, db_flag = FALSE,
                              filter_na_group = T, legend.position = "none", 
                              sample_colname = "patient_id", overwrite_plot = T) {
   # Create output folder

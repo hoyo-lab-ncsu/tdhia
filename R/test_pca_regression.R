@@ -35,7 +35,7 @@
 #' @param n.cores Number of workers. One uses lapply(); larger values use
 #'   BiocParallel with SnowParam on Windows and MulticoreParam elsewhere.
 #' @param db_flag Logical; save the initial environment to
-#'   pc_regression_test.RData in the working directory. Defaults to TRUE.
+#'   pc_regression_test.RData in the working directory. Defaults to FALSE.
 #'
 #' @details
 #' Study rows with missing outcome, covariates, or sample IDs are removed,
@@ -62,7 +62,7 @@ pc_regression_test <- function (
     cpg_beta, m_value_transform = TRUE,  data_norm_type="n1",
     pct_variance = 0.80, n_pcs = NULL,
     df_study, outcome, covariates, Patient_ID, family, icr_ids = NULL,
-    min_cpg = 3, verbose = TRUE, n.cores = 1, db_flag = T) {
+    min_cpg = 3, verbose = TRUE, n.cores = 1, db_flag = FALSE) {
   
   if (db_flag) {save(list = ls(all.names = TRUE), file = "pc_regression_test.RData")}
   # load(file = "pc_regression_test.RData")

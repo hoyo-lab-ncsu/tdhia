@@ -40,7 +40,7 @@
 #'   unique value in this inference. SKAT is always called with `out_type = "C"`
 #'   (continuous response), independently of this argument.
 #' @param db_flag Logical; whether to save the function's initial environment
-#'   to `tdhia_stat_tests.RData` in the working directory. Defaults to `TRUE`.
+#'   to `tdhia_stat_tests.RData` in the working directory. Defaults to `FALSE`.
 #'   Pipeline and GLM helpers are called with their own debug flags enabled
 #'   even when this argument is `FALSE`.
 #' @param overwrite_cache Logical; whether to recompute cached CpG GLM, SKAT,
@@ -96,7 +96,7 @@
 tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
     study_data, m_value_transform = T, data_cache_path, 
     model_prefix = "", impute_na = TRUE, n.cores = max(c(parallel::detectCores()-4, 1)),
-    verbose = T, family = NULL,db_flag= T, overwrite_cache = F, add_genomic_metadata = T) {
+    verbose = T, family = NULL,db_flag = FALSE, overwrite_cache = F, add_genomic_metadata = T) {
   
   if (db_flag) {save(list = ls(all.names = TRUE), file = "tdhia_stat_tests.RData")}
   # load(file = "tdhia_stat_tests.RData")
