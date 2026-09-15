@@ -64,7 +64,7 @@ Not approved or still pending:
 ## Code Style
 
 1. Prefer compact, readable code that makes use of a standard line of roughly
-   80 characters. Use `R/tdhia_stat_tests.R` as a reference for compact layout.
+   80 characters.
 2. Keep multiple arguments on each line in function calls and definitions, and
    multiple elements on each line when defining lists, when they fit comfortably.
    Do not default to one argument or list element per line. Wrap near 80
