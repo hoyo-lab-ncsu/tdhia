@@ -2,7 +2,7 @@
 % Please edit documentation in R/tdhia_stat_tests.R
 \name{tdhia_stat_tests}
 \alias{tdhia_stat_tests}
-\title{tdha_stat_tests}
+\title{Run CpG and ICR Methylation Association Tests}
 \usage{
 tdhia_stat_tests(
   primary_var,
@@ -22,20 +22,111 @@ tdhia_stat_tests(
 )
 }
 \arguments{
-\item{study_data}{todo}
+\item{primary_var}{Character string naming a column in \code{study_data}. Used
+as the response in GLM, SKAT, and principal component regression, and as
+the first predictor in the limma analysis.}
 
-\item{model_prefix}{todo}
+\item{predictor_vars}{Nonempty character vector of additional column names
+in \code{study_data}. All are included in GLM and limma models. The current
+implementation uses only \code{predictor_vars[-1]} as covariates for SKAT and
+principal component regression.}
 
-\item{impute_na}{todo}
+\item{betas}{List returned by \code{\link[=tdhia_pipeline]{tdhia_pipeline()}}, including \code{input_args}
+and \code{probe_beta}. The pipeline is rerun from these inputs to prepare
+methylation data for the tests; this argument is not a beta matrix.}
 
-\item{n.cores}{todo}
+\item{study_data}{Data frame with one row per sample and columns named by
+\code{primary_var} and \code{predictor_vars}. Row names must be sample identifiers
+matching the methylation matrix column names and pipeline sample IDs.}
 
-\item{model_str}{todo}
+\item{m_value_transform}{Logical; whether to transform beta values to
+M-values in the underlying tests. Defaults to \code{TRUE}.}
 
-\item{beta_data}{todo}
+\item{data_cache_path}{Character string giving an existing, writable
+directory for intermediate RDS results. The directory is not created.}
 
-\item{transform_to_m}{todo}
+\item{model_prefix}{Character string. Currently unused, including in cache
+file names.}
+
+\item{impute_na}{Logical; whether the CpG and ICR GLMs impute missing values
+using MICE. If \code{FALSE}, missing values are handled by removal in the GLM
+helper. This option does not control the other tests.}
+
+\item{n.cores}{Number of cores passed to GLM and SKAT helpers. Defaults to
+the detected core count minus four, with a minimum of one. Principal
+component regression is always run with one core.}
+
+\item{verbose}{Logical; whether to print progress from this function and
+helpers that receive this argument. Limma and Lancaster helpers are
+currently called with verbose output enabled regardless of this value.}
+
+\item{family}{Character string specifying the GLM family, such as
+\code{"gaussian"} or \code{"binomial"}, also passed to principal component regression.
+If \code{NULL}, uses \code{"binomial"} when \code{study_data[[primary_var]]} has exactly
+two unique values, and \code{"gaussian"} otherwise. Missing values count as a
+unique value in this inference. SKAT is always called with \code{out_type = "C"}
+(continuous response), independently of this argument.}
+
+\item{db_flag}{Logical; whether to save the function's initial environment
+to \code{tdhia_stat_tests.RData} in the working directory. Defaults to \code{TRUE}.
+Pipeline and GLM helpers are called with their own debug flags enabled
+even when this argument is \code{FALSE}.}
+
+\item{overwrite_cache}{Logical; whether to recompute cached CpG GLM, SKAT,
+principal component regression, limma, and Lancaster results. Defaults
+to \code{FALSE}. Existing ICR GLM results are always reused, even when \code{TRUE}.}
+
+\item{add_genomic_metadata}{Logical; whether to join genomic annotations
+from \code{\link[=add_metadata_to_imp_sites]{add_metadata_to_imp_sites()}} to the CpG and ICR result tables.
+Defaults to \code{TRUE}.}
+}
+\value{
+A named list of four data frames:
+\describe{
+\item{df_cpg}{CpGs assigned to ICRs in \code{manifest_v1A2_design_scores},
+identified by \code{primary_var} and \code{cpg_id}, with \verb{cpg_glm_*} and
+\verb{cpg_limma_*} statistics and optional genomic metadata.}
+\item{df_cpg_summary}{One row containing \code{primary_var} and counts of
+values below 0.05 in each numeric adjusted p-value column of \code{df_cpg},
+ignoring missing values.}
+\item{df_icr}{ICRs in the manifest, identified by \code{primary_var} and
+\code{icr_id}, with \verb{icr_glm_*}, \verb{icr_skat_*}, \verb{icr_pcr_*}, and \verb{icr_lanc_*}
+results, CpG-level summaries, and optional genomic metadata. CpG
+summaries include minimum p-values and signed values of greatest
+absolute magnitude for effect estimates and test statistics.}
+\item{df_icr_summary}{One row containing \code{primary_var} and counts of
+values below 0.05 in each numeric adjusted p-value column of \code{df_icr},
+ignoring missing values.}
+}
+Results are left-joined to manifest identifiers, so untested sites can
+have missing statistics.
 }
 \description{
-tdha_stat_tests
+Runs generalized linear models (GLMs) and limma tests at CpG level, and
+GLMs, SKAT, principal component regression, and Lancaster combination tests
+at imprinting control region (ICR) level. Combines results into annotated
+tables and counts significant results for each adjusted p-value column.
+}
+\details{
+The GLM formula is \code{primary_var ~ beta + predictor_vars}, with the named
+predictors joined by \code{+} and \code{beta} representing each methylation site.
+GLMs use pipeline output with failed beta measurements set to missing.
+The other tests use samples with complete study variables and pipeline
+output that retains failed beta measurements. Samples removed by pipeline
+filtering are excluded from the corresponding prepared study data.
+
+SKAT uses \code{method = "optimal.adj"}, scaling, and at least three CpGs per
+ICR. Principal component regression also requires at least three CpGs and
+retains components explaining 80 percent of variance. Both GLM analyses
+use the number of ICRs for the number of p-value adjustment comparisons.
+
+Intermediate test results are cached using file names derived only from
+\code{primary_var} and the test name. Changes to data, predictors, or other
+settings do not invalidate caches. Use a separate cache directory for
+each analysis configuration. Pipeline preparation runs even when test
+results are read from cache.
+}
+\seealso{
+\code{\link[=tdhia_pipeline]{tdhia_pipeline()}}, \code{\link[=imprintome_glm]{imprintome_glm()}}, \code{\link[=skat_icr_test]{skat_icr_test()}},
+\code{\link[=pc_regression_test]{pc_regression_test()}}, \code{\link[=cpg_dml_test]{cpg_dml_test()}}, \code{\link[=icr_dmr_test]{icr_dmr_test()}}
 }

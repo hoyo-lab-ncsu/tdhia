@@ -102,17 +102,20 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   # load(file = "tdhia_stat_tests.RData")
   verbosecat <- \(x) if (verbose) cat(x)
   
-  # Parse model variables
-  # parsed_model <- tdhia::parse_lm_formula(model_str)
-  parsed_model= list()
-  parsed_model$response <- unname(primary_var)
-  parsed_model$primary_predictor <- predictor_vars[1]
-  parsed_model$covariates <- predictor_vars[-1]
-  parsed_model$all <- c(unname(primary_var), "beta", predictor_vars)
+  # Evaluate the analysis only when its cached result cannot be reused.
+  cache_result <- function(path, expr, overwrite = FALSE) {
+    if (file.exists(path) && !overwrite) return(readRDS(path))
+    result <- force(expr)
+    saveRDS(result, path)
+    result
+  }
+
+  # Set model variables
   model_str <- paste0(primary_var, " ~ beta + ", paste0(predictor_vars,collapse = " + "))
   
   # Extract columns used in study data
-  study_columns <- c(parsed_model$all[parsed_model$all != "beta"])#,"patient_id")
+  study_columns <- c(unname(primary_var), predictor_vars)
+  study_columns <- study_columns[study_columns != "beta"]
   
   # Create beta data and study_data with NAs                                 ####
   #_____________________________________________________________________________
@@ -134,7 +137,6 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   study_data_complete <- study_data %>% select(all_of(study_columns)) %>% na.omit()
   betas_complete <- betas
   # Only include patient columns that are found in complete records in study data
-  # betas_complete$input_args$probe_data_cache <- subset_probe_beta(data_beta$probe_beta, rownames())
   # Only load a subset
   betas_complete$input_args$idat_basenames <- rownames(study_data_complete)
   # Keeps all measurements
@@ -173,18 +175,13 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   # CpG GLM                                                            ##########  
   #_____________________________________________________________________________
   df_cpg_glm_path = file.path(data_cache_path, paste0(primary_var, "_df_cpg_glm.rds"))
-  if (!file.exists(df_cpg_glm_path) || overwrite_cache) {
-   
-    
-  df_cpg_glm <- tdhia::imprintome_glm(
-    model_str = model_str, study_data = study_data,
-    betas = betas_na$cpg_beta$cpg_beta_df, family = family, m_value_transform = m_value_transform,
-    n_p_adj = nrow(betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na, 
-    verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
-  saveRDS(object = df_cpg_glm,  file = df_cpg_glm_path)
-  } else { 
-    df_cpg_glm <- readRDS(file = df_cpg_glm_path)
-  }
+  df_cpg_glm <- cache_result(df_cpg_glm_path, {
+    tdhia::imprintome_glm(
+      model_str = model_str, study_data = study_data_na,
+      betas = betas_na$cpg_beta$cpg_beta_df, family = family, m_value_transform = m_value_transform,
+      n_p_adj = nrow(betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
+      verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
+  }, overwrite = overwrite_cache)
   # Add results to master cpg dataframe
   df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% 
     select(Variable, Estimate, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
@@ -206,16 +203,13 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   # ICR GLM                                                    #################
   #_____________________________________________________________________________
   df_icr_glm_path = file.path(data_cache_path, paste0(primary_var, "df_icr_glm.rds"))
-  if (!file.exists(df_icr_glm_path)) {
-  df_icr_glm <- tdhia::imprintome_glm(
-    model_str = model_str, study_data = study_data,
-    betas = betas_na$icr_beta$icr_beta_df, family = family, m_value_transform = m_value_transform,
-    n_p_adj = nrow(betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
-    verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
-  saveRDS(object = df_icr_glm,  file = df_icr_glm_path)
-  } else {
-    df_icr_glm <- readRDS(file = df_icr_glm_path)
-  }
+  df_icr_glm <- cache_result(df_icr_glm_path, {
+    tdhia::imprintome_glm(
+      model_str = model_str, study_data = study_data_na,
+      betas = betas_na$icr_beta$icr_beta_df, family = family, m_value_transform = m_value_transform,
+      n_p_adj = nrow(betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
+      verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
+  }, overwrite = FALSE)
   # Add results to master cpg dataframe
   df_icr_glm_formatted <- df_icr_glm$imp_site %>% 
     select(Variable, Estimate, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
@@ -232,18 +226,15 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   # ICR SKAT                                                         ##########  
   #_____________________________________________________________________________
   df_icr_skat_path = file.path(data_cache_path, paste0(primary_var, "df_icr_skat.rds"))
-  if (!file.exists(df_icr_skat_path) || overwrite_cache) {
-   df_icr_skat <- tdhia::skat_icr_test(
-     cpg_betas = as.data.frame(betas_complete$cpg_beta$cpg_beta_df),
-     df_study = study_data_complete,  response = parsed_model$response,
-     predictors = parsed_model$covariates,  method = "optimal.adj",
-     out_type = "C",  icr_ids = NULL,  min_cpg = 3,  db_flag = FALSE,
-     m_value_transform = m_value_transform,  scaling = TRUE,  verbose = verbose,
-     n.cores = n.cores)
-   saveRDS(object = df_icr_skat,  file = df_icr_skat_path)
-  } else { 
-    df_icr_skat <- readRDS(file = df_icr_skat_path)
-  }
+  df_icr_skat <- cache_result(df_icr_skat_path, {
+    tdhia::skat_icr_test(
+      cpg_betas = as.data.frame(betas_complete$cpg_beta$cpg_beta_df),
+      df_study = study_data_complete,  response = unname(primary_var),
+      predictors = predictor_vars[-1],  method = "optimal.adj",
+      out_type = "C",  icr_ids = NULL,  min_cpg = 3,  db_flag = FALSE,
+      m_value_transform = m_value_transform,  scaling = TRUE,  verbose = verbose,
+      n.cores = n.cores)
+  }, overwrite = overwrite_cache)
   df_icr <- df_icr %>% left_join( 
     df_icr_skat %>% rename(skat_n_cpg = n_cpg) %>%
       rename_with(~ paste0("icr_", .), -icr_id), 
@@ -255,18 +246,15 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   # ICR PCA Regression                                               ##########  
   #_____________________________________________________________________________
   df_icr_pcr_path = file.path(data_cache_path, paste0(primary_var, "df_icr_pcr.rds"))
-  if (!file.exists(df_icr_pcr_path) || overwrite_cache) {
-   df_icr_pcr <- tdhia::pc_regression_test(
-    cpg_beta = Matrix::t(betas_complete$cpg_beta$cpg_beta_df) %>% as.data.frame(),
-    m_value_transform = m_value_transform,  data_norm_type = "n1", pct_variance = 0.80,
-    df_study = study_data_complete %>% rename(Patient_ID = patient_id),
-    outcome = parsed_model$response,  covariates = parsed_model$covariates,
-    Patient_ID = "Patient_ID",  family = family,  icr_ids = NULL,
-    min_cpg = 3,  verbose = verbose,  n.cores = 1)
-   saveRDS(object = df_icr_pcr,  file = df_icr_pcr_path)
-  } else { 
-    df_icr_pcr <- readRDS(file = df_icr_pcr_path)
-  }
+  df_icr_pcr <- cache_result(df_icr_pcr_path, {
+    tdhia::pc_regression_test(
+      cpg_beta = Matrix::t(betas_complete$cpg_beta$cpg_beta_df) %>% as.data.frame(),
+      m_value_transform = m_value_transform,  data_norm_type = "n1", pct_variance = 0.80,
+      df_study = study_data_complete %>% rename(Patient_ID = patient_id),
+      outcome = unname(primary_var),  covariates = predictor_vars[-1],
+      Patient_ID = "Patient_ID",  family = family,  icr_ids = NULL,
+      min_cpg = 3,  verbose = verbose,  n.cores = 1)
+  }, overwrite = overwrite_cache)
   df_icr <- df_icr %>% left_join( 
     df_icr_pcr %>% rename(icr_id = ICR_id, adj_pval = adj_p_value ) %>% 
       rename_with(~ paste0("icr_pcr_", .), -icr_id), by = join_by(icr_id)) 
@@ -275,17 +263,14 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   # CpG Limma                                                         ##########  
   #_____________________________________________________________________________
   df_cpg_limma_path = file.path(data_cache_path, paste0(primary_var, "df_cpg_limma.rds"))
-  if (!file.exists(df_cpg_limma_path) || overwrite_cache) {
-   df_cpg_limma <- tdhia::cpg_dml_test(
-     df_study = study_data_complete, predictors = c(primary_var, predictor_vars), 
-     cpg_beta = betas_complete$cpg_beta$cpg_beta_df,
-     pvalue_threshold = 0.001, db_flag = F, sample_name = "patient_id", correlation_check = F,
-     m_value_transform = m_value_transform,
-     beadchip_correction = F, verbose = T)
-   saveRDS(object = df_cpg_limma,  file = df_cpg_limma_path)
-  } else { 
-    df_cpg_limma <- readRDS(file = df_cpg_limma_path)
-  }
+  df_cpg_limma <- cache_result(df_cpg_limma_path, {
+    tdhia::cpg_dml_test(
+      df_study = study_data_complete, predictors = c(primary_var, predictor_vars),
+      cpg_beta = betas_complete$cpg_beta$cpg_beta_df,
+      pvalue_threshold = 0.001, db_flag = F, sample_name = "patient_id", correlation_check = F,
+      m_value_transform = m_value_transform,
+      beadchip_correction = F, verbose = T)
+  }, overwrite = overwrite_cache)
   # Add limma cpg results
   df_cpg_limma_formatted <- df_cpg_limma$df_dml %>% 
     select(CpG_Probe, logFC, AveExpr, P.Value, t, P.Value, adj.P.Val  ) %>%
@@ -309,14 +294,11 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   # ICR lancaster                                                     ##########  
   #_____________________________________________________________________________
   df_icr_lancaster_path = file.path(data_cache_path, paste0(primary_var, "df_icr_lancaster.rds"))
-  if (!file.exists(df_icr_lancaster_path) || overwrite_cache) {
-   df_icr_lancaster <-  tdhia::icr_dmr_test(
-     df_dml = df_cpg_limma$df_dml, chr_lens = df_cpg_limma$chr_lens,
-     pval_threshold = 0.05, fdr_sig_threshold = 0.0001, verbose = T, db_flag = F)
-   saveRDS(object = df_icr_lancaster,  file = df_icr_lancaster_path)
-  } else { 
-    df_icr_lancaster <- readRDS(file = df_icr_lancaster_path)
-  }
+  df_icr_lancaster <- cache_result(df_icr_lancaster_path, {
+    tdhia::icr_dmr_test(
+      df_dml = df_cpg_limma$df_dml, chr_lens = df_cpg_limma$chr_lens,
+      pval_threshold = 0.05, fdr_sig_threshold = 0.0001, verbose = T, db_flag = F)
+  }, overwrite = overwrite_cache)
   df_icr <- df_icr %>% left_join( 
     df_icr_lancaster$ICR_summary %>% rename(icr_id = ICR_id, combined_adj_pval = FDR) %>% 
       rename_with(~ paste0("icr_lanc_", .), -icr_id), by = join_by(icr_id)) 

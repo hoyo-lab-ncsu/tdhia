@@ -67,8 +67,6 @@
 #' @returns test
 #' @export
 #' @author Kate Everly
-
-
 pc_regression_test <- function (
     cpg_beta, m_value_transform = TRUE,  data_norm_type="n1",
     pct_variance = 0.80, n_pcs = NULL,
@@ -101,7 +99,7 @@ pc_regression_test <- function (
       unname() %>% unique()
   }
 
-  # Tranform cpg_beta matrix from beta values to m-values if requested
+  # Transform cpg_beta matrix from beta values to m-values if requested
   # even if you transform to m-values, the dataframe of cpg methylation levels is
   # still referred to as the "cpg_beta" throughout the script
   if (m_value_transform){
