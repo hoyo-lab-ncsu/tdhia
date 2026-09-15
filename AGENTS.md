@@ -19,6 +19,10 @@ Before making changes:
 
 ## Planning and Scope
 
+Routine documentation, formatting, and small mechanical changes may proceed
+when directly requested; reserve a separate approval step for substantive
+design or scientific behavior changes.
+
 For nontrivial changes, or whenever the user requests a plan first:
 
 1. Do not edit files during the planning phase.
@@ -80,3 +84,88 @@ sample identifiers or compatible dimensions.
 
 Avoid duplicating downstream type, length, range, or missing-value checks.
 Do not add extensive defensive validation for hypothetical misuse.
+
+## Research Package Priorities
+
+This package supports research and student contributors. Prefer clear,
+practical implementations over elaborate frameworks or unnecessary
+standardization. Follow established repository conventions unless there
+is a concrete reason to change them.
+
+Keep changes focused. Avoid unrelated cleanup, new dependencies, or broad
+refactoring during a targeted fix.
+
+## Scientific Behavior
+
+Treat changes to statistical methods, model formulas, normalization,
+filtering, missing-value handling, and multiple-testing correction as
+scientific behavior changes. Explain the old and proposed behavior and
+obtain explicit approval before changing it.
+
+Preserve sample and feature alignment. Where relevant, document matrix
+orientation, identifier columns or row names, methylation scale, and
+whether filtering occurs before or after statistical adjustment.
+
+Do not silently change scientific behavior while refactoring or updating
+documentation. If the implementation appears incorrect, report it and
+propose a separate fix.
+
+## Public Function Compatibility
+
+Preserve exported function names, argument names, defaults, return fields,
+and output column names unless a change is explicitly approved.
+
+Before changing a public interface, check its callers, examples, and
+documentation. Explain any migration needed by existing users.
+
+Keep internal helpers unexported unless they are intentionally useful as
+public functions.
+
+## Documentation
+
+When changing a public function, update its roxygen documentation in the
+same change. Describe inputs, returned objects, missing-value handling,
+and relevant side effects accurately.
+
+Regenerate affected Rd files with roxygen2. Do not edit generated Rd files
+by hand. Report if regeneration cannot be completed.
+
+Prefer small examples using synthetic data. Avoid examples that require
+private datasets, lengthy analyses, downloads, or credentials.
+
+## Verification
+
+Match verification effort to the change. For scientific behavior changes
+and bug fixes, prefer a small reproducible example that distinguishes the
+correct result from the previous behavior.
+
+Check identifiers and ordering as well as numeric results when modifying
+data processing. Use a fixed random seed when reproducibility matters.
+
+Do not run expensive analyses, download datasets, or regenerate large
+outputs merely to check a small change. State what was checked and what
+remains unverified.
+
+## Debugging and Research Data
+
+Default db_flag to FALSE. When a wrapper exposes db_flag, propagate that
+choice to downstream calls rather than forcing debugging on.
+
+Document debug-file locations and contents. Avoid overwriting snapshots
+from parallel workers.
+
+Do not commit participant data, debug workspaces, credentials, or local
+analysis outputs. Use synthetic or explicitly approved public data for
+examples and tests.
+
+## Supporting Student Contributors
+
+Explain the purpose of a change and any important R or statistical
+concept needed to maintain it. Keep explanations concise and concrete.
+
+Use comments to explain assumptions and non-obvious decisions. Prefer
+readable, explicit code when a shorter expression would be harder for
+a student to understand.
+
+When reporting a problem, distinguish confirmed behavior from suspected
+issues and include a small reproduction when practical.
