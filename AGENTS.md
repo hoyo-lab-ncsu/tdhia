@@ -67,3 +67,16 @@ Not approved or still pending:
    characters at sensible boundaries without sacrificing readability.
 3. Aim for roughly one code comment line per four lines of code. Treat this as
    a general guideline, using judgment where more explanation is needed.
+
+## Argument Validation
+
+Keep argument validation concise and appropriate for a research-grade R
+package. Prefer relying on downstream functions to validate their inputs.
+
+Add explicit checks only when downstream calls would not catch the problem,
+or would produce a misleading error, silently incorrect result, or unintended
+side effect. Focus on assumptions specific to the function, such as matching
+sample identifiers or compatible dimensions.
+
+Avoid duplicating downstream type, length, range, or missing-value checks.
+Do not add extensive defensive validation for hypothetical misuse.
