@@ -1,17 +1,97 @@
-
-
-
-#' tdha_stat_tests
-#' 
-#' 
-#' @param model_str todo
-#' @param beta_data todo
-#' @param study_data todo
-#' @param transform_to_m todo
-#' @param model_prefix todo
-#' @param impute_na todo
-#' @param n.cores todo
-#' 
+#' Run CpG and ICR Methylation Association Tests
+#'
+#' Runs generalized linear models (GLMs) and limma tests at CpG level, and
+#' GLMs, SKAT, principal component regression, and Lancaster combination tests
+#' at imprinting control region (ICR) level. Combines results into annotated
+#' tables and counts significant results for each adjusted p-value column.
+#'
+#' @param primary_var Character string naming a column in `study_data`. Used
+#'   as the response in GLM, SKAT, and principal component regression, and as
+#'   the first predictor in the limma analysis.
+#' @param predictor_vars Nonempty character vector of additional column names
+#'   in `study_data`. All are included in GLM and limma models. The current
+#'   implementation uses only `predictor_vars[-1]` as covariates for SKAT and
+#'   principal component regression.
+#' @param betas List returned by [tdhia_pipeline()], including `input_args`
+#'   and `probe_beta`. The pipeline is rerun from these inputs to prepare
+#'   methylation data for the tests; this argument is not a beta matrix.
+#' @param study_data Data frame with one row per sample and columns named by
+#'   `primary_var` and `predictor_vars`. Row names must be sample identifiers
+#'   matching the methylation matrix column names and pipeline sample IDs.
+#' @param m_value_transform Logical; whether to transform beta values to
+#'   M-values in the underlying tests. Defaults to `TRUE`.
+#' @param data_cache_path Character string giving an existing, writable
+#'   directory for intermediate RDS results. The directory is not created.
+#' @param model_prefix Character string. Currently unused, including in cache
+#'   file names.
+#' @param impute_na Logical; whether the CpG and ICR GLMs impute missing values
+#'   using MICE. If `FALSE`, missing values are handled by removal in the GLM
+#'   helper. This option does not control the other tests.
+#' @param n.cores Number of cores passed to GLM and SKAT helpers. Defaults to
+#'   the detected core count minus four, with a minimum of one. Principal
+#'   component regression is always run with one core.
+#' @param verbose Logical; whether to print progress from this function and
+#'   helpers that receive this argument. Limma and Lancaster helpers are
+#'   currently called with verbose output enabled regardless of this value.
+#' @param family Character string specifying the GLM family, such as
+#'   `"gaussian"` or `"binomial"`, also passed to principal component regression.
+#'   If `NULL`, uses `"binomial"` when `study_data[[primary_var]]` has exactly
+#'   two unique values, and `"gaussian"` otherwise. Missing values count as a
+#'   unique value in this inference. SKAT is always called with `out_type = "C"`
+#'   (continuous response), independently of this argument.
+#' @param db_flag Logical; whether to save the function's initial environment
+#'   to `tdhia_stat_tests.RData` in the working directory. Defaults to `TRUE`.
+#'   Pipeline and GLM helpers are called with their own debug flags enabled
+#'   even when this argument is `FALSE`.
+#' @param overwrite_cache Logical; whether to recompute cached CpG GLM, SKAT,
+#'   principal component regression, limma, and Lancaster results. Defaults
+#'   to `FALSE`. Existing ICR GLM results are always reused, even when `TRUE`.
+#' @param add_genomic_metadata Logical; whether to join genomic annotations
+#'   from [add_metadata_to_imp_sites()] to the CpG and ICR result tables.
+#'   Defaults to `TRUE`.
+#'
+#' @details
+#' The GLM formula is `primary_var ~ beta + predictor_vars`, with the named
+#' predictors joined by `+` and `beta` representing each methylation site.
+#' GLMs use pipeline output with failed beta measurements set to missing.
+#' The other tests use samples with complete study variables and pipeline
+#' output that retains failed beta measurements. Samples removed by pipeline
+#' filtering are excluded from the corresponding prepared study data.
+#'
+#' SKAT uses `method = "optimal.adj"`, scaling, and at least three CpGs per
+#' ICR. Principal component regression also requires at least three CpGs and
+#' retains components explaining 80 percent of variance. Both GLM analyses
+#' use the number of ICRs for the number of p-value adjustment comparisons.
+#'
+#' Intermediate test results are cached using file names derived only from
+#' `primary_var` and the test name. Changes to data, predictors, or other
+#' settings do not invalidate caches. Use a separate cache directory for
+#' each analysis configuration. Pipeline preparation runs even when test
+#' results are read from cache.
+#'
+#' @return A named list of four data frames:
+#' \describe{
+#'   \item{df_cpg}{CpGs assigned to ICRs in `manifest_v1A2_design_scores`,
+#'     identified by `primary_var` and `cpg_id`, with `cpg_glm_*` and
+#'     `cpg_limma_*` statistics and optional genomic metadata.}
+#'   \item{df_cpg_summary}{One row containing `primary_var` and counts of
+#'     values below 0.05 in each numeric adjusted p-value column of `df_cpg`,
+#'     ignoring missing values.}
+#'   \item{df_icr}{ICRs in the manifest, identified by `primary_var` and
+#'     `icr_id`, with `icr_glm_*`, `icr_skat_*`, `icr_pcr_*`, and `icr_lanc_*`
+#'     results, CpG-level summaries, and optional genomic metadata. CpG
+#'     summaries include minimum p-values and signed values of greatest
+#'     absolute magnitude for effect estimates and test statistics.}
+#'   \item{df_icr_summary}{One row containing `primary_var` and counts of
+#'     values below 0.05 in each numeric adjusted p-value column of `df_icr`,
+#'     ignoring missing values.}
+#' }
+#' Results are left-joined to manifest identifiers, so untested sites can
+#' have missing statistics.
+#'
+#' @seealso [tdhia_pipeline()], [imprintome_glm()], [skat_icr_test()],
+#'   [pc_regression_test()], [cpg_dml_test()], [icr_dmr_test()]
+#'
 #' @export
 tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
     study_data, m_value_transform = T, data_cache_path, 
@@ -106,7 +186,8 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
     df_cpg_glm <- readRDS(file = df_cpg_glm_path)
   }
   # Add results to master cpg dataframe
-  df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% select(Variable, Estimate, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
+  df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% 
+    select(Variable, Estimate, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
     rename(cpg_id = Variable, cpg_glm_estimate = Estimate, cpg_glm_statistic = Statistic,
            cpg_glm_raw_pval = P_VAL, cpg_glm_adj_pval = ADJ_P_VAL, cpg_glm_family = Family) %>%
     left_join(  tdhia::mapping_cpg_icr_ids %>% select(ICR_id, CpG_id) %>% distinct() %>% 
@@ -115,7 +196,8 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
   # Add cpg_glm results to icr table
   df_icr <- df_icr %>% left_join(
     df_cpg_glm_formatted %>% group_by(icr_id) %>% summarize(
-      cpg_glm_estimate_max = max_mag_sign(cpg_glm_estimate), cpg_glm_statistic_max = max_mag_sign(cpg_glm_statistic),
+      cpg_glm_estimate_max = max_mag_sign(cpg_glm_estimate), 
+      cpg_glm_statistic_max = max_mag_sign(cpg_glm_statistic),
       cpg_glm_raw_pval_min = min(cpg_glm_raw_pval), cpg_glm_adj_pval_min = min(cpg_glm_adj_pval),
       cpg_glm_family = cpg_glm_family[1]
     ), by = join_by(icr_id) )
@@ -135,7 +217,8 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
     df_icr_glm <- readRDS(file = df_icr_glm_path)
   }
   # Add results to master cpg dataframe
-  df_icr_glm_formatted <- df_icr_glm$imp_site %>% select(Variable, Estimate, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
+  df_icr_glm_formatted <- df_icr_glm$imp_site %>% 
+    select(Variable, Estimate, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
     rename(icr_id = Variable, icr_glm_estimate = Estimate, icr_glm_statistic = Statistic,
            icr_glm_raw_pval = P_VAL, icr_glm_adj_pval = ADJ_P_VAL, icr_glm_family = Family)
   # 
@@ -204,7 +287,8 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
     df_cpg_limma <- readRDS(file = df_cpg_limma_path)
   }
   # Add limma cpg results
-  df_cpg_limma_formatted <- df_cpg_limma$df_dml %>% select(CpG_Probe, logFC, AveExpr, P.Value, t, P.Value, adj.P.Val  ) %>%
+  df_cpg_limma_formatted <- df_cpg_limma$df_dml %>% 
+    select(CpG_Probe, logFC, AveExpr, P.Value, t, P.Value, adj.P.Val  ) %>%
     rename(cpg_id = CpG_Probe, cpg_limma_logfc = logFC, cpg_limma_avg_expr = AveExpr,
            cpg_limma_raw_pval = P.Value, cpg_limma_t = t, cpg_limma_adj_pval = adj.P.Val) %>% 
     left_join(  tdhia::mapping_cpg_icr_ids %>% select(ICR_id, CpG_id) %>% distinct() %>% 
@@ -218,7 +302,8 @@ tdhia_stat_tests <- function( primary_var, predictor_vars, betas,
     cpg_limma_logfc_max  = max_mag_sign(cpg_limma_logfc ), 
     cpg_limma_avg_expr_max  = max_mag_sign(cpg_limma_avg_expr ),
     cpg_limma_t_max  = max_mag_sign(cpg_limma_t),
-    cpg_limma_raw_pval_min = min(cpg_limma_raw_pval ), cpg_limma_adj_pval_min = min(cpg_limma_adj_pval)), by = join_by(icr_id))
+    cpg_limma_raw_pval_min = min(cpg_limma_raw_pval ), 
+    cpg_limma_adj_pval_min = min(cpg_limma_adj_pval)), by = join_by(icr_id))
     
     
   # ICR lancaster                                                     ##########  
