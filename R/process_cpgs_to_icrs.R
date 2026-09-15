@@ -1,28 +1,44 @@
 
 
-#' convert_cpgs_to_icrs
+#' Aggregate CpG Methylation to ICRs
 #'
-#' Converts a dataframe of beta values of specific CpG sites into beta
-#' values for Imprint Control Region (ICR) sites. Calculates mean beta value for
-#' cases where multiple CpG sites map to a single ICR site.
+#' Maps CpG sites to imprinting control regions and averages their beta
+#' values separately for each sample, ignoring missing values.
 #'
-#' @param cpg_beta a dataframe of beta values with rows representing cpg sites
-#'  and columns representing different patients/ samples.
-#' @param icr_mapping tba
-#' @param sort_by_icr tba
-#' @param max_icr_fail_rate if a fraction of samples for an ICR have NA values
-#' above this proportion (0-1), the ICR is discarded from the results.
-#' @param quantile_norm a boolean flag, when true normalizes the beta values
-#' between columns of the output icr beta matrix. Default is FALSE because this
-#' normalization is done earlier in the pipeline.
-#' @param db_flag boolean when true export workspace to disk for debugging.
+#' @param cpg_beta List returned by convert_probes_to_cpgs(), containing
+#'   cpg_beta_df (CpGs in rows, samples in columns), platform, and manifest.
+#' @param icr_mapping Data frame containing CpG_id and ICR_id columns.
+#'   NULL uses the package's mapping_cpg_icr_ids data.
+#' @param sort_by_icr Logical; request sorting by the numeric ICR suffix.
+#'   The current implementation passes a quoted column name to arrange(),
+#'   so the requested numeric ordering is not reliably applied.
+#' @param max_icr_fail_rate Numeric missing-value fraction used to calculate
+#'   and print an ICR discard summary. The filtered intermediate table is
+#'   currently not used to construct the return value, so this argument does
+#'   not remove ICRs from the returned data.
+#' @param quantile_norm Logical; currently unused. No quantile normalization
+#'   is performed, regardless of this argument.
+#' @param db_flag Logical; save the initial environment to
+#'   convert_cpgs_to_icrs.RData in the working directory.
+#'
+#' @details
+#' CpGs are joined to the supplied mapping before averaging; multiple mapping
+#' rows can therefore contribute multiple times. Unmapped ICR entries are
+#' removed. An all-missing set of beta values produces NaN. The reported
+#' failure fraction is calculated before dropping the ICR ID and count columns.
+#' A filtering summary is printed on every call.
+#'
+#' @return A named list with:
+#'   - icr_beta_df: data frame of mean beta values, ICR IDs in rows and
+#'     sample IDs in columns.
+#'   - platform and manifest: metadata copied from cpg_beta.
+#'   - n_CpGs: number of joined CpG rows per returned ICR, in table order;
+#'     this is not a per-sample count of nonmissing measurements.
+#'   - cpg_icr_mapping: mapping table used for aggregation.
+#'   - input_args: argument values excluding cpg_beta.
+#' @seealso [convert_probes_to_cpgs()], [tdhia_pipeline()]
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
-#'
-#' @returns a dataframe containing beta values where rows are ICR ids and columns
-#' are either (1) the basenames of the idat files or (2) some other mapping
-#' specified when the data was loaded in \code{load_idat}.
-#'
 #' @export
 convert_cpgs_to_icrs <- function(cpg_beta, icr_mapping = NULL, sort_by_icr = TRUE,
                                  max_icr_fail_rate = 0.20, quantile_norm = FALSE,

@@ -2,7 +2,7 @@
 % Please edit documentation in R/process_cpgs_to_icrs.R
 \name{convert_cpgs_to_icrs}
 \alias{convert_cpgs_to_icrs}
-\title{convert_cpgs_to_icrs}
+\title{Aggregate CpG Methylation to ICRs}
 \usage{
 convert_cpgs_to_icrs(
   cpg_beta,
@@ -14,29 +14,50 @@ convert_cpgs_to_icrs(
 )
 }
 \arguments{
-\item{cpg_beta}{a dataframe of beta values with rows representing cpg sites
-and columns representing different patients/ samples.}
+\item{cpg_beta}{List returned by convert_probes_to_cpgs(), containing
+cpg_beta_df (CpGs in rows, samples in columns), platform, and manifest.}
 
-\item{icr_mapping}{tba}
+\item{icr_mapping}{Data frame containing CpG_id and ICR_id columns.
+NULL uses the package's mapping_cpg_icr_ids data.}
 
-\item{sort_by_icr}{tba}
+\item{sort_by_icr}{Logical; request sorting by the numeric ICR suffix.
+The current implementation passes a quoted column name to arrange(),
+so the requested numeric ordering is not reliably applied.}
 
-\item{max_icr_fail_rate}{if a fraction of samples for an ICR have NA values
-above this proportion (0-1), the ICR is discarded from the results.}
+\item{max_icr_fail_rate}{Numeric missing-value fraction used to calculate
+and print an ICR discard summary. The filtered intermediate table is
+currently not used to construct the return value, so this argument does
+not remove ICRs from the returned data.}
 
-\item{quantile_norm}{a boolean flag, when true normalizes the beta values
-between columns of the output icr beta matrix. Default is FALSE because this
-normalization is done earlier in the pipeline.}
+\item{quantile_norm}{Logical; currently unused. No quantile normalization
+is performed, regardless of this argument.}
 
-\item{db_flag}{boolean when true export workspace to disk for debugging.}
+\item{db_flag}{Logical; save the initial environment to
+convert_cpgs_to_icrs.RData in the working directory.}
 }
 \value{
-a dataframe containing beta values where rows are ICR ids and columns
-are either (1) the basenames of the idat files or (2) some other mapping
-specified when the data was loaded in \code{load_idat}.
+A named list with:
+\itemize{
+\item icr_beta_df: data frame of mean beta values, ICR IDs in rows and
+sample IDs in columns.
+\item platform and manifest: metadata copied from cpg_beta.
+\item n_CpGs: number of joined CpG rows per returned ICR, in table order;
+this is not a per-sample count of nonmissing measurements.
+\item cpg_icr_mapping: mapping table used for aggregation.
+\item input_args: argument values excluding cpg_beta.
+}
 }
 \description{
-Converts a dataframe of beta values of specific CpG sites into beta
-values for Imprint Control Region (ICR) sites. Calculates mean beta value for
-cases where multiple CpG sites map to a single ICR site.
+Maps CpG sites to imprinting control regions and averages their beta
+values separately for each sample, ignoring missing values.
+}
+\details{
+CpGs are joined to the supplied mapping before averaging; multiple mapping
+rows can therefore contribute multiple times. Unmapped ICR entries are
+removed. An all-missing set of beta values produces NaN. The reported
+failure fraction is calculated before dropping the ICR ID and count columns.
+A filtering summary is printed on every call.
+}
+\seealso{
+\code{\link[=convert_probes_to_cpgs]{convert_probes_to_cpgs()}}, \code{\link[=tdhia_pipeline]{tdhia_pipeline()}}
 }

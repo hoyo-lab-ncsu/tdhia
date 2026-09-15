@@ -2,7 +2,7 @@
 % Please edit documentation in R/GLM_parallel.R
 \name{GLM_parallel}
 \alias{GLM_parallel}
-\title{GLM_parallel}
+\title{Fit One Model in a Series of GLM Association Tests}
 \usage{
 GLM_parallel(
   R,
@@ -18,55 +18,63 @@ GLM_parallel(
 )
 }
 \arguments{
-\item{R}{dataframe where each column is a Response variable.}
+\item{R}{Data frame or matrix of response variables with samples in rows.}
 
-\item{Rind}{column index for R if it has multiple columns (for parallel processing).
-Default for Rind is 1 for single column dataframe.}
+\item{Rind}{Single column index selecting the response in R.}
 
-\item{P}{dataframe where each column is a Predictor variable.}
+\item{P}{Optional data frame or matrix of primary predictors. Rows must
+already correspond to the same samples and order as R.}
 
-\item{Pind}{column index for P if it has multiple columns (for parallel processing).
-Default for Pind is 1 for single column dataframe.}
+\item{Pind}{Single column index selecting the primary predictor in P.
+Ignored when P is NULL.}
 
-\item{Pe}{dataframe of extra predictor variables to be included in all models.}
+\item{Pe}{Optional data frame of additional predictors included together.
+Rows must already be aligned with R.}
 
-\item{family}{string denoting GLM family}
+\item{family}{GLM family specification passed to .fit_model.}
 
-\item{verbose}{boolean flag, when true prints fits to model.}
+\item{verbose}{Logical; print the fitted coefficient table.}
 
-\item{impute_na}{boolean flag, when TRUE inputs missing NA values with MICE
-package.}
+\item{impute_na}{Logical; enable multiple imputation through .fit_model.}
 
-\item{db_flag}{boolean flag, when TRUE saves workspace to disk for debugging}
+\item{db_flag}{Logical; save the initial environment to GLM_parallel.RData
+in the working directory. Failure snapshots can be written even if FALSE.}
 
-\item{.fit_model}{todo}
+\item{.fit_model}{Fitting function with arguments model_data,
+formula_string, family, impute_na, and n_imputes, in that order.
+Must return a list containing cf (a coefficient table including an
+intercept row) and aic. Defaults to fit_model().}
 }
 \value{
-fit of general linear model, including
+A data frame with one row per non-intercept coefficient:
 \itemize{
-\item Estimate: point estimates of coefficients for each of the predictors
-\item Std. Error: standard error of the estimates
-\item Cumulative two-tailed probability
+\item Response and Variable: response and coefficient names.
+\item Estimate, StdError, Statistic, P_VAL: coefficient summary values.
+\item Confounder: legacy indicator initialized to 0; the current single-index
+implementation does not mark additional covariates as confounders.
+\item ADJ_P_VAL: NA placeholder for adjustment by the caller.
+\item Family and Formula: family specification and constructed formula.
+\item Model_Id: maximum of the selected response and predictor indices.
+\item aic: model AIC, or mean AIC for imputed fits.
 }
 }
 \description{
-perform general linear modeling with the equation of two
-possible forms:
+Selects a response and primary predictor, adds common covariates, and
+fits one generalized linear model. This worker can be called repeatedly
+or in parallel by an outer analysis function.
+}
+\details{
+The model uses the selected R column as response, the selected P column
+when supplied, and all Pe columns as predictors. Sample alignment is the
+caller's responsibility. The number of imputations is the ceiling of the
+percentage of missing model-data cells, with a minimum of five when any
+values are missing.
 
-Response ~ Parallel_Predictor + Predictors + Confounders
-Parallel_Response ~ Predictors + Confounders
-
-\code{R\[,Rind] ~ P\[,Pind] + Pe\[,1] + Pe\[,...]}
-
-R[,Rind]: Either a single response variable, or several response variables
-where a separate model is fitted for each (parallelized).
-P[,Pind]: A series of predictors where a separate model is fitted for each
-(parallelized). Note only R or P can be parallelized, but not both.
-Pe: Extra predictors, to be included in all models.
-
-One predictor and one response variable (column) is assumed. If fitting a
-series of models for several R's or P's, this function can be called in
-parallel, and the particular column to be used for each iteration can be
-specified by the column index Rind or Pind. NA values from R or P can be
-imputed with the impute_na flag.
+Errors raised by .fit_model are caught. A failed fit yields placeholder
+coefficients with NA estimates and p-values of 1, and writes a
+GLM_parallel_error_pid-\if{html}{\out{<process ID>}}.RData snapshot. A constant response
+detected before fitting writes GLM_parallel_error.RData and stops.
+}
+\seealso{
+\code{\link[=fit_model]{fit_model()}}, \code{\link[=imprintome_glm]{imprintome_glm()}}
 }

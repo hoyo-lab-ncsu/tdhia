@@ -2,16 +2,32 @@
 
 
 
-#' add_metadata_to_imp_sites
+#' Annotate CpG or ICR Identifiers
 #'
-#' For the zinc finger (ZFP57, ZFP445) columsn are binding sites located within 
-#' 1000 bp from the imprintome site. Sites were found based on  ChIP-Seq peaks 
-#' measured from transduced HEK 293T cells and KAP1 in hES H1 cells (GEO; GSE78099).
-#' 
-#' 
-#' @param imp_ids list of ids for getting metadata
-#' @param imp_type specify whether ids are cpg ids or icr ids
-#' @param db_flag boolean, when true, save environemnt variables to disk.
+#' Adds ICR confidence, zinc-finger annotations, genomic coordinates, and
+#' nearest-transcript information from annotation tables bundled with tdhia.
+#'
+#' @param imp_ids Character vector of CpG IDs or ICR IDs to annotate.
+#' @param imp_type Identifier type: "cpg" (default) maps CpGs to ICRs;
+#'   "icr" uses the supplied ICR identifiers directly.
+#' @param db_flag Logical; save the initial environment to
+#'   add_metadata_to_imp_sites.RData in the working directory. Defaults to TRUE.
+#'
+#' @details
+#' For CpG input, the first matching ICR in mapping_cpg_icr_ids is used.
+#' The zinc-finger source annotations describe binding sites within 1,000 bp
+#' of imprintome regions, based on the package's bundled data. Transcript
+#' annotations are left-joined by ICR ID; repeated annotation rows can expand
+#' the output. Unmatched identifiers are retained, with missing transcript
+#' metadata, FALSE membership flags, and confidence 0 where no class matches.
+#'
+#' @return A data frame with icr_id and, for CpG input, cpg_id, plus:
+#'   - is_icr_zinc, ZFP57, ZFP445: logical annotation-membership flags.
+#'   - icr_conf: 1 for high-confidence literature-supported ICRs, 2 for
+#'     gametic ICRs, 3 for other ICRs in the whole-imprintome annotation, and
+#'     0 when no class matches. Higher-confidence membership takes precedence.
+#'   - Genomic.Coordinates, Nearest.Transcript, Distance.to.Nearest.Transcript:
+#'     fields copied from imprintome_icr_nearest_transcripts.
 #' @importFrom rlang .data
 #' @export
 add_metadata_to_imp_sites <- function(imp_ids, imp_type = "cpg", db_flag = T) {

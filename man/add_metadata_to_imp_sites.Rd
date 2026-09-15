@@ -2,19 +2,39 @@
 % Please edit documentation in R/add_gene_metadata_to_icr.R
 \name{add_metadata_to_imp_sites}
 \alias{add_metadata_to_imp_sites}
-\title{add_metadata_to_imp_sites}
+\title{Annotate CpG or ICR Identifiers}
 \usage{
 add_metadata_to_imp_sites(imp_ids, imp_type = "cpg", db_flag = T)
 }
 \arguments{
-\item{imp_ids}{list of ids for getting metadata}
+\item{imp_ids}{Character vector of CpG IDs or ICR IDs to annotate.}
 
-\item{imp_type}{specify whether ids are cpg ids or icr ids}
+\item{imp_type}{Identifier type: "cpg" (default) maps CpGs to ICRs;
+"icr" uses the supplied ICR identifiers directly.}
 
-\item{db_flag}{boolean, when true, save environemnt variables to disk.}
+\item{db_flag}{Logical; save the initial environment to
+add_metadata_to_imp_sites.RData in the working directory. Defaults to TRUE.}
+}
+\value{
+A data frame with icr_id and, for CpG input, cpg_id, plus:
+\itemize{
+\item is_icr_zinc, ZFP57, ZFP445: logical annotation-membership flags.
+\item icr_conf: 1 for high-confidence literature-supported ICRs, 2 for
+gametic ICRs, 3 for other ICRs in the whole-imprintome annotation, and
+0 when no class matches. Higher-confidence membership takes precedence.
+\item Genomic.Coordinates, Nearest.Transcript, Distance.to.Nearest.Transcript:
+fields copied from imprintome_icr_nearest_transcripts.
+}
 }
 \description{
-For the zinc finger (ZFP57, ZFP445) columsn are binding sites located within
-1000 bp from the imprintome site. Sites were found based on  ChIP-Seq peaks
-measured from transduced HEK 293T cells and KAP1 in hES H1 cells (GEO; GSE78099).
+Adds ICR confidence, zinc-finger annotations, genomic coordinates, and
+nearest-transcript information from annotation tables bundled with tdhia.
+}
+\details{
+For CpG input, the first matching ICR in mapping_cpg_icr_ids is used.
+The zinc-finger source annotations describe binding sites within 1,000 bp
+of imprintome regions, based on the package's bundled data. Transcript
+annotations are left-joined by ICR ID; repeated annotation rows can expand
+the output. Unmatched identifiers are retained, with missing transcript
+metadata, FALSE membership flags, and confidence 0 where no class matches.
 }

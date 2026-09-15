@@ -17,3 +17,4 @@
 ^sample_ids\.txt$
 ^tri_sig_icr_summary_with_genes\.csv$
 ^uhdl_sig_icr_summary_with_genes\.csv$
+^pkgdown-review$

@@ -2,7 +2,7 @@
 % Please edit documentation in R/analyze_case_control.R
 \name{analyze_case_control}
 \alias{analyze_case_control}
-\title{analyze_case_control}
+\title{Compare Methylation Between Control and Case Groups}
 \usage{
 analyze_case_control(
   beta_matrix,
@@ -12,15 +12,42 @@ analyze_case_control(
 )
 }
 \arguments{
-\item{beta_matrix}{a matrix of beta values, cpg/ ICR site (rows) by patients (columns)}
+\item{beta_matrix}{Numeric matrix or data frame with CpG or ICR sites in
+rows and samples in columns. Row names supply the site identifiers.}
 
-\item{ctrl_cols}{boolean vector of which columns in beta matrix are control group}
+\item{ctrl_cols}{Logical vector aligned to columns of beta_matrix.
+TRUE identifies controls (group 1); FALSE identifies cases (group 2).}
 
-\item{n_adjust}{number to adjust p-values for FDR multiple comparisons}
+\item{n_adjust}{Number of comparisons passed to custom_p.adjust() with
+method = "fdr". Defaults to the original number of methylation sites.}
 
-\item{filter_na_pval}{todo}
+\item{filter_na_pval}{Logical; remove sites with missing raw p-values
+before multiple-testing adjustment. Defaults to TRUE.}
+}
+\value{
+A data frame in input-site order, optionally excluding missing
+p-values, with:
+\itemize{
+\item id and imp_id: original row number and site identifier.
+\item p_val, adj_pval, adj_sig: raw p-value, FDR-adjusted p-value, and
+whether the adjusted p-value is below 0.05.
+\item mean1, mean2, std1, std2: group means and standard deviations.
+\item frac_na1 and frac_na2: missing fractions within each group.
+\item delta: mean2 minus mean1.
+\item perc_delta: 100 times delta divided by mean1.
+}
 }
 \description{
-analyze for changes in beta value between a control group and an
-experiment group.
+Runs a two-sided Welch two-sample t-test for each methylation site and
+summarizes group means, variability, missingness, and methylation changes.
+}
+\details{
+A test is attempted only when each group has at least three nonmissing
+measurements; otherwise its p-value is NA. Means and standard deviations
+ignore missing values. Other t.test() errors, such as constant-data errors,
+are not caught. Percent changes can be infinite or undefined when the
+control mean is zero.
+}
+\seealso{
+\code{\link[=custom_p.adjust]{custom_p.adjust()}}
 }

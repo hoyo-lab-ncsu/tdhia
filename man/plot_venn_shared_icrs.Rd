@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_venn_shared_icrs.R
 \name{plot_venn_shared_icrs}
 \alias{plot_venn_shared_icrs}
-\title{venn_shared_icrs}
+\title{Plot Shared ICRs Across Groups}
 \usage{
 plot_venn_shared_icrs(
   df_imp_sig,
@@ -14,19 +14,37 @@ plot_venn_shared_icrs(
 )
 }
 \arguments{
-\item{df_imp_sig}{a dataframe of significant cpg sites for each icr.
-Required to have the (colname) specified and icr_id column.}
+\item{df_imp_sig}{Data frame containing icr_id and the grouping column.
+Supply already-selected significant sites; no significance filter is
+applied by this function.}
 
-\item{colname}{column name to speficy venn diagram groups}
+\item{colname}{Character string naming the grouping column.}
 
-\item{group_names}{manual override of groups for venn diagram.}
+\item{group_names}{Optional vector of group values to include. NULL uses
+unique values of the grouping column. These values select groups;
+they are not replacement display labels.}
 
-\item{output_dir_path}{path to output folder if export is specified.}
+\item{output_dir_path}{Existing output directory for the optional PNG.
+Defaults to the working directory.}
 
-\item{name_suffix}{estra misc. suffic to saved filename if export is specified.}
+\item{name_suffix}{Optional filename suffix. NULL disables saving;
+any non-NULL value, including an empty string, enables PNG output.}
 
-\item{db_flag}{todo}
+\item{db_flag}{Logical; save the initial environment to
+plot_venn_shared_icrs.RData in the working directory.}
+}
+\value{
+A named list with enn_input, the named list of unique ICR vectors
+used for the diagram, and figure, the plot object returned by
+ggVennDiagram::ggVennDiagram() with additional theme settings.
+The field name enn_input reflects the current implementation.
 }
 \description{
-produces venn diagram plot of shared ICRs
+Builds a Venn diagram from unique ICR identifiers in each group, with
+groups ordered by decreasing number of distinct ICRs.
+}
+\details{
+When saving is enabled, the filename is icr_venn_diagram followed by
+name_suffix and .png. The plot is saved at a base width of four inches
+and height of two inches. The directory is not created by this function.
 }

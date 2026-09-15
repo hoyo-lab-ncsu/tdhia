@@ -2,7 +2,7 @@
 % Please edit documentation in R/process_probes_to_cpgs.R
 \name{convert_probes_to_cpgs}
 \alias{convert_probes_to_cpgs}
-\title{convert_probes_to_cpgs}
+\title{Aggregate Probe Methylation to CpG Sites}
 \usage{
 convert_probes_to_cpgs(
   probe_beta,
@@ -16,47 +16,57 @@ convert_probes_to_cpgs(
 )
 }
 \arguments{
-\item{probe_beta}{a list object that must contain
-\itemize{
-\item probe_beta_df: beta value dataframe, probe_id x patient_id
-\item probe_pval_df: p-value value dataframe, probe_id x patient_id
-\item Probe_ID: vector of string containing ID for each probe
-}}
+\item{probe_beta}{List containing probe_beta_df (a numeric data frame with
+probes in rows and samples in columns), platform, and manifest. The
+manifest must contain Name and MAPINFO for genomic mapping checks.
+Probe p-values are not used by this function.}
 
-\item{quantile_norm}{a boolean flag, when true normalizes the beta values
-between columns of the icr beta dataframe. Default is FALSE because this
-normalization is done earlier in the pipeline, at the probe level.}
+\item{quantile_norm}{Logical; quantile-normalize sample columns of the
+aggregated CpG beta data using preprocessCore::normalize.quantiles().}
 
-\item{discard_unmapped_cpgs}{a boolean flag, when set to TRUE, discards any
-CpG sites that are not mapped to a unique genomic location from MAPINFO column
-in the manifest file.}
+\item{discard_unmapped_cpgs}{Logical; remove CpGs whose first matching
+manifest entry has MAPINFO equal to zero or NA.}
 
-\item{discard_non_icr_cpgs}{a boolean flag, when set to TRUE, discards any CpG
-sites that do not map to an ICR.}
+\item{discard_non_icr_cpgs}{Logical; remove CpGs without a matching ICR in
+mapping_cpg_icr_ids.}
 
-\item{smooth_adj_cpgs}{boolean when true performs a 3-window rolling average
-of adjacent cpg beta values within}
+\item{smooth_adj_cpgs}{Logical; sort by ICR and genomic position, then
+apply a centered rolling mean of width three within each ICR, separately
+for each sample. Partial windows are used at region boundaries.}
 
-\item{sort_cpgs}{boolean when true sorts cpgs by ICR id and then genomic
-position.}
+\item{sort_cpgs}{Logical; sort by numeric ICR suffix and CpG_start.
+Smoothing also performs this sorting regardless of sort_cpgs.}
 
-\item{db_flag}{boolean when true export workspace to disk for debugging.}
+\item{db_flag}{Logical; save the initial environment to
+convert_probes_to_cpgs.RData in the working directory.}
 
-\item{multicore}{number of cores for parallel processing.}
+\item{multicore}{Number of workers for smoothing. Defaults to the detected
+core count minus two, with a minimum of one. Unused without smoothing.}
 }
 \value{
-a dataframe containing beta values where rows are cpg sites and columns
-are either (1) the basenames of the idat files or (2) some other mapping
-specified when the data was loaded in \code{load_idat}.
+A named list with:
 \itemize{
-\item cpg_beta_df: dataframe of beta values, probe_id x sample_id
-\item platform: string that describes platform for methylation array
-\item manifest: dataframe of the manifest file used for SeSame processing
-\item cpg_n_probes: number of probes for each cpg site.
+\item cpg_beta_df: data frame of aggregated beta values, CpG IDs in rows
+and sample IDs in columns.
+\item platform and manifest: metadata copied from probe_beta.
+\item cpg_n_probes: data frame containing n_probes for retained CpGs.
+Match by CpG row names: this table is captured before optional sorting
+and smoothing and is not reordered with cpg_beta_df.
+\item input_args: argument values excluding probe_beta.
 }
 }
 \description{
-Converts a dataframe of beta values of specific methylation probes into beta
-values for CpG sites. Calculates mean beta value for cases where multiple
-probes map to a single CpG site.
+Averages beta values from probes assigned to the same CpG, with optional
+mapping filters, quantile normalization, sorting, and within-ICR smoothing.
+}
+\details{
+CpG IDs are obtained by removing an underscore followed by four terminal
+characters from probe row names. Means ignore missing beta measurements;
+an all-missing group produces NaN. Probe counts include all contributing
+probe rows, rather than only nonmissing values. Quantile normalization,
+when requested, precedes sorting and smoothing. Progress messages are
+printed unconditionally.
+}
+\seealso{
+\code{\link[=filter_probes]{filter_probes()}}, \code{\link[=convert_cpgs_to_icrs]{convert_cpgs_to_icrs()}}
 }

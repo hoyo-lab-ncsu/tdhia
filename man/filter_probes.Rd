@@ -2,7 +2,7 @@
 % Please edit documentation in R/filter_probes.R
 \name{filter_probes}
 \alias{filter_probes}
-\title{filter_probes}
+\title{Filter Probe Methylation Measurements and Samples}
 \usage{
 filter_probes(
   probe_beta,
@@ -21,62 +21,79 @@ filter_probes(
 )
 }
 \arguments{
-\item{probe_beta}{a list object with the following named fields
-$probe_beta_df: a dataframe of beta values, probe_id x sample_id
-$probe_pval_df: a dataframe of signal detection p-values, probe_id x sample_id}
+\item{probe_beta}{List containing probe_beta_df and probe_pval_df,
+aligned numeric data frames with probe IDs in rows and sample IDs in
+columns, plus platform and manifest metadata.}
 
-\item{discard_unmapped_probes}{boolean flag, when TRUE probes that do not map
-to a unique genomic position or CpG site are discarded from the probe beta and
-p-value dataframes. Probes that match to a CpG site are identified by their prefix
-in the probe name (\if{html}{\out{<prefix>}}\if{html}{\out{<index>}}_\if{html}{\out{<version tag>}}). Prefixes are (ctl:control,
-cg:CpG, ch:CHG, mu:multi-unique, rp:repetitive element, or rs:SNP)}
+\item{discard_unmapped_probes}{Logical; retain probes with mapped genomic
+positions and IDs starting with cg followed by a digit.}
 
-\item{max_sig_pval}{a maximum threshold for the signal detection value, beta
-values higher than this max are set to NA.}
+\item{max_sig_pval}{Numeric detection p-value threshold. A measurement
+passes only when its p-value is strictly less than this value.}
 
-\item{set_failed_betas_na}{boolean flag, when TRUE beta measurements with pval >
-max_sig_pval will be set to NA. When false, the beta value is left as is.}
+\item{set_failed_betas_na}{Logical; set individual failing beta values to
+NA. Probe and sample failure-rate filters still run when FALSE.}
 
-\item{mft}{manifest dataframe for the array if nto specified, the default is
-loaded.}
+\item{mft}{Manifest data frame with Probe_ID, cpg_id, MAPINFO, Name, and
+Design.Score columns. NULL uses manifest_v1A2_design_scores.}
 
-\item{max_probe_fail_rate}{fraction value (0-1), if a probe fails the p-value
-threshold above this fraction of samples, all measurements from this probe
-are set to NA. (Default: 0.25).}
+\item{max_probe_fail_rate}{Maximum fraction of failed measurements per
+probe. Above this value, all beta values for that probe become NA.
+NULL disables the probe failure-rate calculation.}
 
-\item{discard_failed_probes}{boolean flag, when TRUE any probes that have NA
-values across all samples are discarded (default = TRUE).}
+\item{discard_failed_probes}{Logical; remove rows whose beta values are
+all NA after probe filtering.}
 
-\item{max_patient_fail_rate}{fraction value (0-1), if a patient fails the p-value
-threshold above this fraction of probes, all measurements from this patient
-are set to NA. (Default: 0.25).}
+\item{max_patient_fail_rate}{Maximum sample failure fraction. Above this
+value, all beta values for the sample become NA. NA disables this step.
+The default is 0.30.}
 
-\item{discard_failed_patients}{boolean flag, when TRUE any patients that have NA
-values across all probes are discarded (default = TRUE).}
+\item{discard_failed_patients}{Logical; remove columns whose beta values
+are all NA after sample filtering.}
 
-\item{min_design_score}{discard probes below this design score threshold.
-Default: NA (don't discard any probes by design score). Design scores vary
-from 0-1, with a higher value being a better designed probe.}
+\item{min_design_score}{Numeric minimum design score. NA disables the
+filter; otherwise only scores strictly greater than this value remain.}
 
-\item{icr_conf_levels}{a numerical vector listing the desired ICR confidence
-levels for filtered probes.Any probes that are not included in this list are
-excluded. ICR confidence scores are (1-3), where
-(1) High: literature validated gold standard.
-(2) Medium: experimental evidence of gametic origin of differential methylation.
-(3) Low: experimental evidence of 50\% methylation in somatic tissues.
-Example: icr_conf_levels = c(1,2)
-Would discard any probes associated with a ICR confidence score of 3.}
+\item{icr_conf_levels}{Optional numeric vector of allowed ICR confidence
+classes: 1 (literature-supported), 2 (gametic), and 3 (other annotated
+ICRs). NULL disables filtering. Membership is determined by
+add_metadata_to_imp_sites(); probes outside the allowed classes
+are removed.}
 
-\item{verbose}{boolean flag, when TRUE prints the results of each filtering
-step (default = TRUE).}
+\item{verbose}{Logical; print filtering summaries. Loading the default
+manifest prints a message independently of this flag.}
 
-\item{db_flag}{boolean when true export workspace to disk for debugging.}
+\item{db_flag}{Logical; save the initial environment to
+filter_probes_debug.RData in the working directory.}
 }
 \value{
-a dataframe containing beta values where rows are probe_ids and columns
-are the sample_ids (basenames of the IDAT files or some other mapping
-specified by idat_remappings).
+A named list with:
+\itemize{
+\item probe_beta_df and probe_pval_df: filtered beta and detection-p-value
+data frames, with probes in rows and samples in columns.
+\item design_scores: Name and Design.Score columns for retained probes.
+\item platform and manifest: metadata copied from probe_beta.
+\item probe_fail_rate_df: cpg_id and probe_fail_rate before later filtering,
+or NULL when max_probe_fail_rate is NULL.
+\item passed_mapped_probes_per_patient: per-sample fractions passing the
+detection threshold before whole-probe and sample removal, or NA when
+individual measurement filtering is disabled.
+QC summaries are not necessarily subset to the final retained sites
+and samples.
+}
 }
 \description{
-Applies probe and measurement filtering for a probe_beta matrix.
+Filters probe data by genomic mapping, detection p-values, probe and
+sample failure rates, design scores, and ICR confidence.
+}
+\details{
+Mapping filtering precedes detection-p-value filtering. Probe failure
+rates use measurements before whole-probe removal. Sample failure counts
+are calculated after failed-probe removal, but use the earlier probe
+count as denominator. Design-score and confidence filters run afterward.
+Detection p-values are subset with retained rows and columns, but are
+not replaced by NA when their corresponding beta values fail a threshold.
+}
+\seealso{
+\code{\link[=tdhia_pipeline]{tdhia_pipeline()}}, \code{\link[=convert_probes_to_cpgs]{convert_probes_to_cpgs()}}
 }

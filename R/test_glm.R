@@ -72,46 +72,70 @@ parse_lm_formula <- function(formula) {
 
 
 
-#' imprintome_glm
+#' Fit Methylation Association Models Across CpG or ICR Sites
 #'
-#' @description fits a series of general linear models with parallel processing
-#'  across each CpG or ICR site of the form
-#'  
-#'  R ~ P + Pe
-#'  Where R is the response variable, P is the primary predictor, and Pe are the
-#'  covariate variables. The beta matrix (either CpG or ICR level) must be 
-#'  specified with the term "beta" in the model string.
+#' Fits generalized linear models with methylation as either the response
+#' or the first predictor, adjusting for additional study variables.
 #'
-#' @param model_str model string for glm. Should use column names in study_data, 
-#' and the term "beta" to reference the beta methylation data. Beta must either
-#'  be a response or primary predictor.
-#' @param study_data dataframe of study variables (each row is a sample). 
-#' Rownames should be patient labels that match columns in betas.
-#' @param betas beta matrix, each row is imprintome site (cpg or ICR), each 
-#' column is a sample (patient). Column names should be patient labels that match 
-#' rownames in study_data.
-#' @param family string for family model argument for glm(). (ex. 'binomial', 'gaussian')
-#' @param n_p_adj number of comparisons to use for p-value adjustment. Sometimes
-#'  is this is different than the number of actual comparisons (could be more or
-#'  less). Defaults to max columns to response and predictor variables
-#' @param max_p_val max p-value threshold, prints number of entries below this
-#'  threshold, but does not alter computation.
-#' @param impute_na boolean flag, when TRUE missing values in R or P are
-#' recovered with multiple imputations with the mice package.
-#' @param n.cores number of cores used for parallel computation. Default is NULL
-#' and set to max cores detected minus 1.
-#' @param db_flag boolean when true export workspace to disk for debugging.
-#' @param rm.na.R flag to remove NA values in R prior to imputation.
-#' @param rm.na.P flag to remove NA values in P prior to imputation.
-#' @param rm.na.Pe flag to remove NA values in Pe prior to imputation.
-#' @param rm.na.all flag to remove all NA values across R, P, and Pe
-#' @param verbose prints additional info to console
+#' @param model_str Character model formula using study_data column names
+#'   and the special term beta for methylation. Put beta on the left-hand
+#'   side or as the first term on the right-hand side, for example
+#'   "outcome ~ beta + age" or "beta ~ exposure + age".
+#' @param study_data Data frame with one row per sample. Row names must
+#'   match sample identifiers in the columns of betas.
+#' @param betas Numeric methylation matrix or data frame, sites in rows and
+#'   samples in columns. Row names identify CpG or ICR sites.
+#' @param family GLM family specification passed to the model fitter,
+#'   usually "gaussian" or "binomial".
+#' @param n_p_adj Number of comparisons for apply_fdr_correction(). NULL
+#'   uses the larger number of response or primary-predictor columns.
+#'   The adjustment helper requires this not to exceed the number of
+#'   p-values in each adjusted result table.
+#' @param max_p_val Adjusted p-value threshold for printed summaries.
+#'   Does not filter the returned results.
+#' @param impute_na Logical; enable MICE imputation in fit_model() for
+#'   missing model values remaining after the requested row removals.
+#' @param n.cores Number of parallel workers. NULL uses the detected core
+#'   count minus one, with a minimum of one.
+#' @param db_flag Logical; save debugging environments to imprintome_glm.RData
+#'   and study_imprint2.RData, and enable debugging in GLM_parallel().
+#' @param rm.na.R Logical; remove samples missing any response-column value
+#'   before fitting any models.
+#' @param rm.na.P Logical; remove samples missing any primary-predictor
+#'   column value before fitting any models.
+#' @param m_value_transform Logical; convert betas to M-values using
+#'   sesame::BetaValueToMValue(). Defaults to TRUE.
+#' @param rm.na.Pe Logical; remove samples missing any covariate value.
+#' @param rm.na.all Logical; enable all three row-removal flags.
+#' @param verbose Logical; print progress and model information. The final
+#'   summary is attempted independently of this flag.
 #'
+#' @details
+#' Only samples shared by study_data and betas are retained. Predictor rows
+#' are aligned to response rows by sample ID. Models vary over methylation
+#' sites while retaining the same study covariates. Requested missing-value
+#' removal is performed across the entire selected response or predictor
+#' table, so missingness at one site can exclude a sample from every model.
+#' Remaining missingness is handled by fit_model().
+#'
+#' Each result table is sorted by raw p-value, replacing missing raw p-values
+#' with 1 before applying the package's FDR correction. Fitting failures caught
+#' by GLM_parallel() can produce placeholder rows with missing estimates and
+#' p-values of 1; see that function for debug-file behavior.
+#'
+#' @return A named list of coefficient-result data frames. The imp_site
+#'   element combines coefficients for primary predictors; other elements
+#'   contain results for individual additional coefficient names. When beta
+#'   is the response, methylation site IDs appear in Response; when beta is
+#'   the first predictor, they appear in Variable.
+#'   Tables contain Response, Variable, Estimate, StdError, Statistic, P_VAL,
+#'   Confounder, ADJ_P_VAL, Family, Formula, Model_Id, and aic, as described
+#'   in GLM_parallel(), with ADJ_P_VAL filled by apply_fdr_correction().
+#'   The example_formula attribute holds the first fitted formula.
+#' @seealso [GLM_parallel()], [fit_model()], [apply_fdr_correction()]
 #' @importFrom magrittr %>%
 #' @importFrom foreach %dopar%
 #' @importFrom rlang .data
-#'
-#' @return results with fitted coefficients from the glm, sorted by p-value
 #' @export
 imprintome_glm <- function (
     model_str, study_data, betas, family, n_p_adj = NULL, max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,
@@ -442,57 +466,57 @@ summarize_study <- function(dfs, varnames = NULL, max_p_val = 0.05,
 
 
 
-#' analyze_association
+#' Fit Association Models from Response and Predictor Tables
 #'
-#' @description fits a series of general linear models with parallel processing
-#' using dataframes of: R response variables, P predictor variables (split across 
-#' models), and Pe predictor variables (consistent across models). The model 
-#' formula takes on the form:
+#' Legacy interface for fitting a series of generalized linear models.
+#' Each call emits a deprecation warning recommending imprintome_glm().
 #'
-#' If R has many columns and P has one, models are parallelized over R:
+#' @param R Data frame with samples in rows and response variables in
+#'   columns. Row names identify samples shared with P and Pe.
+#' @param P Optional data frame of primary predictors with samples in rows.
+#'   Models vary across columns of R or P; both should not have multiple
+#'   columns. Values are used as supplied, without an M-value transformation.
+#' @param Pe Optional data frame of covariates included in every model.
+#'   Row names must match R.
+#' @param family GLM family specification, usually "gaussian" or "binomial".
+#' @param n_p_adj Number of comparisons for apply_fdr_correction(). Defaults
+#'   to the larger column count of R and P. Must not exceed the number of
+#'   p-values in each adjusted result table.
+#' @param max_p_val Adjusted p-value threshold for printed summaries;
+#'   does not filter returned tables.
+#' @param impute_na Logical; enable MICE imputation for missing model values
+#'   remaining after row removal.
+#' @param n.cores Number of parallel workers. NULL uses detectCores() minus
+#'   one; this legacy implementation does not impose a minimum.
+#' @param db_flag Logical; save environments to analyze_association.RData
+#'   and study_imprint2.RData and enable debugging in GLM_parallel().
+#' @param rm.na.R Logical; remove samples missing any response value.
+#' @param rm.na.P Logical; remove samples missing any primary-predictor value.
+#' @param rm.na.Pe Logical; remove samples missing any covariate value.
+#' @param rm.na.all Logical; enable all three missing-value removal flags
+#'   before model fitting and imputation.
+#' @param print_confounders Logical; currently unused. The final summary
+#'   call uses print_confounders = FALSE regardless of this value.
+#' @param verbose Logical; print progress and model information. Some output,
+#'   including the deprecation warning and final summary, is unconditional.
+#' @param icr_mapping Currently unused; retained in this legacy interface.
 #'
-#' R\[,i] ~ P\[,1] + Pe\[,1] + Pe\[,2] + Pe\[,3] ...
+#' @details
+#' P and Pe are reordered to match R by sample row names. At most one of R
+#' and P should contain multiple columns. Missing-value removal considers all
+#' columns of each selected table, so a missing value can exclude a sample
+#' from every model. GLM_parallel() fits each model, and missing raw p-values
+#' are replaced by 1 before sorting and FDR correction.
 #'
-#' If P has many variables/ columns and R has one, models are parallelized over P:
-#'
-#' R\[,1] ~ P\[,i] + Pe\[,1] + Pe\[,2] + Pe\[,3] ...
-#'
-#' This designed that either R or P are the CpG beta values or the ICR beta
-#' values. The code handles either case. Note that R and P cannot both be
-#' multicolumn.
-#'
-#' @param R dataframe of response variable so  patients (rows) x variables
-#'  (columns) could either be beta values for cpg or ICR sites, or
-#'  study metadata.
-#' @param P parallelized predictor variable(s)- data frame that is patients
-#'  (rows) x variables (columns), could either be beta values for cpg or ICR
-#'  sites. For study metadata, use Pe input argument.
-#' @param Pe extra predictor variables that are not parallelized (included in all
-#'  fitted models).
-#' @param family string for family model argument for glm(). (ex. 'binomial', 'gaussian')
-#' @param n_p_adj number of comparisons to use for p-value adjustment. Sometimes
-#'  is this is different than the number of actual comparisons (could be more or
-#'  less). Defaults to max columns to response and predictor variables
-#' @param max_p_val max p-value threshold, prints number of entries below this
-#'  threshold, but does not alter computation.
-#' @param impute_na boolean flag, when TRUE missing values in R or P are
-#' recovered with multiple imputations with the mice package.
-#' @param n.cores number of cores used for parallel computation. Default is NULL
-#' and set to max cores detected minus 1.
-#' @param db_flag boolean when true export workspace to disk for debugging.
-#' @param rm.na.R flag to remove NA values in R prior to imputation.
-#' @param rm.na.P flag to remove NA values in P prior to imputation.
-#' @param rm.na.Pe flag to remove NA values in Pe prior to imputation.
-#' @param rm.na.all TODO
-#' @param print_confounders TODO
-#' @param verbose TODO
-#' @param icr_mapping TODO
-#'
+#' @return A named list with imp_site when P is supplied, additional
+#'   coefficient-result tables, and a character element example_formula.
+#'   Unlike imprintome_glm(), example_formula is a list element, not an
+#'   attribute. Result tables have the columns documented by GLM_parallel(),
+#'   with ADJ_P_VAL filled by apply_fdr_correction(), and are sorted by P_VAL.
+#' @seealso [imprintome_glm()], [GLM_parallel()]
 #' @importFrom magrittr %>%
 #' @importFrom foreach %dopar%
 #' @importFrom rlang .data
-#'
-#' @return results with fitted coefficients from the glm, sorted by p-value
 #' @export
 analyze_association <- function (R, P = NULL, Pe = NULL, family, n_p_adj = max(c(ncol(R), ncol(P))),
                            max_p_val = 0.05, impute_na = TRUE, n.cores = NULL,

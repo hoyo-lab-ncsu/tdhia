@@ -2,21 +2,41 @@
 % Please edit documentation in R/GLM_parallel.R
 \name{fit_model}
 \alias{fit_model}
-\title{fit_model}
+\title{Fit a GLM with Optional Multiple Imputation}
 \usage{
 fit_model(model_data, formula_string, family, impute_na, n_imputes)
 }
 \arguments{
-\item{model_data}{todo}
+\item{model_data}{Data frame containing all variables in formula_string.}
 
-\item{formula_string}{todo}
+\item{formula_string}{Character string specifying a model formula.}
 
-\item{family}{todo}
+\item{family}{GLM family specification accepted by glm(), usually
+"gaussian" or "binomial".}
 
-\item{impute_na}{todo}
+\item{impute_na}{Logical; use multiple imputation when TRUE and
+n_imputes is greater than zero.}
 
-\item{n_imputes}{todo}
+\item{n_imputes}{Number of imputations passed as m to mice::mice().
+Zero bypasses imputation even when impute_na is TRUE.}
+}
+\value{
+A named list with cf and aic. The cf table includes the intercept
+and has coefficient names as row names, with columns Estimate, StdError,
+Statistic, and P_VAL. The aic value is the fitted model's AIC or the mean
+AIC across imputed-data models. Statistic and P_VAL come from the direct
+GLM summary or pooled coefficient summary, respectively.
 }
 \description{
-test
+Fits a generalized linear model directly or fits and pools models across
+MICE imputations, returning a common coefficient-table format.
+}
+\details{
+The imputation branch uses maxit = 20 and seed = 0, then pools coefficient
+estimates with mice::pool(). The direct branch uses the usual glm()
+missing-data handling. Both branches remove a trailing TRUE suffix from
+the first non-intercept coefficient's name.
+}
+\seealso{
+\code{\link[=GLM_parallel]{GLM_parallel()}}
 }

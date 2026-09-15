@@ -1,45 +1,50 @@
 
-#' GLM_parallel
+#' Fit One Model in a Series of GLM Association Tests
 #'
-#' @description perform general linear modeling with the equation of two
-#' possible forms:
+#' Selects a response and primary predictor, adds common covariates, and
+#' fits one generalized linear model. This worker can be called repeatedly
+#' or in parallel by an outer analysis function.
 #'
-#' Response ~ Parallel_Predictor + Predictors + Confounders
-#' Parallel_Response ~ Predictors + Confounders
+#' @param R Data frame or matrix of response variables with samples in rows.
+#' @param Rind Single column index selecting the response in R.
+#' @param P Optional data frame or matrix of primary predictors. Rows must
+#'   already correspond to the same samples and order as R.
+#' @param Pind Single column index selecting the primary predictor in P.
+#'   Ignored when P is NULL.
+#' @param Pe Optional data frame of additional predictors included together.
+#'   Rows must already be aligned with R.
+#' @param family GLM family specification passed to .fit_model.
+#' @param verbose Logical; print the fitted coefficient table.
+#' @param impute_na Logical; enable multiple imputation through .fit_model.
+#' @param db_flag Logical; save the initial environment to GLM_parallel.RData
+#'   in the working directory. Failure snapshots can be written even if FALSE.
+#' @param .fit_model Fitting function with arguments model_data,
+#'   formula_string, family, impute_na, and n_imputes, in that order.
+#'   Must return a list containing cf (a coefficient table including an
+#'   intercept row) and aic. Defaults to fit_model().
 #'
-#' \code{R\[,Rind] ~ P\[,Pind] + Pe\[,1] + Pe\[,...]}
+#' @details
+#' The model uses the selected R column as response, the selected P column
+#' when supplied, and all Pe columns as predictors. Sample alignment is the
+#' caller's responsibility. The number of imputations is the ceiling of the
+#' percentage of missing model-data cells, with a minimum of five when any
+#' values are missing.
 #'
-#' R\[,Rind]: Either a single response variable, or several response variables
-#'  where a separate model is fitted for each (parallelized).
-#' P\[,Pind]: A series of predictors where a separate model is fitted for each
-#'  (parallelized). Note only R or P can be parallelized, but not both.
-#' Pe: Extra predictors, to be included in all models.
+#' Errors raised by .fit_model are caught. A failed fit yields placeholder
+#' coefficients with NA estimates and p-values of 1, and writes a
+#' GLM_parallel_error_pid-<process ID>.RData snapshot. A constant response
+#' detected before fitting writes GLM_parallel_error.RData and stops.
 #'
-#' One predictor and one response variable (column) is assumed. If fitting a
-#' series of models for several R's or P's, this function can be called in
-#' parallel, and the particular column to be used for each iteration can be
-#' specified by the column index Rind or Pind. NA values from R or P can be
-#' imputed with the impute_na flag.
-#'
-#' @param R dataframe where each column is a Response variable.
-#' @param Rind column index for R if it has multiple columns (for parallel processing).
-#' Default for Rind is 1 for single column dataframe.
-#' @param P dataframe where each column is a Predictor variable.
-#' @param Pind column index for P if it has multiple columns (for parallel processing).
-#' Default for Pind is 1 for single column dataframe.
-#' @param Pe dataframe of extra predictor variables to be included in all models.
-#' @param family string denoting GLM family
-#' @param verbose boolean flag, when true prints fits to model.
-#' @param impute_na boolean flag, when TRUE inputs missing NA values with MICE
-#' package.
-#' @param db_flag boolean flag, when TRUE saves workspace to disk for debugging
-#' @param .fit_model todo
-#' @return fit of general linear model, including
-#' - Estimate: point estimates of coefficients for each of the predictors
-#' - Std. Error: standard error of the estimates
-#' - Cumulative two-tailed probability
-#'
-#'
+#' @return A data frame with one row per non-intercept coefficient:
+#'   - Response and Variable: response and coefficient names.
+#'   - Estimate, StdError, Statistic, P_VAL: coefficient summary values.
+#'   - Confounder: legacy indicator initialized to 0; the current single-index
+#'     implementation does not mark additional covariates as confounders.
+#'   - ADJ_P_VAL: NA placeholder for adjustment by the caller.
+#'   - Family and Formula: family specification and constructed formula.
+#'   - Model_Id: maximum of the selected response and predictor indices.
+#'   - aic: model AIC, or mean AIC for imputed fits.
+#' @seealso [fit_model()], [imprintome_glm()]
 #' @importFrom magrittr %>%
 #' @export
 GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
@@ -139,13 +144,32 @@ GLM_parallel = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
 }
 
 
-#' fit_model
-#' @description test
-#' @param model_data todo
-#' @param formula_string todo
-#' @param family todo
-#' @param impute_na todo
-#' @param n_imputes todo
+#' Fit a GLM with Optional Multiple Imputation
+#'
+#' Fits a generalized linear model directly or fits and pools models across
+#' MICE imputations, returning a common coefficient-table format.
+#'
+#' @param model_data Data frame containing all variables in formula_string.
+#' @param formula_string Character string specifying a model formula.
+#' @param family GLM family specification accepted by glm(), usually
+#'   "gaussian" or "binomial".
+#' @param impute_na Logical; use multiple imputation when TRUE and
+#'   n_imputes is greater than zero.
+#' @param n_imputes Number of imputations passed as m to mice::mice().
+#'   Zero bypasses imputation even when impute_na is TRUE.
+#'
+#' @details
+#' The imputation branch uses maxit = 20 and seed = 0, then pools coefficient
+#' estimates with mice::pool(). The direct branch uses the usual glm()
+#' missing-data handling. Both branches remove a trailing TRUE suffix from
+#' the first non-intercept coefficient's name.
+#'
+#' @return A named list with cf and aic. The cf table includes the intercept
+#'   and has coefficient names as row names, with columns Estimate, StdError,
+#'   Statistic, and P_VAL. The aic value is the fitted model's AIC or the mean
+#'   AIC across imputed-data models. Statistic and P_VAL come from the direct
+#'   GLM summary or pooled coefficient summary, respectively.
+#' @seealso [GLM_parallel()]
 #' @export
 fit_model <- function(model_data, formula_string, family, impute_na, n_imputes) {
   

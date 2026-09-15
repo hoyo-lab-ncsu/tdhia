@@ -1,14 +1,32 @@
 
-#' venn_shared_icrs
-#' @description produces venn diagram plot of shared ICRs
+#' Plot Shared ICRs Across Groups
 #'
-#' @param df_imp_sig a dataframe of significant cpg sites for each icr. 
-#'  Required to have the (colname) specified and icr_id column.
-#' @param colname column name to speficy venn diagram groups
-#' @param group_names manual override of groups for venn diagram.
-#' @param output_dir_path path to output folder if export is specified.
-#' @param name_suffix estra misc. suffic to saved filename if export is specified.
-#' @param db_flag todo
+#' Builds a Venn diagram from unique ICR identifiers in each group, with
+#' groups ordered by decreasing number of distinct ICRs.
+#'
+#' @param df_imp_sig Data frame containing icr_id and the grouping column.
+#'   Supply already-selected significant sites; no significance filter is
+#'   applied by this function.
+#' @param colname Character string naming the grouping column.
+#' @param group_names Optional vector of group values to include. NULL uses
+#'   unique values of the grouping column. These values select groups;
+#'   they are not replacement display labels.
+#' @param output_dir_path Existing output directory for the optional PNG.
+#'   Defaults to the working directory.
+#' @param name_suffix Optional filename suffix. NULL disables saving;
+#'   any non-NULL value, including an empty string, enables PNG output.
+#' @param db_flag Logical; save the initial environment to
+#'   plot_venn_shared_icrs.RData in the working directory.
+#'
+#' @details
+#' When saving is enabled, the filename is icr_venn_diagram followed by
+#' name_suffix and .png. The plot is saved at a base width of four inches
+#' and height of two inches. The directory is not created by this function.
+#'
+#' @return A named list with enn_input, the named list of unique ICR vectors
+#'   used for the diagram, and figure, the plot object returned by
+#'   ggVennDiagram::ggVennDiagram() with additional theme settings.
+#'   The field name enn_input reflects the current implementation.
 #' @export
 plot_venn_shared_icrs <- function(df_imp_sig, colname = "Response", group_names = NULL, 
                              output_dir_path = getwd(), name_suffix = NULL, db_flag = FALSE) {

@@ -2,7 +2,7 @@
 % Please edit documentation in R/test_pca_regression.R
 \name{pc_regression_test}
 \alias{pc_regression_test}
-\title{pc_regression_test}
+\title{Test ICR Associations Using Principal Component Regression}
 \usage{
 pc_regression_test(
   cpg_beta,
@@ -23,86 +23,82 @@ pc_regression_test(
 )
 }
 \arguments{
-\item{cpg_beta}{cpg beta matrix (cpg_id as COLUMNS x sample_id as ROWS).
-Values are assumed to be on beta scale (0-1).
-Use m_value_transform to convert to m-values (recommended).}
+\item{cpg_beta}{Numeric data frame of beta values with samples in rows and
+CpG IDs in columns. Row names must match sample IDs in df_study.}
 
-\item{m_value_transform}{boolean, when true, transform beta values to
-m-values to control heteroskedasticity. Default = TRUE.}
+\item{m_value_transform}{Logical; convert beta values to M-values before
+normalization and PCA. Defaults to TRUE.}
 
-\item{data_norm_type}{string. Type of data normalization you want to perform
-on the cpg beta values prior to creating the principal components. Options
-are in the data.Normalization function of the clusterSim package
-Default is n1 (standardization)}
+\item{data_norm_type}{Normalization type passed to
+clusterSim::data.Normalization(); "n1" standardizes columns.}
 
-\item{pct_variance}{string, the minimum chosen level of variance that the
-principal components will account for. Default is 80\%.
-For example, if PC1 accounts for 59\% of the cumulative variance, PC2 for
-72\% of the of the cumulative variance, PC3 for 81\% of the of the cumulative
-variance, and PC4 for 88\% of the cumulative variance, the PCs that will
-be used for analysis are PC1, PC2 and PC3.}
+\item{pct_variance}{Numeric cumulative variance fraction, normally in
+(0, 1], used to select components separately for each ICR. Default: 0.80.}
 
-\item{n_pcs}{Optional positive integer specifying the exact number of
-principal components to include in each regression model. When \code{NULL}
-(default), the number of principal components is determined separately for
-each ICR using \code{pct_variance}. When supplied, \code{n_pcs} overrides
-\code{pct_variance}. If an ICR contains fewer available principal components than
-requested, all available principal components are used.}
+\item{n_pcs}{Optional positive integer overriding pct_variance. Uses the
+requested number of components, capped at the number available per ICR.}
 
-\item{df_study}{dataframe of sample associated data to be used in linear
-models, (nrows = sample size). Columns should include those specified with
-'outcome' and 'covariates' input arguments. There should be a column labeled
-"Patient_ID" to link the cpg_beta and df_study}
+\item{df_study}{Data frame containing outcome, covariates, and sample IDs.
+Row names must match cpg_beta; ID-column values must agree with row names.}
 
-\item{outcome}{string, column name of response variable located in df_study.}
+\item{outcome}{Character string naming the response column in df_study.}
 
-\item{covariates}{vector of strings of column names of predictors that are
-located in df_study.}
+\item{covariates}{Character vector of adjustment-column names in df_study.
+The current reduced-model formula construction requires covariates.}
 
-\item{Patient_ID}{string, whatever your patient ID column is called in your
-study data}
+\item{Patient_ID}{Character string naming the sample-ID column selected
+from df_study. Use "Patient_ID": the per-ICR helper currently joins on
+that literal column name regardless of this argument.}
 
-\item{family}{string. Define your outcome type (categorical outcomes- ex.
-case vs control) are defined as binomial. Continuous numerical outcomes as
-continuous. This will determine if logistic regression with likelihood
-ratio test, or linear regression with F test will be performed.
-"binomial" (default)
-"continuous"}
+\item{family}{Character string. "binomial" fits logistic models and uses a
+chi-squared likelihood-ratio test. Other values, including "gaussian" and
+"continuous", use linear models and an F test. There is no default.}
 
-\item{icr_ids}{vector of strings of icr_ids to be tested. Default = NULL
-(tests all icrs that are covered by the input cpg beta matrix).}
+\item{icr_ids}{Character vector of ICR IDs, or NULL to use ICRs represented
+by the CpG columns in the package mapping.}
 
-\item{min_cpg}{minimum number of cpg sites for an icr to be included in
-results (default is 3).}
+\item{min_cpg}{Minimum CpG count for retaining an ICR in the final table.
+This filter is applied after fitting and multiple-testing adjustment.}
 
-\item{verbose}{boolean, when true, prints additional output.}
+\item{verbose}{Logical; print progress. Model warnings and errors can
+still be reported when FALSE.}
 
-\item{n.cores}{number of cores to run on (default is 1)}
+\item{n.cores}{Number of workers. One uses lapply(); larger values use
+BiocParallel with SnowParam on Windows and MulticoreParam elsewhere.}
+
+\item{db_flag}{Logical; save the initial environment to
+pc_regression_test.RData in the working directory. Defaults to TRUE.}
 }
 \value{
-test
+A table sorted by adj_p_value, with:
+\itemize{
+\item ICR_id: region identifier.
+\item raw_p_value: full-versus-reduced model comparison p-value.
+\item n_cpg and n_pc: numbers of CpGs and retained components.
+\item model_converged: the full model's convergence field when supplied by
+the model object; lm objects do not provide this field.
+\item model_range: range of fitted values from the full model.
+\item adj_p_value: Benjamini-Hochberg adjusted p-value.
+\item q_value: q-value calculated by qvalue::qvalue().
+Adjustments include fitted ICRs subsequently removed by min_cpg.
+}
 }
 \description{
-Principal component regression followed by likelihood ratio test or F test
-to test for the association of ICR methylation with an outcome. Both
-continuous and dichotomous response variables are supported.
-For each ICR, the CpG sites will be reduced to principal components that
-account for a chosen amount of variance (default 80\%). Two regression models
-will be fit: a reduced model with only covariates and a full model with
-covariates and principal components (ICR methylation). In the case of
-binomial outcomes, logistic regression models using the binomial family are
-fit. In the case of continuous outcomes, linear regression models are fit.
-The full and reduced models are then compared with a likelihood ratio test
-(for a binomial outcome) or an F test (for a continuous outcome). The resulting
-q-value adjusts for multiple test correction and tells you if the full
-model was significantly improved over the reduced.
+Reduces each ICR's CpG measurements to principal components, then compares
+a covariate-only model with a model containing covariates and those
+components. Uses a likelihood-ratio test for binomial outcomes and an
+F test for continuous outcomes.
 }
 \details{
-Note that there is a line of code to remove any patients that are missing
-data (outcome or covariates). I recommend manually filtering that out first
-so that you know your exact sample size prior to running (just my personal
-preference). Another quick check prior to starting is to ensure both the cpg_beta and
-df_study have the patients ids in rows.
+Study rows with missing outcome, covariates, or sample IDs are removed,
+then study and methylation data are aligned by row names. CpG measurements
+are not imputed here. Each ICR is normalized by column, then prcomp() is
+called with centering and scaling. Fitting warnings are reported; caught
+fitting errors return NULL to subsequent model-comparison code and do not
+guarantee that processing of other ICRs will continue.
+}
+\seealso{
+\code{\link[=skat_icr_test]{skat_icr_test()}}, \code{\link[=tdhia_stat_tests]{tdhia_stat_tests()}}
 }
 \author{
 Kate Everly

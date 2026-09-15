@@ -1,60 +1,66 @@
 
 
-#' tdhia_pipeline
+#' Run the Imprintome Processing Pipeline
 #'
-#' @description runs standard tdhia pipeline in a single step.
+#' Loads IDAT measurements or cached probe data, filters probes and samples,
+#' and aggregates methylation beta values to CpG and ICR levels.
 #'
-#' TODO: this function does not check if the cached data with probe_data matches
-#'  the settings of the current function cell, need to add in future.
-#' @param idat_dir_paths a vector of strings specifying full directory paths
-#' where IDAT files are located.
-#' @param probe_data_cache either a probe_data object, a filepath to processed data, or NULL.
-#'   1) probe_data: the initial processing of idat files to probe_data is
-#'    skipped. All donstream processing still occurs.
-#'   2) filepath: a path where probe data is saved. If the file exists, the 
-#'   probe data is loaded from there instead of reprocessing.
-#'   3) NULL: the probe data is processed and not cached to disk.
-#' @param multicore boolean, when true uses n.cores processing in sesame.
-#' @param idat_basenames vector of basenames for idat files, may be a subset of 
-#' files that are stored in the cache saved in probe_data_cache.
-#' @param discard_unmapped_probes boolean, when true, probe_ids
-#' @param max_sig_pval single numeric between (0-1), maximum sesame signal
-#' p-value that is allowed
-#' @param set_failed_betas_na boolean, when true probe measurements that fail
-#' the p-value threshold are set to NA (missing).
-#' @param max_probe_fail_rate maximum number of measurements that a probe can
-#' fail the p-value threshold before being removed entirely from dataset (all
-#' values set to NA).
-#' @param discard_failed_probes boolean when true, the probes that fail the
-#' max_probe_fail_rate are removed entirely.
-#' @param db_flag flag for saving function work space for debugging.
-#' @param smooth_adj_cpgs boolean, when true, adjacent cpg beta values within an
-#' ICR are smoothed with a sliding window average.
-#' @param max_icr_fail_rate maximum allowable fraction of samples that can be
-#' missing before the entire ICR is excluded from dataset.
-#' @param overwrite_probe_cache todo
-#' @param max_patient_fail_rate maximum number of imprintome cpg sites that fail
-#' the max_sig_pval threshold. Any patients with a higher fraction will be 
-#' discarded.
-#' @param merge_replicates string with the following possible values that
-#' determines how replicate probes are handled.
-#'  - NULL: the probe replicates are not merged (default value).
-#'  - pre_beta: replicates are merged by averaging fluorescent signal from
-#'   each channel individually, beta values are then calculated from these
-#'   averaged values (pre_beta = merging done before beta calculation).
-#'  - post_beta: beta value is calculated before replicates are merged and beta
-#'   values are averaged between replicates (post_beta = merging done before
-#'   beta calculation).
-#' @param enforce_req_idats check that all idat files requested in idat_basenames
-#'  argument are found on disk. Throws error if this is not the case.
-#' @param min_design_score discard probes below this design score threshold.
-#' Default: NA (don't discard any probes by design score). Design scores vary
-#' from 0-1, with a higher value being a better designed probe.
-#' @param probe_beta provide probe data from a previously processed function call
-#'  of load_idata_to_probes. This is useful to provide when you want different
-#'   settings downstead of probe beta culations (such as setting individual beta 
-#'   values to NA if the sesame p-valu threshold is not met).
-#' @return named list with all of the output from each of the pipeline steps.
+#' @param idat_dir_paths Character vector of directories containing IDAT files,
+#'   passed to load_idata_to_probes() when probe data must be processed.
+#' @param overwrite_probe_cache Logical; reprocess an input probe-data list
+#'   when TRUE. An existing cache file supplied as a path is still reused.
+#' @param probe_data_cache NULL, a probe-data list from load_idata_to_probes(),
+#'   or an RDS path. NULL processes without saving a cache; a missing path is
+#'   populated and an existing path is read. Parent directories are created.
+#' @param multicore Logical or core count passed to load_idata_to_probes().
+#' @param idat_basenames Character vector of requested sample basenames.
+#'   NULL uses all available samples; supplied names also subset cached data.
+#' @param discard_unmapped_probes Logical; retain only mapped CpG probes when
+#'   TRUE, as determined by filter_probes().
+#' @param max_sig_pval Numeric detection p-value threshold. Measurements pass
+#'   when their detection p-value is strictly below this value.
+#' @param set_failed_betas_na Logical; replace individual failed measurements
+#'   with NA. Probe-level and sample-level filtering still run when FALSE.
+#' @param max_probe_fail_rate Maximum fraction of failed measurements per
+#'   probe. Probes above the threshold have all beta values set to NA.
+#' @param discard_failed_probes Logical; remove probes whose beta values are
+#'   all missing after filtering.
+#' @param max_patient_fail_rate Maximum failure fraction per sample, passed
+#'   to filter_probes(); failing samples have all beta values set to NA and
+#'   are removed using that helper's default discard_failed_patients setting.
+#' @param smooth_adj_cpgs Logical; apply a centered three-CpG rolling mean
+#'   within each ICR during CpG aggregation.
+#' @param max_icr_fail_rate Numeric threshold passed to convert_cpgs_to_icrs().
+#'   Its current implementation reports failures but does not apply that
+#'   threshold to the returned ICR table.
+#' @param db_flag Logical; save debugging workspaces for this function and
+#'   processing helpers that receive the flag.
+#' @param merge_replicates Replicate handling passed to the IDAT loader:
+#'   "pre_beta" (default) averages fluorescence before calculating beta,
+#'   "post_beta" averages beta values, and NULL leaves replicates separate.
+#' @param enforce_req_idats Logical; require all requested IDAT basenames
+#'   when loading files.
+#' @param min_design_score Minimum probe design score. NA disables this
+#'   filter; otherwise only scores strictly greater than the threshold remain.
+#' @param verbose Logical; print pipeline progress. This flag is not forwarded
+#'   to the processing helpers, which can print their own messages.
+#'
+#' @details
+#' Filtering and both aggregation steps run even when probe data are cached.
+#' Cached probe data are not checked against the current processing settings.
+#' Quantile normalization is disabled in the loader and CpG conversion calls.
+#' See the individual processing functions for filtering and aggregation
+#' details.
+#'
+#' @return A named list with:
+#'   - probe_beta: loaded or cached probe data, subset to requested samples.
+#'   - filt_probe_beta: filtered probe data and QC summaries from
+#'     filter_probes().
+#'   - cpg_beta: CpG beta values and metadata from convert_probes_to_cpgs().
+#'   - icr_beta: ICR beta values and metadata from convert_cpgs_to_icrs().
+#'   - input_args: argument values captured for reproducing the pipeline call.
+#' @seealso [load_idata_to_probes()], [filter_probes()],
+#'   [convert_probes_to_cpgs()], [convert_cpgs_to_icrs()]
 #' @export
 tdhia_pipeline <- function(
     idat_dir_paths = NULL, overwrite_probe_cache = F, probe_data_cache = NULL,

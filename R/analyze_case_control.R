@@ -1,15 +1,37 @@
 
 
 
-#' analyze_case_control
+#' Compare Methylation Between Control and Case Groups
 #'
-#' @description analyze for changes in beta value between a control group and an
-#' experiment group.
+#' Runs a two-sided Welch two-sample t-test for each methylation site and
+#' summarizes group means, variability, missingness, and methylation changes.
 #'
-#' @param beta_matrix a matrix of beta values, cpg/ ICR site (rows) by patients (columns)
-#' @param ctrl_cols boolean vector of which columns in beta matrix are control group
-#' @param n_adjust number to adjust p-values for FDR multiple comparisons
-#' @param filter_na_pval todo
+#' @param beta_matrix Numeric matrix or data frame with CpG or ICR sites in
+#'   rows and samples in columns. Row names supply the site identifiers.
+#' @param ctrl_cols Logical vector aligned to columns of beta_matrix.
+#'   TRUE identifies controls (group 1); FALSE identifies cases (group 2).
+#' @param n_adjust Number of comparisons passed to custom_p.adjust() with
+#'   method = "fdr". Defaults to the original number of methylation sites.
+#' @param filter_na_pval Logical; remove sites with missing raw p-values
+#'   before multiple-testing adjustment. Defaults to TRUE.
+#'
+#' @details
+#' A test is attempted only when each group has at least three nonmissing
+#' measurements; otherwise its p-value is NA. Means and standard deviations
+#' ignore missing values. Other t.test() errors, such as constant-data errors,
+#' are not caught. Percent changes can be infinite or undefined when the
+#' control mean is zero.
+#'
+#' @return A data frame in input-site order, optionally excluding missing
+#'   p-values, with:
+#'   - id and imp_id: original row number and site identifier.
+#'   - p_val, adj_pval, adj_sig: raw p-value, FDR-adjusted p-value, and
+#'     whether the adjusted p-value is below 0.05.
+#'   - mean1, mean2, std1, std2: group means and standard deviations.
+#'   - frac_na1 and frac_na2: missing fractions within each group.
+#'   - delta: mean2 minus mean1.
+#'   - perc_delta: 100 times delta divided by mean1.
+#' @seealso [custom_p.adjust()]
 #' @export
 analyze_case_control <- function(beta_matrix, ctrl_cols, n_adjust = nrow(beta_matrix), filter_na_pval = TRUE) {
   # Initialize a vector of NAs to store p-values

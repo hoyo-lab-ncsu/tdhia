@@ -2,7 +2,7 @@
 % Please edit documentation in R/correct_idat_names.R
 \name{correct_idat_names}
 \alias{correct_idat_names}
-\title{correct_idat_names}
+\title{Check or Correct IDAT Filename Capitalization}
 \usage{
 correct_idat_names(
   idat_dir_path,
@@ -12,21 +12,34 @@ correct_idat_names(
 )
 }
 \arguments{
-\item{idat_dir_path}{either a full filesystem path to the directory of idats
-to be rename, or a vector paths to individual IDAT files}
+\item{idat_dir_path}{Character string giving a directory to inspect.
+A vector of multiple file paths can be used for checking; a single
+string is always treated as a directory. Use a directory when renaming,
+because the rename log path is constructed from this argument.}
 
-\item{rename}{boolean, when true IDAT files are renamed, otherwise their
-fileneames are checked and an error or warning is raised}
+\item{rename}{Logical; TRUE renames files and writes a log. FALSE only
+checks names. Defaults to TRUE.}
 
-\item{failcheck_error}{boolean, when true an error is raised when filenames are
-checked, otherwise a warning is raised.}
+\item{failcheck_error}{Logical; when checking names, stop on a failed
+check if TRUE, or warn and return FALSE otherwise.}
+
+\item{verbose}{Logical; print the renaming progress message. Invalid
+filenames are printed during a failed check regardless of this flag.}
 }
 \value{
-results with fitted coefficients from the glm, sorted by p-value
+In checking mode, TRUE when all names pass, or FALSE with a warning
+when names fail and failcheck_error is FALSE; otherwise an error.
+In renaming mode, NULL after writing the log and attempting the renames.
 }
 \description{
-correct capitalization to match the convention expected by the
-sesame package. Example correct filenames:
-4207113116_1544_Grn.idat.
-4207113116_1544_Red.idat.
+Checks IDAT channel-name capitalization or renames files to use the
+Grn.idat and Red.idat suffixes expected by sesame.
+}
+\details{
+Renaming replaces uppercase .IDAT extensions and lowercase grn.idat and
+red.idat suffixes. Before renaming, idat_rename_log.csv is written in the
+input directory with old_name and new_name columns. An existing log is
+overwritten. The function does not return the success flags from
+file.rename(), so a NULL result is not confirmation that every rename
+succeeded.
 }

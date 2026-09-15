@@ -1,39 +1,49 @@
 
 
-#' skat_icr_test
+#' Test ICR Methylation Associations with SKAT
 #'
-#' Performs kernel-regression-based association tests for methylation state for
-#' a collection of cpg sites. Both continuous and dichotomous response variables
-#' are supported.
+#' Fits a covariate-only null model and tests the joint association of each
+#' ICR's CpG measurements with a continuous or dichotomous response using
+#' a linear SKAT kernel.
 #'
-#' @param cpg_betas cpg beta matrix (cpg_id as rows x sample_id as columns).
-#'  Values are assumed to be on beta scale (0-1). Use m_value_transform to
-#'   convert to m-values (recommended).
-#' @param df_study dataframe of sample associated data to be used in linear
-#' models, (nrows = sample size). Columns should include those specified with
-#' 'response' and 'predictors' input arguments.
-#' @param response string, column name of response variable located in df_study.
-#' @param predictors vector of strings of column names of predictors that are
-#' located in df_study.
-#' @param method
-#'   davies: exact p-value for skat method (heterogeneous)
-#'   optimal.adj: skat-O unified approach, combination of SKAT and burden test
-#'    (default).
-#' @param out_type character, specifies type of variable for response column.
-#' "C": continuous (default).
-#' "D":  dichotomous.
-#' @param icr_ids vector of strings of icr_ids to be tested. Default = NULL,
-#' tests all icrs that are covered by the input cpg beta matrix.
-#' @param min_cpg minimum number of cpg sites for an icr to be included in results.
-#' @param m_value_transform boolean, when true, transform beta values to
-#' m-values to control heteroskedasticity. Default = TRUE.
-#' @param scaling boolean, when true, z scales the data for SKAT analysis.
-#' @param verbose boolean, when TRUE, prints progress to command line (default = TRUE).
-#' @param n.cores integer, number of cores for processing (default = 1).
-#' @param db_flag boolean, when true, save environment to disk.
-#' @returns test
-#' @export
+#' @param cpg_betas Numeric data frame of beta values with CpG IDs in rows
+#'   and sample IDs in columns. The per-ICR helper requires data-frame input.
+#' @param df_study Data frame with response and predictor columns. Row names
+#'   must match the sample IDs in cpg_betas.
+#' @param response Character string naming the response column.
+#' @param predictors Character vector of covariate names for the null model.
+#'   The current formula construction requires a nonempty predictor vector.
+#' @param method Method passed to SKAT::SKAT(), such as "davies" or
+#'   "optimal.adj" (the default SKAT-O combination of SKAT and burden tests).
+#' @param out_type Response type passed to SKAT::SKAT_Null_Model():
+#'   "C" for continuous (default) or "D" for dichotomous.
+#' @param icr_ids Character vector of ICR IDs. NULL selects regions covered
+#'   by the supplied CpGs in manifest_v1A2_design_scores.
+#' @param min_cpg Minimum number of CpGs for retaining an ICR. Regions are
+#'   tested first, then filtered before p-value adjustment.
+#' @param db_flag Logical; save the initial environment to skat_icr_test.RData
+#'   in the working directory. Defaults to TRUE.
+#' @param m_value_transform Logical; convert beta values to M-values within
+#'   each ICR before testing.
+#' @param scaling Logical; center and scale each CpG across samples.
+#' @param verbose Logical; print progress and the null-model formula.
+#' @param n.cores Number of workers. One runs sequentially; larger values use
+#'   SnowParam on Windows. The non-Windows multicore branch currently does
+#'   not execute tests; use one core on those systems.
+#'
+#' @details
+#' Samples with missing response or predictor values are removed, and the
+#' remaining study rows are aligned to methylation columns by sample ID.
+#' This function does not impute missing CpG measurements. The null model
+#' uses Adjustment = TRUE and n.Resampling = 0.
+#'
+#' @return A data frame sorted by skat_adj_pvalue, containing icr_id,
+#'   skat_raw_pvalue, n_cpg, skat_adj_pvalue (Benjamini-Hochberg adjustment),
+#'   and skat_qvalue (from qvalue::qvalue()). Adjustments are calculated
+#'   across regions remaining after the min_cpg filter.
+#' @seealso [pc_regression_test()], [tdhia_stat_tests()]
 #' @author Kate Everly, Bruce Corliss
+#' @export
 skat_icr_test <- function(cpg_betas, df_study, response, predictors,
                           method = "optimal.adj",
                           out_type="C", icr_ids = NULL,
