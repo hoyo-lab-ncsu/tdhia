@@ -22,7 +22,7 @@
 #'   M-values in the underlying tests. Defaults to `TRUE`.
 #' @param data_cache_path Character string giving an existing, writable
 #'   directory for intermediate RDS results. The directory is not created.
-#' @param model_prefix Character string. Currently unused, including in cache
+#' @param model_group Character string. Currently unused, including in cache
 #'   file names.
 #' @param impute_na Logical; whether the CpG and ICR GLMs impute missing values
 #'   using MICE. If `FALSE`, missing values are handled by removal in the GLM
@@ -95,7 +95,7 @@
 #' @export
 tdhia_stat_tests <- function( 
     primary_var, predictor_vars, betas, study_data, m_value_transform = T, 
-    data_cache_path, model_prefix = "", impute_na = TRUE, 
+    data_cache_path, model_group = "default", impute_na = TRUE, 
     n.cores = max(c(parallel::detectCores()-4, 1)), verbose = T, 
     family = NULL,db_flag = FALSE, overwrite_stats_cache = F,
     overwrite_betas_cache = F, add_genomic_metadata = T) {
@@ -120,8 +120,8 @@ tdhia_stat_tests <- function(
   study_columns <- c(unname(primary_var), predictor_vars)
   study_columns <- study_columns[study_columns != "beta"]
   
-  beta_path_na <-  file.path(data_cache_path, paste0(model_prefix, "_", primary_var, "_na_betas_and_study_data.rds"))
-  beta_path_complete <-  file.path(data_cache_path, paste0(model_prefix, "_", primary_var, "_complete_betas_and_study_data.rds"))
+  beta_path_na <-  file.path(data_cache_path, paste0(model_group, "_", primary_var, "_na_betas_and_study_data.rds"))
+  beta_path_complete <-  file.path(data_cache_path, paste0(model_group, "_", primary_var, "_complete_betas_and_study_data.rds"))
   
   
   # Betas and study data with NAs                                          ####
@@ -175,10 +175,14 @@ tdhia_stat_tests <- function(
   # Initialize result grame for cpg and icr level analysis
   cpg_ids = tdhia::manifest_v1A2_design_scores %>% filter(!is.na(icr_id)) %>% 
     pull(cpg_id) %>% unique()
-  df_cpg <- data.frame(primary_var = rep(primary_var, length(cpg_ids)), cpg_id = cpg_ids)
+  df_cpg <- data.frame(primary_var = rep(primary_var, length(cpg_ids)), 
+                       model_group = rep(model_group, length(cpg_ids)), 
+                       cpg_id = cpg_ids)
   icr_ids = tdhia::manifest_v1A2_design_scores  %>% filter(!is.na(icr_id)) %>%
     pull(icr_id) %>% unique()
-  df_icr <- data.frame(primary_var = rep(primary_var, length(icr_ids)), icr_id = icr_ids)
+  df_icr <- data.frame(primary_var = rep(primary_var, length(icr_ids)), 
+                       model_group =  rep(model_group, length(icr_ids)),
+                       icr_id = icr_ids)
   rm(cpg_ids, icr_ids)
   
   # Parse model string, test if response is binomial or not
@@ -197,7 +201,7 @@ tdhia_stat_tests <- function(
   
   # CpG GLM                                                            ##########  
   #_____________________________________________________________________________
-  df_cpg_glm_path = file.path(data_cache_path, paste0(model_prefix, "_", primary_var, "_df_cpg_glm.rds"))
+  df_cpg_glm_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "_df_cpg_glm.rds"))
   df_cpg_glm <- cache_result(df_cpg_glm_path, {
     tdhia::imprintome_glm(
       model_str = model_str, study_data = data_na$study_data,
@@ -225,7 +229,7 @@ tdhia_stat_tests <- function(
   
   # ICR GLM                                                    #################
   #_____________________________________________________________________________
-  df_icr_glm_path = file.path(data_cache_path, paste0(model_prefix, "_", primary_var, "df_icr_glm.rds"))
+  df_icr_glm_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "df_icr_glm.rds"))
   df_icr_glm <- cache_result(df_icr_glm_path, {
     tdhia::imprintome_glm(
       model_str = model_str, study_data = data_na$study_data,
@@ -246,7 +250,7 @@ tdhia_stat_tests <- function(
   
   # ICR SKAT                                                         ##########  
   #_____________________________________________________________________________
-  df_icr_skat_path = file.path(data_cache_path, paste0(model_prefix, "_", primary_var, "df_icr_skat.rds"))
+  df_icr_skat_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "df_icr_skat.rds"))
   df_icr_skat <- cache_result(df_icr_skat_path, {
     tdhia::skat_icr_test(
       cpg_betas = as.data.frame(data_complete$betas$cpg_beta$cpg_beta_df),
@@ -266,7 +270,7 @@ tdhia_stat_tests <- function(
   
   # ICR PCA Regression                                               ##########  
   #_____________________________________________________________________________
-  df_icr_pcr_path = file.path(data_cache_path, paste0(model_prefix, "_", primary_var, "df_icr_pcr.rds"))
+  df_icr_pcr_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "df_icr_pcr.rds"))
   df_icr_pcr <- cache_result(df_icr_pcr_path, {
     tdhia::pc_regression_test(
       cpg_beta = Matrix::t(data_complete$betas$cpg_beta$cpg_beta_df) %>% as.data.frame(),
@@ -284,7 +288,7 @@ tdhia_stat_tests <- function(
   
   # CpG Limma                                                         ##########  
   #_____________________________________________________________________________
-  df_cpg_limma_path = file.path(data_cache_path, paste0(model_prefix, "_", primary_var, "df_cpg_limma.rds"))
+  df_cpg_limma_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "df_cpg_limma.rds"))
   df_cpg_limma <- cache_result(df_cpg_limma_path, {
     tdhia::cpg_dml_test(
       df_study = data_complete$study_data, predictors = c(primary_var, predictor_vars),
@@ -313,7 +317,7 @@ tdhia_stat_tests <- function(
   
   # ICR lancaster                                                     ##########  
   #_____________________________________________________________________________
-  df_icr_lancaster_path = file.path(data_cache_path, paste0(model_prefix, "_", primary_var, "df_icr_lancaster.rds"))
+  df_icr_lancaster_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "df_icr_lancaster.rds"))
   df_icr_lancaster <- cache_result(df_icr_lancaster_path, {
     tdhia::icr_dmr_test(
       df_dml = df_cpg_limma$df_dml, chr_lens = df_cpg_limma$chr_lens,
@@ -325,11 +329,11 @@ tdhia_stat_tests <- function(
   #  cpg level results
   df_cpg_summary <- df_cpg %>% select(contains("adj_pval")) %>%
     summarise(across(where(is.numeric), ~ sum(.x < 0.05, na.rm = TRUE))) %>% 
-    mutate(primary_var = primary_var, .before = 1)
+    mutate(primary_var = primary_var, model_group = model_group, .before = 1)
   #  icr level results
   df_icr_summary <- df_icr %>% select(contains("adj_pval")) %>%
     summarise(across(where(is.numeric), ~ sum(.x < 0.05, na.rm = TRUE))) %>%
-    mutate(primary_var = primary_var, .before = 1)
+    mutate(primary_var = primary_var, model_group = model_group, .before = 1)
   
   
   # Add metadata to results tables
@@ -377,11 +381,69 @@ tdhia_stat_pretty_labels <- function(df) {
   pretty_labels = col_names
   
   pretty_labels <- str_replace_all(pretty_labels, "_", " ")
+  pretty_labels <- str_replace_all(pretty_labels, "\\.", " ")
   
   pretty_labels <- str_replace_all(pretty_labels, "pval", "p-Value")
   pretty_labels <- stringr::str_to_title(pretty_labels)
   
+  # Adjust capitalization
+  pretty_labels <- str_replace_all(pretty_labels, regex("icr", ignore_case = T), "ICR")
+  pretty_labels <- str_replace_all(pretty_labels, regex("cpg", ignore_case = T), "CpG")
+  pretty_labels <- str_replace_all(pretty_labels, regex("glm", ignore_case = T), "GLM")
+  pretty_labels <- str_replace_all(pretty_labels, regex("zfp", ignore_case = T), "ZFP")
+  
   names(col_names) <- pretty_labels
   
   return(col_names)
+}
+
+
+
+tdhia_stat_export_tables <- function(df_all_test, out_path) {
+  
+  dir.create(out_path, showWarnings = F, recursive = T)
+
+  # Export all models and vars
+  write.csv(x = df_all_test$df_cpg,
+            file.path(out_path, paste0("all-models_all-vars_results_cpg_all-tests.csv")))
+  
+  write.csv(x = df_all_test$df_icr,
+            file.path(out_path, paste0("all-models_all-vars_results_icr_all_tests.csv")))
+  
+  
+  # ICR Export individual models and primary variables to disk
+  unq_model_group <- df_all_test$df_icr$model_group %>% unique()
+  unq_primary_var <- df_all_test$df_icr$primary_var %>% unique()
+  for (n in seq_along(unq_model_group)) {
+    for (k in seq_along(unq_primary_var)) {
+      write.csv(x = df_all_test$df_icr %>% 
+                  filter(model_group == unq_model_group[n], primary_var == unq_primary_var[k]),
+              file.path(out_path, paste0(unq_model_group[n], "_", unq_primary_var[k], 
+                                         "_results_icr_all-tests.csv")))
+    }
+  }
+  
+  
+  # CpG Export individual models and primary variables to disk
+  unq_model_group <- df_all_test$df_cpg$model_group %>% unique()
+  unq_primary_var <- df_all_test$df_cpg$primary_var %>% unique()
+  for (n in seq_along(unq_model_group)) {
+    for (k in seq_along(unq_primary_var)) {
+      write.csv(x = df_all_test$df_cpg %>% 
+                  filter(model_group == unq_model_group[n], primary_var == unq_primary_var[k]),
+                file.path(out_path, paste0(unq_model_group[n], "_", unq_primary_var[k], 
+                                           "_results_cpg_all-tests.csv")))
+    }
+  }
+  
+  
+  
+  
+  
+}
+
+
+
+tdhia_stat_export_plots <- function() {
+  
 }

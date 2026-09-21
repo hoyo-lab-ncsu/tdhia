@@ -11,7 +11,7 @@ tdhia_stat_tests(
   study_data,
   m_value_transform = T,
   data_cache_path,
-  model_prefix = "",
+  model_group = "default",
   impute_na = TRUE,
   n.cores = max(c(parallel::detectCores() - 4, 1)),
   verbose = T,
@@ -46,7 +46,7 @@ M-values in the underlying tests. Defaults to \code{TRUE}.}
 \item{data_cache_path}{Character string giving an existing, writable
 directory for intermediate RDS results. The directory is not created.}
 
-\item{model_prefix}{Character string. Currently unused, including in cache
+\item{model_group}{Character string. Currently unused, including in cache
 file names.}
 
 \item{impute_na}{Logical; whether the CpG and ICR GLMs impute missing values
