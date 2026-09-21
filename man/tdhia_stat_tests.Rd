@@ -17,7 +17,8 @@ tdhia_stat_tests(
   verbose = T,
   family = NULL,
   db_flag = FALSE,
-  overwrite_cache = F,
+  overwrite_stats_cache = F,
+  overwrite_betas_cache = F,
   add_genomic_metadata = T
 )
 }
@@ -72,7 +73,7 @@ to \code{tdhia_stat_tests.RData} in the working directory. Defaults to \code{FAL
 Pipeline and GLM helpers are called with their own debug flags enabled
 even when this argument is \code{FALSE}.}
 
-\item{overwrite_cache}{Logical; whether to recompute cached CpG GLM, SKAT,
+\item{overwrite_stats_cache}{Logical; whether to recompute cached CpG GLM, SKAT,
 principal component regression, limma, and Lancaster results. Defaults
 to \code{FALSE}. Existing ICR GLM results are always reused, even when \code{TRUE}.}
 
