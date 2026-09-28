@@ -352,17 +352,16 @@ tdhia_stat_tests <- function(
   prefix$df_icr_skat = "icr_skat"
   prefix$df_icr_pcr = "icr_pcr"
   prefix$df_cpg_limma = "cpg_limma"
-  prefix$df_icr_lancaster = "icr_lancaster"
+  prefix$df_icr_lancaster = "icr_lanc"
   
   
   
   
   
   
-  # Export
+  # Export tables with basic attributes stored in each
   out <- list(df_cpg = df_cpg, df_cpg_summary = df_cpg_summary,
               df_icr = df_icr, df_icr_summary = df_icr_summary)
-  
   # For each list in out, apply attributes
   for (n in seq_along(out)) {
     attr(out[[n]], "prefix") <- prefix
@@ -370,7 +369,100 @@ tdhia_stat_tests <- function(
     
   }
   
+  
+  
   return(out)
+}
+
+
+
+tdhia_stat_summary_plots<- function (df_all_test, out_path) {
+  
+  
+  # Add plots as attributes to summary tables
+  # Summary plots
+  mat <- df_all_test$df_icr_summary %>% column_to_rownames("primary_var") %>%
+    select(-model_group) %>% as.matrix()
+  my_breaks <- c(0, 2^(0:ceiling(log2(max(mat)))))
+  my_colors <- colorRampPalette(c("white", "red"))(length(my_breaks) - 1)
+  plot_icr_summary <- pheatmap::pheatmap(
+    mat, scale="none", display_numbers = TRUE, number_format = "%.0f",
+    cluster_rows = FALSE, cluster_cols = FALSE, color = my_colors, breaks = my_breaks)
+  # attr(df_icr_summary, "summary_plot") <- plot_icr_summary
+  # Summary plots
+  mat <-  df_all_test$df_cpg_summary %>% column_to_rownames("primary_var") %>%
+    select(-model_group) %>% as.matrix()
+  my_breaks <- c(0, 2^(0:ceiling(log2(max(mat)))))
+  my_colors <- colorRampPalette(c("white", "red"))(length(my_breaks) - 1)
+  plot_cpg_summary <- pheatmap::pheatmap(
+    mat, scale="none", display_numbers = TRUE, number_format = "%.0f",
+    cluster_rows = FALSE, cluster_cols = FALSE,  color = my_colors, breaks = my_breaks)
+  # attr(df_cpg_summary, "summary_plot") <- plot_cpg_summary
+  
+  
+  
+  
+  
+  prefixes <-attr(df_all_test$df_icr, "prefix")
+  
+  
+  df_cpg_summary <- df_all_test$df_cpg %>%
+    tidyr::pivot_longer(
+      cols = matches(paste0("^(", paste(prefixes, collapse = "|"), ").*adj_pval")),
+      names_to = "pval_col", values_to = "adj_pval" ) %>%
+    dplyr::mutate(
+      method = stringr::str_extract(
+        pval_col, paste0("^(", paste(prefixes, collapse = "|"), ")"))
+    ) %>%
+    dplyr::filter(adj_pval < 0.05) %>%
+    dplyr::group_by(model_group, primary_var, method) %>%
+    dplyr::summarise(
+      n_icr = length(unique(icr_id)),
+      n_high = length(icr_id[icr_conf == 1]),
+      n_medium = length(icr_id[icr_conf == 2]),
+      n_low = length(icr_id[icr_conf == 3]),
+      n_zf = length(icr_id[is_icr_zinc]),
+      n_not_zf = length(icr_id[!is_icr_zinc]),
+      .groups = "drop"
+    )
+  
+  
+  df_icr_summary <- df_all_test$df_icr %>%
+    tidyr::pivot_longer(
+      cols = matches(paste0("^(", paste(prefixes, collapse = "|"), ").*adj_pval")),
+      names_to = "pval_col", values_to = "adj_pval" ) %>%
+    dplyr::mutate(
+      method = stringr::str_extract(
+        pval_col, paste0("^(", paste(prefixes, collapse = "|"), ")"))
+    ) %>%
+    dplyr::filter(adj_pval < 0.05) %>%
+    dplyr::group_by(model_group, primary_var, method) %>%
+    dplyr::summarise(
+      n_icr = dplyr::n(),
+      n_high = sum(icr_conf == 1, na.rm = TRUE),
+      n_medium = sum(icr_conf == 2, na.rm = TRUE),
+      n_low = sum(icr_conf == 3, na.rm = TRUE),
+      n_zf = sum(is_icr_zinc, na.rm = TRUE),
+      n_not_zf = sum(!is_icr_zinc, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  
+  if (!is.null(out_path)) {
+    write.csv(x = df_cpg_summary, file = file.path(out_path, "model_summary_cpg.csv"))
+    write.csv(x = df_icr_summary, file = file.path(out_path,"model_summary_icr.csv"))
+    
+    cowplot::save_plot(filename = file.path(out_path, "model_summary_cpg.jpg"),
+                       plot = plot_cpg_summary,base_width = 8, base_height = 7)
+    
+    cowplot::save_plot(filename = file.path(out_path, "model_summary_icr.jpg"),
+                       plot = plot_icr_summary,base_width = 8, base_height = 7)
+    
+    
+  }
+  
+  return(list(plot_icr_summary = plot_icr_summary, plot_cpg_summary = plot_cpg_summary,
+              df_icr_summary = df_icr_summary, df_cpg_summary = df_cpg_summary))
 }
 
 
@@ -439,11 +531,79 @@ tdhia_stat_export_tables <- function(df_all_test, out_path) {
   
   
   
+  df_all_test %>% group_by(primary_var , model_group)
   
 }
 
 
 
-tdhia_stat_export_plots <- function() {
+tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data,df_cpg_beta, df_cpg_sig_colname, out_path, manual_range, db_flag = F) {
+  
+  if (db_flag) {save(list = ls(all.names = TRUE), file = "tdhia_stat_export_dot_plots.RData")}
+  # load(file = "tdhia_stat_export_dot_plots.RData")
+  
+  unq_model_group = df_icr$model_group %>% unique()
+  unq_primary_var = df_icr$primary_var %>% unique()
+  unq_analysis_prefix = attr(df_icr, "prefix") %>% unlist()
+  
+  
+  # 2. Generate all combinations
+  df_comb <- expand.grid(unq_model_group, unq_primary_var, unq_analysis_prefix)
+  colnames(df_comb) <- c("model_group", "primary_var", "analysis_prefix")
+  
+  for (n in 1:nrow(df_comb)) {
+    this_model_group = df_comb$model_group[n] %>% as.character()
+    this_primary_var = df_comb$primary_var[n] %>% as.character()
+    this_analysis_prefix = df_comb$analysis_prefix[n] %>% as.character()
+    
+    cat(sprintf("%s, %s, %s\n", this_model_group, this_primary_var, this_analysis_prefix))
+    
+    # Get colname for p-values to annotate significance with icrs
+    pval_colname = colnames(df_icr)[(grepl(pattern = this_analysis_prefix, x = colnames(df_icr)) & 
+                                       grepl(pattern = "adj_pval", x = colnames(df_icr))) %>% which()]
+    
+    # Get significant icrs from this analysis, this model group, this primary variable
+    sig_icrs <-    
+      df_icr %>%  filter(primary_var == this_primary_var, model_group == this_model_group) %>% 
+      filter(!!sym(pval_colname) < 0.05) %>%
+      arrange( str_replace_all(icr_id, "ICR_", "") %>% as.numeric()) %>% 
+      pull(icr_id) 
+    
+    # Get list of significant cpgs for this model group and primary variable
+    sig_cpgs <- df_cpg %>% filter(
+      primary_var == this_primary_var, model_group == this_model_group) %>% 
+      filter(!!sym(df_cpg_sig_colname) < 0.05) %>% pull(cpg_id)
+    if (length(sig_cpgs)==0) next
+    
+    
+    # If response variable is continuous, dichotomize
+    df_patient_groups = data.frame(group = study_data[[this_primary_var]])
+    # df_patient_groups$
+    rownames(df_patient_groups) <- rownames(study_data)
+   
+    
+    if (!is.logical(df_patient_groups$group) &&
+        !is.factor(df_patient_groups$group)) {
+      df_patient_groups$group <- (df_patient_groups$group >
+        median(df_patient_groups$group, na.rm = T)) %>%  as.factor()
+    }
+    
+    subout_path <-  paste0(out_path, "/",this_model_group, "_", 
+                           this_primary_var, "_", this_analysis_prefix)
+    
+    for (m in seq_along(sig_icrs)) {
+    # Plot call for each ICR
+    out <- plot_icr_dotplot(
+      mat_cpg_beta = df_cpg_beta, sig_cpgs = sig_cpgs, df_patient_groups = df_patient_groups, 
+      icr_id = sig_icrs[m], xlab_txt = "", plot_height_width = c(5,3),
+      output_path = subout_path,
+      max_sig_hwindow = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]], db_flag = F,
+      filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value", 
+                     sample_colname = "patient_id", overwrite_plot = T) 
+      
+    }
+    
+  }
+  
   
 }

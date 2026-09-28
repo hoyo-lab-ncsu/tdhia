@@ -20,7 +20,7 @@
 #'   2) Vector of 2 numerics: the lower and upper index of CpG sites to be 
 #'   included. If positive, the index is from the start. If negative, index is 
 #'   from the end. 
-#'   3) Single numeric: how much padding is added around significant CpG sites.0
+#'   3) Single numeric: how much padding is added around significant CpG sites. Recommended: 20.
 #' @param output_path full file system path so save plot to.
 #' @param db_flag when true, saves environment variables to disk to a file with 
 #' same name as function.
@@ -28,8 +28,8 @@
 #' @param legend.position specify position of legend as specified in ggplot theme
 #'  (default = "none").
 #' @param ytext text for y axis.
-#' @param sample_colname name of coolumn that refers to sample_id found with 
-#' df_patient_groups, and also matc the column names in mat_cpg_beta.
+#' @param sample_colname name of column that refers to sample_id found with 
+#' df_patient_groups, and also matches the column names in mat_cpg_beta.
 #' @param overwrite_plot boolean, when true, overwrite plot to disk.
 #' @returns a ggplot function handle to the plot.
 #'
@@ -46,6 +46,11 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   if(db_flag) save(list = ls(all.names = TRUE), file = "plot_icr_methylation.RData")
   # load(file = "plot_icr_methylation.RData")
   
+  # If sample_colname does not exist in df_patient_groups, use rownames
+  if ( !(sample_colname %in% colnames(df_patient_groups))) {
+    df_patient_groups  <- df_patient_groups %>% rownames_to_column(sample_colname)
+  }
+  
   # Get list of CpGs for specified icrs
   df = dplyr::left_join(x = data.frame(cpg_id = rownames(mat_cpg_beta)),
             y = tdhia::manifest_v1A2_design_scores %>% dplyr::select("cpg_id", "icr_id","MAPINFO") %>% dplyr::distinct(),
@@ -54,6 +59,10 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   
   # Subset the cpg_beta matrix
   sub_mat_cpg_beta = mat_cpg_beta[df$icr_id == icr_id,]
+  
+  
+  total_cpgs <- nrow(sub_mat_cpg_beta)
+  
   
   # Reorder rows to genomic location
   sub_mat_cpg_beta <- sub_mat_cpg_beta %>% dplyr::arrange(df[df$icr_id == icr_id,]$MAPINFO)
@@ -125,21 +134,22 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     # geom_ribbon(aes(fill = ))+
     # ggtitle(sprintf("%s (%sZF, %s): %s", icr_id, zinc_finger_str,icf_conf_str, 
     #           icr_metadata$Nearest.Transcript)) +
-    ggtitle(sprintf("%s: %s", icr_id, icr_metadata$Nearest.Transcript)) +
+    ggtitle(sprintf("%s (%d CpGs) %sZF: %s", icr_id, total_cpgs, zinc_finger_str,icr_metadata$Nearest.Transcript)) +
     theme_classic(base_size = 7) + theme(axis.text.x = element_text(
-      angle = 45,vjust = 1, hjust = 1), plot.title = element_text(size = 7),
+      angle = 45,vjust = 1, hjust = 1), plot.title = element_text(size = 6),
       legend.position = legend.position) 
   
   
   plot_path <- paste0(output_path, "/", 
                       sprintf("Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg")
-  if (overwrite_plot) {
+  if (!is.na(output_path) && overwrite_plot) {
     # Print summaries of data to command line as well
     print(gg)
-    print(table(df_patient_groups$group))
+    # print(table(df_patient_groups$group))
     cowplot::save_plot(filename = plot_path, plot = gg,base_height = 2, base_width = 2.5)
   }
-
+  
+  cat(sprintf("%s, cpg_subset: %s\n", icr_id, paste0(max_sig_hwindow, collapse = ": ")))
   
   # Export
   return(list(plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
@@ -210,6 +220,8 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # Subset the cpg_beta matrix
   sub_mat_cpg_beta = mat_cpg_beta[df$icr_id == icr_id,]
   
+  total_cpgs <- nrow(sub_mat_cpg_beta)
+  
   # Reorder rows to genomic location, assuming same chromosomes
   sub_mat_cpg_beta <- sub_mat_cpg_beta %>% dplyr::arrange(df[df$icr_id == icr_id,]$MAPINFO)
   # ordered_cpg_ids <- df[df$icr_id == icr_id,] %>% arrange(MAPINFO) %>% pull(cpg_id)
@@ -243,9 +255,12 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   df_long_cpg_beta <- dplyr::left_join(x = df_long_cpg_beta, y= df_patient_groups, by = dplyr::join_by({{sample_colname}}),
                                 keep = FALSE, na_matches = "never", relationship = "many-to-one")
   
-  df_long_cpg_beta$cpg_id <- factor(df_long_cpg_beta$cpg_id, levels = rev(rownames(sub_mat_cpg_beta)), ordered=TRUE)
-  df_long_cpg_beta$diff_group <- factor(df_long_cpg_beta$diff_group, levels = unique(df_long_cpg_beta$diff_group) %>% sort(), ordered=TRUE)
-  df_long_cpg_beta$subset_group <- factor(df_long_cpg_beta$subset_group, levels = unique(df_long_cpg_beta$subset_group) %>% sort(), ordered=TRUE)
+  df_long_cpg_beta$cpg_id <- factor(df_long_cpg_beta$cpg_id, 
+                                    levels = rev(rownames(sub_mat_cpg_beta)), ordered=TRUE)
+  df_long_cpg_beta$diff_group <- factor(df_long_cpg_beta$diff_group,
+                                        levels = unique(df_long_cpg_beta$diff_group) %>% sort(), ordered=TRUE)
+  df_long_cpg_beta$subset_group <- factor(df_long_cpg_beta$subset_group,
+                                          levels = unique(df_long_cpg_beta$subset_group) %>% sort(), ordered=TRUE)
   
   
   # Calculate beta difference across all patients
@@ -303,13 +318,12 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
                              max(df_summary$cpg_id_rank)+0.5), xlim = padded_xlim, expand = c(0,0)) +
     geom_vline(xintercept = 0, color = "black")+
     ylab(xlab_txt) + xlab("Mean Beta Value") + 
-    ggtitle(sprintf("%s: %s", icr_id, icr_metadata$Nearest.Transcript)) +
+    ggtitle(sprintf("%s (%d CpGs): %s", icr_id, total_cpgs, icr_metadata$Nearest.Transcript)) +
     theme_classic(base_size = 7) + 
     theme(axis.text.x = element_text(vjust = 0.5, hjust = 1),
           axis.text.y = element_text(colour = ifelse( df_summary$cpg_sig, "black", "grey50"),
                                      face = "bold"),
-      plot.title = element_text(size = 7),
-      legend.position = legend.position)
+      plot.title = element_text(size = 7), legend.position = legend.position)
   gg
   
   
@@ -318,11 +332,10 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   if (overwrite_plot | !file.exists(plot_path)) {
     # Print summaries of data to command line as well
     print(gg)
-    print(table(df_summary$diff_group))
     cowplot::save_plot(filename = plot_path, plot = gg, base_height = plot_height_width[1], base_width = plot_height_width[1])
   }
 
-  
+  cat(sprintf("%s, cpg_subset: %s", icr_id, max_sig_hwindow))
   # Export
   return(list(plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
 }

@@ -20,7 +20,7 @@
 #' @param output_dir_path path to export results from each model
 #' @param imp_type specify whether the analysis done is at the icr level or 
 #' cpg level.
-#' @param add_ensembl_ids when trye, attempts to add corresponding ensembl IDS 
+#' @param add_ensembl_ids when true, attempts to add corresponding ensembl IDS 
 #' based ont he gene symbols.
 #' @importFrom rlang .data
 #' @importFrom magrittr %>%

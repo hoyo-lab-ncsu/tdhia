@@ -19,7 +19,7 @@ export_model_results_for_ipa(
 \item{imp_type}{specify whether the analysis done is at the icr level or
 cpg level.}
 
-\item{add_ensembl_ids}{when trye, attempts to add corresponding ensembl IDS
+\item{add_ensembl_ids}{when true, attempts to add corresponding ensembl IDS
 based ont he gene symbols.}
 }
 \description{

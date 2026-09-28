@@ -46,7 +46,7 @@ height, as defined in cowplot::save_plot().}
 \item Vector of 2 numerics: the lower and upper index of CpG sites to be
 included. If positive, the index is from the start. If negative, index is
 from the end.
-\item Single numeric: how much padding is added around significant CpG sites.0
+\item Single numeric: how much padding is added around significant CpG sites. Recommended: 20.
 }}
 
 \item{db_flag}{when true, saves environment variables to disk to a file with
@@ -59,8 +59,8 @@ same name as function.}
 
 \item{ytext}{text for y axis.}
 
-\item{sample_colname}{name of coolumn that refers to sample_id found with
-df_patient_groups, and also matc the column names in mat_cpg_beta.}
+\item{sample_colname}{name of column that refers to sample_id found with
+df_patient_groups, and also matches the column names in mat_cpg_beta.}
 
 \item{overwrite_plot}{boolean, when true, overwrite plot to disk.}
 }
