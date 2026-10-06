@@ -10,7 +10,7 @@
 #' all ICRs and not just ICR being plotted).
 #' @param df_patient_groups a dataframe with the sample_colname 
 #' (default: patient_id) and a "group" column that specifies whether each patient 
-#' is in the low (1) or high (2) group.
+#' is in the low (1, blue) or high (2, red) group.
 #' @param icr_id the ID of the specific ICR to be plotted of the form ICR_#, i.e., ICR_10.
 #' @param xlab_txt xlabel for plot 
 #' @param plot_height_width vector of two numbers in inches, for plot width and 
@@ -125,7 +125,6 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     geom_point(aes(color = group), size = 1.5, alpha = 0.5) + 
     geom_text(aes(label = ifelse(df_summary$cpg_id %in% sig_cpgs, "*", "")), 
               y = padded_xlim[2], size = 4, vjust=1) + 
-    # geom_boxplot(aes(color = group), position = position_dodge(width=0.7), width = 0.7, linewidth = .2) +
     scale_color_manual(values=c("blue", "red")) + #, labels= c("Low","High"), guide = "none") + 
     scale_fill_manual(values=c("grey90", "white"), guide = "none") +
     # scale_x_continuous(expand = c(0, 0)) +
@@ -140,19 +139,43 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
       legend.position = legend.position) 
   
   
-  plot_path <- paste0(output_path, "/", 
-                      sprintf("Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg")
+  # Connect group means and fill each curve down to zero without stacking.
+  gg2 <- ggplot(data = df_summary,
+                aes(x = cpg_id_rank, y = beta_mean, group = group)) +
+    geom_ribbon(aes(ymin = 0, ymax = beta_mean, fill = group),
+                alpha = 0.2, colour = NA) +
+    geom_line(aes(color = group), linewidth = 0.5) +
+    scale_color_manual(values = c("blue", "red")) +
+    scale_fill_manual(values = c("blue", "red")) +
+    # Site ranks follow the same genomic order as the dot plot.
+    scale_x_continuous(breaks = seq_len(nrow(sub_mat_cpg_beta))) +
+    coord_cartesian(xlim = range(df_summary$cpg_id_rank),
+                    ylim = padded_xlim) +
+    xlab("CpG Sites") + ylab(ytext) +
+    ggtitle(sprintf("%s (%d CpGs) %sZF: %s", icr_id, total_cpgs,
+                    zinc_finger_str, icr_metadata$Nearest.Transcript)) +
+    theme_classic(base_size = 7) +
+    theme(plot.title = element_text(size = 6),
+          legend.position = legend.position)
+
+  # Export
+  plot_path <-
   if (!is.na(output_path) && overwrite_plot) {
     # Print summaries of data to command line as well
     print(gg)
     # print(table(df_patient_groups$group))
-    cowplot::save_plot(filename = plot_path, plot = gg,base_height = 2, base_width = 2.5)
+    cowplot::save_plot(filename =  paste0(output_path, "/", sprintf(
+      "dot_Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg"), 
+      plot = gg,base_height = 2, base_width = 2.5)
+    cowplot::save_plot(filename =  paste0(output_path, "/", sprintf(
+      "line_Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg"), 
+      plot = gg2,base_height = 2, base_width = 2.5)
   }
   
-  cat(sprintf("%s, cpg_subset: %s\n", icr_id, paste0(max_sig_hwindow, collapse = ": ")))
+  # cat(sprintf("%s, cpg_subset: %s\n", icr_id, paste0(max_sig_hwindow, collapse = ": ")))
   
   # Export
-  return(list(plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
+  return(list(dot_plot = gg, line_plot = gg2, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
 }
 
 

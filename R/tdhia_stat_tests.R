@@ -573,7 +573,7 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data,df_cpg_beta, 
     sig_cpgs <- df_cpg %>% filter(
       primary_var == this_primary_var, model_group == this_model_group) %>% 
       filter(!!sym(df_cpg_sig_colname) < 0.05) %>% pull(cpg_id)
-    if (length(sig_cpgs)==0) next
+    if (length(sig_icrs)==0) next
     
     
     # If response variable is continuous, dichotomize

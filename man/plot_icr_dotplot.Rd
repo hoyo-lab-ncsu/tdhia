@@ -29,7 +29,7 @@ all ICRs and not just ICR being plotted).}
 
 \item{df_patient_groups}{a dataframe with the sample_colname
 (default: patient_id) and a "group" column that specifies whether each patient
-is in the low (1) or high (2) group.}
+is in the low (1, blue) or high (2, red) group.}
 
 \item{icr_id}{the ID of the specific ICR to be plotted of the form ICR_#, i.e., ICR_10.}
 
