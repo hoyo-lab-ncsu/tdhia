@@ -28,7 +28,7 @@ all ICRs and not just ICR being plotted).}
 
 \item{df_patient_groups}{a dataframe with the
 \enumerate{
-\item a sample colum  name (default: patient_id, specified by sample_colname)
+\item a sample column  name (default: patient_id, specified by sample_colname)
 \item diff_group: column that specifies whether each patient
 is in the low (1) or high (2) group.
 \item subset_group: column that specifies different subsets of patient population
@@ -61,7 +61,7 @@ same name as function.}
 \item{legend.position}{specify position of legend as specified in ggplot theme
 (default = "none").}
 
-\item{sample_colname}{name of coolumn that refers to sample_id found with
+\item{sample_colname}{name of column that refers to sample_id found with
 df_patient_groups, and also matc the column names in mat_cpg_beta.}
 
 \item{overwrite_plot}{boolean, when true, plot is overwritten to disk.}

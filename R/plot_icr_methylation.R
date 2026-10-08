@@ -1,6 +1,164 @@
 
 
 
+#' Plot CpG estimates, standard errors, and a local trend within an ICR
+#'
+#' @description Plot one coefficient per CpG, ordered by increasing genomic
+#'   position from top to bottom. Black points and grey segments show estimates
+#'   plus or minus one standard error. An optional black LOESS curve shows the
+#'   trend, with transparent red fill between positive smoothed values and zero
+#'   and blue fill between negative smoothed values and zero.
+#' @param df_cpg Data frame containing `cpg_id` and the selected coefficient
+#'   and standard error columns. Subset to one primary variable and model group
+#'   before calling; duplicate CpG results within the ICR are rejected.
+#' @param icr_id Single ICR identifier, such as `"ICR_10"`.
+#' @param coeff_colname Name of the numeric coefficient column.
+#' @param coeff_se_colname Numeric standard error column on the same scale as
+#'   the coefficient. Standard errors must be nonnegative.
+#' @param spline_window_size Approximate number of neighboring CpGs used by
+#'   LOESS, an integer of at least 5. Defaults to 5; NULL disables smoothing.
+#'   Larger values smooth more. The window is capped at the plotted CpG count.
+#' @details CpG membership and positions come from
+#'   `tdhia::manifest_v1A2_design_scores`, using `icr_id` and `MAPINFO`.
+#'   Only CpGs present in `df_cpg` are plotted. Rows with missing or nonfinite
+#'   coefficients, standard errors, or positions are omitted with a warning.
+#'   Indices number the remaining CpGs
+#'   in genomic order; for large ICRs only a subset of index ticks is displayed.
+#'   LOESS fits coefficient against CpG index (not base-pair distance), using
+#'   degree 1 and span = min(spline_window_size / n_cpgs, 1). Despite the argument
+#'   name, this is a local regression, not a spline. With fewer than five valid
+#'   CpGs, smoothing is skipped with a warning. SEs do not weight the smoother.
+#'   The x-axis is symmetric about zero and includes all SE endpoints and
+#'   smoothed values, with equal padding on both sides.
+#' @returns A ggplot object. Its `data` contains the plotted rows, genomic
+#'   positions, CpG indices, coefficients, standard errors, and interval bounds.
+#'   No files are written.
+#' @export
+plot_icr_cpg_diffs <- function(
+    df_cpg, icr_id,
+    coeff_colname = "cpg_glm_estimate",
+    coeff_se_colname = "cpg_glm_estimate_se", spline_window_size = 5) {
+  required <- c("cpg_id", coeff_colname, coeff_se_colname)
+  missing_cols <- setdiff(required, names(df_cpg))
+  if (length(missing_cols)) {
+    stop("Missing columns in df_cpg: ", paste(missing_cols, collapse = ", "))
+  }
+  if (length(icr_id) != 1L || is.na(icr_id)) {
+    stop("icr_id must be a single nonmissing ICR identifier.")
+  }
+  if (!is.null(spline_window_size) &&
+      (!is.numeric(spline_window_size) || length(spline_window_size) != 1L ||
+       !is.finite(spline_window_size) || spline_window_size < 5 ||
+       spline_window_size != floor(spline_window_size))) {
+    stop("spline_window_size must be NULL or an integer of at least 5.")
+  }
+
+  # Use the package manifest for both membership and genomic ordering.
+  manifest <- tdhia::manifest_v1A2_design_scores
+  sites <- unique(manifest[which(manifest$icr_id == icr_id),
+                           c("cpg_id", "MAPINFO")])
+  if (anyDuplicated(sites$cpg_id)) {
+    stop("The manifest contains conflicting positions for CpGs in this ICR.")
+  }
+  df_plot <- as.data.frame(df_cpg[df_cpg$cpg_id %in% sites$cpg_id, ])
+  if (!nrow(df_plot)) stop("No CpG results found for ", icr_id, ".")
+  if (anyDuplicated(df_plot$cpg_id)) {
+    stop("Multiple results per CpG; subset df_cpg to one primary variable ",
+         "and model group before plotting.")
+  }
+
+  df_plot$MAPINFO <- sites$MAPINFO[match(df_plot$cpg_id, sites$cpg_id)]
+  df_plot$coefficient <- df_plot[[coeff_colname]]
+  df_plot$coefficient_se <- df_plot[[coeff_se_colname]]
+  if (!is.numeric(df_plot$coefficient) ||
+      !is.numeric(df_plot$coefficient_se)) {
+    stop("Coefficient and standard error columns must be numeric.")
+  }
+  if (any(df_plot$coefficient_se < 0, na.rm = TRUE)) {
+    stop("Standard errors must be nonnegative.")
+  }
+
+  # Remove unavailable results before assigning consecutive site indices.
+  keep <- is.finite(df_plot$coefficient) &
+    is.finite(df_plot$coefficient_se) & is.finite(df_plot$MAPINFO)
+  if (any(!keep)) warning("Omitting ", sum(!keep), " CpG(s) with missing ",
+                          "or nonfinite coefficients, SEs, or positions.")
+  df_plot <- df_plot[keep, , drop = FALSE]
+  if (!nrow(df_plot)) stop("No finite CpG results remain for ", icr_id, ".")
+  df_plot <- df_plot[order(df_plot$MAPINFO, df_plot$cpg_id), , drop = FALSE]
+  df_plot$cpg_index <- seq_len(nrow(df_plot))
+  df_plot$lower <- df_plot$coefficient - df_plot$coefficient_se
+  df_plot$upper <- df_plot$coefficient + df_plot$coefficient_se
+
+  # Keep the index axis readable even for ICRs containing hundreds of CpGs.
+  n_sites <- nrow(df_plot)
+  ticks <- if (n_sites <= 20L) seq_len(n_sites) else
+    sort(unique(c(1, pretty(c(1, n_sites), n = 8), n_sites)))
+  ticks <- ticks[ticks >= 1 & ticks <= n_sites]
+  title <- sprintf("%s (%d CpGs)", icr_id, n_sites)
+
+  gg <- ggplot2::ggplot(df_plot, ggplot2::aes(x = coefficient, y = cpg_index)) +
+    # Scale limits include all layers, including the SEs and LOESS curve.
+    ggplot2::scale_x_continuous(limits = function(limits) {
+      bound <- max(abs(limits))
+      if (bound == 0) bound <- 1
+      c(-bound, bound)
+    }) +
+    ggplot2::scale_y_reverse(breaks = ticks) +
+    ggplot2::labs(x = coeff_colname, y = "CpG index (genomic order)",
+                  title = title) +
+    ggplot2::theme_classic(base_size = 10)
+  
+  # Predict in index order; geom_path follows CpGs rather than sorting by x.
+  if (!is.null(spline_window_size)) {
+    if (n_sites < 5L) {
+      warning("Skipping LOESS: fewer than five valid CpGs.")
+    } else {
+      fit <- stats::loess(coefficient ~ cpg_index, data = df_plot,
+                          span = min(spline_window_size / n_sites, 1),
+                          degree = 1, control = stats::loess.control(
+                            surface = "direct"))
+      trend <- data.frame(cpg_index = seq(1, n_sites,
+                                          length.out = max(200, n_sites)))
+      trend$estimate <- as.numeric(stats::predict(fit, newdata = trend))
+      # Insert zero crossings so both fills meet the curve at its sign changes.
+      crossing <- which(head(trend$estimate, -1) *
+                          tail(trend$estimate, -1) < 0)
+      if (length(crossing)) {
+        left <- trend[crossing, ]
+        right <- trend[crossing + 1L, ]
+        zeros <- data.frame(cpg_index = left$cpg_index - left$estimate *
+          (right$cpg_index - left$cpg_index) /
+          (right$estimate - left$estimate), estimate = 0)
+        trend <- rbind(trend, zeros)
+        trend <- trend[order(trend$cpg_index), ]
+      }
+      # Draw fills first so they remain behind the estimates and SE segments.
+      gg <- gg + ggplot2::geom_ribbon(
+        data = trend, ggplot2::aes(y = cpg_index, xmin = 0,
+                                    xmax = pmax(estimate, 0)),
+        inherit.aes = FALSE, orientation = "y", fill = "red",
+        alpha = 0.4, colour = NA) +
+        ggplot2::geom_ribbon(
+          data = trend, ggplot2::aes(y = cpg_index,
+                                      xmin = pmin(estimate, 0), xmax = 0),
+          inherit.aes = FALSE, orientation = "y", fill = "blue",
+          alpha = 0.4, colour = NA) +
+        ggplot2::geom_path(
+        data = trend, ggplot2::aes(x = estimate, y = cpg_index),
+        inherit.aes = FALSE, colour = "black", linewidth = 0.7)
+    }
+  }
+  gg <- gg +
+    ggplot2::geom_vline(xintercept = 0, colour = "black", linewidth = 1) +
+    ggplot2::geom_segment(
+      ggplot2::aes(x = lower, xend = upper, yend = cpg_index),
+      colour = "grey60", alpha = 0.6, linewidth = 1) +
+    ggplot2::geom_point(colour = "black", size = 1.05)
+  return(gg)
+}
+
+
 #' plot_icr_dotplot
 #' @description produces a simple dot pot of beta values of CpG sites within a 
 #' specified ICR, seperating patients into 2 groups.
@@ -195,7 +353,7 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
 #' @param sig_cpgs vector of cpg site IDs that are significant (can be across 
 #' all ICRs and not just ICR being plotted).
 #' @param df_patient_groups a dataframe with the  
-#' 1) a sample colum  name (default: patient_id, specified by sample_colname) 
+#' 1) a sample column  name (default: patient_id, specified by sample_colname) 
 #' 2) diff_group: column that specifies whether each patient 
 #' is in the low (1) or high (2) group.
 #' 3) subset_group: column that specifies different subsets of patient population
@@ -216,7 +374,7 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
 #' @param filter_na_group boolean, when TRUE (default), removes NA group from plots.
 #' @param legend.position specify position of legend as specified in ggplot theme
 #'  (default = "none").
-#' @param sample_colname name of coolumn that refers to sample_id found with 
+#' @param sample_colname name of column that refers to sample_id found with 
 #' df_patient_groups, and also matc the column names in mat_cpg_beta.
 #' @param overwrite_plot boolean, when true, plot is overwritten to disk.
 #' @returns a ggplot function handle to the plot.

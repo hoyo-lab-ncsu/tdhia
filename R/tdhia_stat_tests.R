@@ -211,8 +211,9 @@ tdhia_stat_tests <- function(
   }, overwrite = overwrite_stats_cache)
   # Add results to master cpg dataframe
   df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% 
-    select(Variable, Estimate, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
+    select(Variable, Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
     rename(cpg_id = Variable, cpg_glm_estimate = Estimate, cpg_glm_statistic = Statistic,
+           cpg_glm_estimate_se = StdError,
            cpg_glm_raw_pval = P_VAL, cpg_glm_adj_pval = ADJ_P_VAL, cpg_glm_family = Family) %>%
     left_join(  tdhia::mapping_cpg_icr_ids %>% select(ICR_id, CpG_id) %>% distinct() %>% 
                   rename(icr_id = ICR_id, cpg_id = CpG_id), by = join_by(cpg_id))
@@ -239,8 +240,9 @@ tdhia_stat_tests <- function(
   }, overwrite = FALSE)
   # Add cpg level results
   df_icr_glm_formatted <- df_icr_glm$imp_site %>% 
-    select(Variable, Estimate, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
+    select(Variable, Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
     rename(icr_id = Variable, icr_glm_estimate = Estimate, icr_glm_statistic = Statistic,
+           icr_glm_estimate_se = StdError,
            icr_glm_raw_pval = P_VAL, icr_glm_adj_pval = ADJ_P_VAL, icr_glm_family = Family)
   # Add icr level results
   df_icr <- df_icr %>% left_join(df_icr_glm_formatted, by = join_by(icr_id) )
@@ -383,7 +385,7 @@ tdhia_stat_summary_plots<- function (df_all_test, out_path) {
   # Summary plots
   mat <- df_all_test$df_icr_summary %>% column_to_rownames("primary_var") %>%
     select(-model_group) %>% as.matrix()
-  my_breaks <- c(0, 2^(0:ceiling(log2(max(mat)))))
+  my_breaks <- c(0, 2^(0:ceiling(log2(max(pmax(mat,1))))))
   my_colors <- colorRampPalette(c("white", "red"))(length(my_breaks) - 1)
   plot_icr_summary <- pheatmap::pheatmap(
     mat, scale="none", display_numbers = TRUE, number_format = "%.0f",
@@ -392,7 +394,7 @@ tdhia_stat_summary_plots<- function (df_all_test, out_path) {
   # Summary plots
   mat <-  df_all_test$df_cpg_summary %>% column_to_rownames("primary_var") %>%
     select(-model_group) %>% as.matrix()
-  my_breaks <- c(0, 2^(0:ceiling(log2(max(mat)))))
+  my_breaks <- c(0, 2^(0:ceiling(log2(max(pmax(mat,1))))))
   my_colors <- colorRampPalette(c("white", "red"))(length(my_breaks) - 1)
   plot_cpg_summary <- pheatmap::pheatmap(
     mat, scale="none", display_numbers = TRUE, number_format = "%.0f",
@@ -531,7 +533,7 @@ tdhia_stat_export_tables <- function(df_all_test, out_path) {
   
   
   
-  df_all_test %>% group_by(primary_var , model_group)
+  # df_all_test %>% group_by(primary_var , model_group)
   
 }
 
