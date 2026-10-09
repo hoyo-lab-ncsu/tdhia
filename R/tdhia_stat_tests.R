@@ -177,7 +177,10 @@ tdhia_stat_tests <- function(
     pull(cpg_id) %>% unique()
   df_cpg <- data.frame(primary_var = rep(primary_var, length(cpg_ids)), 
                        model_group = rep(model_group, length(cpg_ids)), 
-                       cpg_id = cpg_ids)
+                       cpg_id = cpg_ids) %>%
+    left_join( tdhia::manifest_v1A2_design_scores %>% filter(!is.na(icr_id)) %>% 
+                 select(cpg_id, icr_id) %>% distinct(), by = join_by(cpg_id))
+  
   icr_ids = tdhia::manifest_v1A2_design_scores  %>% filter(!is.na(icr_id)) %>%
     pull(icr_id) %>% unique()
   df_icr <- data.frame(primary_var = rep(primary_var, length(icr_ids)), 
@@ -209,7 +212,7 @@ tdhia_stat_tests <- function(
       n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
-  # Add results to master cpg dataframe
+  # Add to CpG-level results
   df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% 
     select(Variable, Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
     rename(cpg_id = Variable, cpg_glm_estimate = Estimate, cpg_glm_statistic = Statistic,
@@ -218,7 +221,7 @@ tdhia_stat_tests <- function(
     left_join(  tdhia::mapping_cpg_icr_ids %>% select(ICR_id, CpG_id) %>% distinct() %>% 
                   rename(icr_id = ICR_id, cpg_id = CpG_id), by = join_by(cpg_id))
   df_cpg <- df_cpg %>% left_join( df_cpg_glm_formatted %>% select(-icr_id), by = join_by(cpg_id)) 
-  # Add cpg_glm results to icr table
+  # Add to ICR-level results
   df_icr <- df_icr %>% left_join(
     df_cpg_glm_formatted %>% group_by(icr_id) %>% summarize(
       cpg_glm_estimate_max = max_mag_sign(cpg_glm_estimate), 
@@ -238,16 +241,16 @@ tdhia_stat_tests <- function(
       n_p_adj = nrow(data_na$betas$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = FALSE)
-  # Add cpg level results
+  
   df_icr_glm_formatted <- df_icr_glm$imp_site %>% 
     select(Variable, Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
     rename(icr_id = Variable, icr_glm_estimate = Estimate, icr_glm_statistic = Statistic,
            icr_glm_estimate_se = StdError,
            icr_glm_raw_pval = P_VAL, icr_glm_adj_pval = ADJ_P_VAL, icr_glm_family = Family)
-  # Add icr level results
+  # Add to ICR-level results
   df_icr <- df_icr %>% left_join(df_icr_glm_formatted, by = join_by(icr_id) )
-  
-  
+  # Add to CpG-level results
+  df_cpg <- df_cpg %>% left_join(df_icr_glm_formatted, by = join_by(icr_id))
   
   
   # ICR SKAT                                                         ##########  
@@ -262,11 +265,11 @@ tdhia_stat_tests <- function(
       m_value_transform = m_value_transform,  scaling = TRUE,  verbose = verbose,
       n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
-  # Add ICR level results
-  df_icr <- df_icr %>% left_join( 
-    df_icr_skat %>% rename(skat_n_cpg = n_cpg) %>% rename_with(~ paste0("icr_", .), -icr_id), 
-    by = join_by(icr_id)) 
-  
+  df_icr_skat_formatted <- df_icr_skat %>% rename(skat_n_cpg = n_cpg) %>% rename_with(~ paste0("icr_", .), -icr_id)
+  # Add to ICR-level results
+  df_icr <- df_icr %>% left_join( df_icr_skat_formatted, by = join_by(icr_id)) 
+  # Add to CpG-level results
+  df_cpg <- df_cpg %>% left_join(df_icr_skat_formatted, by = join_by(icr_id))
   
   
   
@@ -282,11 +285,12 @@ tdhia_stat_tests <- function(
       Patient_ID = "Patient_ID",  family = family,  icr_ids = NULL,
       min_cpg = 3,  verbose = verbose,  n.cores = 1)
   }, overwrite = overwrite_stats_cache)
-  # Add ICR level results
-  df_icr <- df_icr %>% left_join( 
-    df_icr_pcr %>% rename(icr_id = ICR_id, adj_pval = adj_p_value ) %>% 
-      rename_with(~ paste0("icr_pcr_", .), -icr_id), by = join_by(icr_id)) 
-  
+  df_icr_pcr_formatted <- df_icr_pcr %>% rename(icr_id = ICR_id, adj_pval = adj_p_value ) %>% 
+    rename_with(~ paste0("icr_pcr_", .), -icr_id)
+  # Add to ICR-level results
+  df_icr <- df_icr %>% left_join(df_icr_pcr_formatted, by = join_by(icr_id)) 
+  # Add to CpG-level results
+  df_cpg <- df_cpg %>% left_join(df_icr_pcr_formatted, by = join_by(icr_id))
   
   # CpG Limma                                                         ##########  
   #_____________________________________________________________________________
@@ -299,7 +303,7 @@ tdhia_stat_tests <- function(
       m_value_transform = m_value_transform,
       beadchip_correction = F, verbose = T)
   }, overwrite = overwrite_stats_cache)
-  # Add cpg level results
+  # Add to CpG-level results
   df_cpg_limma_formatted <- df_cpg_limma$df_dml %>% 
     select(CpG_Probe, logFC, AveExpr, P.Value, t, P.Value, adj.P.Val  ) %>%
     rename(cpg_id = CpG_Probe, cpg_limma_logfc = logFC, cpg_limma_avg_expr = AveExpr,
@@ -307,7 +311,7 @@ tdhia_stat_tests <- function(
     left_join(  tdhia::mapping_cpg_icr_ids %>% select(ICR_id, CpG_id) %>% distinct() %>% 
                   rename(icr_id = ICR_id, cpg_id = CpG_id), by = join_by(cpg_id))
   df_cpg <- df_cpg %>% left_join( select(df_cpg_limma_formatted,-icr_id), by = join_by(cpg_id)) 
-  # Add cpg limma results to icr results
+  # Add to ICR-level results
   df_icr <- df_icr %>% left_join(
     df_cpg_limma_formatted %>% group_by(icr_id) %>% summarize(
       cpg_limma_logfc_max  = max_mag_sign(cpg_limma_logfc ), 
@@ -325,14 +329,20 @@ tdhia_stat_tests <- function(
       df_dml = df_cpg_limma$df_dml, chr_lens = df_cpg_limma$chr_lens,
       pval_threshold = 0.05, fdr_sig_threshold = 0.0001, verbose = T, db_flag = F)
   }, overwrite = overwrite_stats_cache)
-  df_icr <- df_icr %>% left_join( 
-    df_icr_lancaster$ICR_summary %>% rename(icr_id = ICR_id, combined_adj_pval = FDR) %>% 
-      rename_with(~ paste0("icr_lanc_", .), -icr_id), by = join_by(icr_id)) 
-  #  cpg level results
+ 
+  df_icr_lancaster_formatted <- df_icr_lancaster$ICR_summary %>% rename(icr_id = ICR_id, combined_adj_pval = FDR) %>% 
+    rename_with(~ paste0("icr_lanc_", .), -icr_id)
+  # Add to ICR-level results
+  df_icr <- df_icr %>% left_join(df_icr_lancaster_formatted, by = join_by(icr_id)) 
+  # Add to CpG-level results
+  df_cpg <- df_cpg %>% left_join(df_icr_lancaster_formatted, by = join_by(icr_id))
+  
+  
+  # Summarize number of significant sites at cpg level
   df_cpg_summary <- df_cpg %>% select(contains("adj_pval")) %>%
     summarise(across(where(is.numeric), ~ sum(.x < 0.05, na.rm = TRUE))) %>% 
     mutate(primary_var = primary_var, model_group = model_group, .before = 1)
-  #  icr level results
+  # Summarize number of significant sites at cpg level
   df_icr_summary <- df_icr %>% select(contains("adj_pval")) %>%
     summarise(across(where(is.numeric), ~ sum(.x < 0.05, na.rm = TRUE))) %>%
     mutate(primary_var = primary_var, model_group = model_group, .before = 1)
@@ -346,8 +356,7 @@ tdhia_stat_tests <- function(
       df_icr$icr_id, imp_type = "icr"), by = join_by("icr_id"), keep = F,multiple = "first")
   }
   
-  
-  # Record column prefixes for each analysis
+  # Record column prefixes for each analysis (used to get output columns for each analysis)
   prefix = list()
   prefix$cpg_glm = "cpg_glm"
   prefix$df_icr_glm = "icr_glm"
@@ -355,10 +364,6 @@ tdhia_stat_tests <- function(
   prefix$df_icr_pcr = "icr_pcr"
   prefix$df_cpg_limma = "cpg_limma"
   prefix$df_icr_lancaster = "icr_lanc"
-  
-  
-  
-  
   
   
   # Export tables with basic attributes stored in each
@@ -370,7 +375,6 @@ tdhia_stat_tests <- function(
     attr(out[[n]], "labels") <- tdhia_stat_pretty_labels(out[[n]])
     
   }
-  
   
   
   return(out)
@@ -595,13 +599,32 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data,df_cpg_beta, 
     
     for (m in seq_along(sig_icrs)) {
     # Plot call for each ICR
-    out <- plot_icr_dotplot(
-      mat_cpg_beta = df_cpg_beta, sig_cpgs = sig_cpgs, df_patient_groups = df_patient_groups, 
-      icr_id = sig_icrs[m], xlab_txt = "", plot_height_width = c(5,3),
-      output_path = subout_path,
-      max_sig_hwindow = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]], db_flag = F,
-      filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value", 
-                     sample_colname = "patient_id", overwrite_plot = T) 
+    # out <- plot_icr_dotplot(
+    #   mat_cpg_beta = df_cpg_beta, sig_cpgs = sig_cpgs, df_patient_groups = df_patient_groups, 
+    #   icr_id = sig_icrs[m], xlab_txt = "", plot_height_width = c(5,3),
+    #   output_path = subout_path,
+    #   max_sig_hwindow = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]], db_flag = F,
+    #   filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value", 
+    #                  sample_colname = "patient_id", overwrite_plot = T) 
+  
+      # a(b)
+    pval = df_all_test$df_icr[[pval_colname]][df_all_test$df_icr$icr_id==sig_icrs[m]]
+      
+      
+    gg <- plot_icr_cpg_diffs(
+      df_cpg = df_all_test$df_cpg,
+      title_extra = sprintf(", p-val=%.1E", pval),
+      icr_id = sig_icrs[m],spline_window_bp_size = 250,
+      export_plot = TRUE,
+      output_path = subout_path)
+    
+    # gg <- plot_icr_cpg_diffs_rows(
+    #   df_cpg = df_all_test$df_cpg,
+    #   icr_id = sig_icrs[m],spline_window_bp_size = 150,
+    #   export_plot = TRUE,
+    #   output_path = subout_path)
+    # print(gg)
+    
       
     }
     

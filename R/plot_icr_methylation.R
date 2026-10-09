@@ -15,29 +15,53 @@
 #' @param coeff_colname Name of the numeric coefficient column.
 #' @param coeff_se_colname Numeric standard error column on the same scale as
 #'   the coefficient. Standard errors must be nonnegative.
-#' @param spline_window_size Approximate number of neighboring CpGs used by
+#' @param spline_window_cpg_size Approximate number of neighboring CpGs used by
 #'   LOESS, an integer of at least 5. Defaults to 5; NULL disables smoothing.
 #'   Larger values smooth more. The window is capped at the plotted CpG count.
+#' @param spline_window_bp_size Full genomic window width in base pairs, a
+#'   positive finite number. Defaults to NULL. When supplied, overrides
+#'   `spline_window_cpg_size`, including its validation. For example, 1000 uses
+#'   sites within 500 bp on either side of each prediction position.
+#' @param export_plot Logical; save the finished plot as a JPEG when TRUE.
+#'   Defaults to FALSE. The ggplot object is returned in either case.
+#' @param output_path Output directory, required when `export_plot = TRUE`.
+#'   Missing directories are created. The filename is
+#'   `diff_Est_<+ or ->ZF_<High, Medium, or Low>_<icr_id>.jpg`, using the same
+#'   metadata as [plot_icr_dotplot()]. Unknown confidence is labeled Unknown.
+#'   Images are 2 inches high and 2.5 inches wide. Existing files are overwritten;
+#'   both diff plotting functions use the same filename convention.
 #' @details CpG membership and positions come from
 #'   `tdhia::manifest_v1A2_design_scores`, using `icr_id` and `MAPINFO`.
 #'   Only CpGs present in `df_cpg` are plotted. Rows with missing or nonfinite
 #'   coefficients, standard errors, or positions are omitted with a warning.
 #'   Indices number the remaining CpGs
 #'   in genomic order; for large ICRs only a subset of index ticks is displayed.
-#'   LOESS fits coefficient against CpG index (not base-pair distance), using
-#'   degree 1 and span = min(spline_window_size / n_cpgs, 1). Despite the argument
+#'   In CpG mode, LOESS fits coefficient against CpG index, using
+#'   degree 1 and span = min(spline_window_cpg_size / n_cpgs, 1). Despite the argument
 #'   name, this is a local regression, not a spline. With fewer than five valid
-#'   CpGs, smoothing is skipped with a warning. SEs do not weight the smoother.
+#'   CpGs, CpG-mode smoothing is skipped with a warning.
+#'   In bp mode, local linear regression uses tricube distance weights within
+#'   half the specified window width; sites at the boundary have zero weight.
+#'   Predictions requiring fewer than two distinct positively weighted genomic
+#'   positions are left as gaps, without widening the window. Prediction
+#'   positions are interpolated from MAPINFO along the numbered CpG axis.
+#'   Both window arguments set to NULL disable smoothing. SEs do not weight
+#'   either smoother. Calls using the old `spline_window_size` argument must
+#'   use `spline_window_cpg_size` instead.
 #'   The x-axis is symmetric about zero and includes all SE endpoints and
 #'   smoothed values, with equal padding on both sides.
 #' @returns A ggplot object. Its `data` contains the plotted rows, genomic
 #'   positions, CpG indices, coefficients, standard errors, and interval bounds.
-#'   No files are written.
+#'   Files are written only when `export_plot = TRUE`.
 #' @export
 plot_icr_cpg_diffs <- function(
-    df_cpg, icr_id,
+    df_cpg, icr_id, title_extra = "",
     coeff_colname = "cpg_glm_estimate",
-    coeff_se_colname = "cpg_glm_estimate_se", spline_window_size = 5) {
+    coeff_se_colname = "cpg_glm_estimate_se", spline_window_cpg_size = 5,
+    spline_window_bp_size = NULL, export_plot = FALSE, output_path = NULL) {
+  # if(TRUE) save(list = ls(all.names = TRUE), file = "plot_icr_cpg_diffs.RData")
+  # load(file = "plot_icr_cpg_diffs.RData")
+  
   required <- c("cpg_id", coeff_colname, coeff_se_colname)
   missing_cols <- setdiff(required, names(df_cpg))
   if (length(missing_cols)) {
@@ -46,11 +70,17 @@ plot_icr_cpg_diffs <- function(
   if (length(icr_id) != 1L || is.na(icr_id)) {
     stop("icr_id must be a single nonmissing ICR identifier.")
   }
-  if (!is.null(spline_window_size) &&
-      (!is.numeric(spline_window_size) || length(spline_window_size) != 1L ||
-       !is.finite(spline_window_size) || spline_window_size < 5 ||
-       spline_window_size != floor(spline_window_size))) {
-    stop("spline_window_size must be NULL or an integer of at least 5.")
+  if (!is.null(spline_window_bp_size)) {
+    if (!is.numeric(spline_window_bp_size) ||
+        length(spline_window_bp_size) != 1L ||
+        !is.finite(spline_window_bp_size) || spline_window_bp_size <= 0) {
+      stop("spline_window_bp_size must be NULL or a positive finite number.")
+    }
+  } else if (!is.null(spline_window_cpg_size) &&
+      (!is.numeric(spline_window_cpg_size) || length(spline_window_cpg_size) != 1L ||
+       !is.finite(spline_window_cpg_size) || spline_window_cpg_size < 5 ||
+       spline_window_cpg_size != floor(spline_window_cpg_size))) {
+    stop("spline_window_cpg_size must be NULL or an integer of at least 5.")
   }
 
   # Use the package manifest for both membership and genomic ordering.
@@ -95,7 +125,7 @@ plot_icr_cpg_diffs <- function(
   ticks <- if (n_sites <= 20L) seq_len(n_sites) else
     sort(unique(c(1, pretty(c(1, n_sites), n = 8), n_sites)))
   ticks <- ticks[ticks >= 1 & ticks <= n_sites]
-  title <- sprintf("%s (%d CpGs)", icr_id, n_sites)
+  title <- sprintf("%s", icr_id)
 
   gg <- ggplot2::ggplot(df_plot, ggplot2::aes(x = coefficient, y = cpg_index)) +
     # Scale limits include all layers, including the SEs and LOESS curve.
@@ -106,21 +136,39 @@ plot_icr_cpg_diffs <- function(
     }) +
     ggplot2::scale_y_reverse(breaks = ticks) +
     ggplot2::labs(x = coeff_colname, y = "CpG index (genomic order)",
-                  title = title) +
+                  title = paste0(title, " ", title_extra)) +
     ggplot2::theme_classic(base_size = 10)
   
   # Predict in index order; geom_path follows CpGs rather than sorting by x.
-  if (!is.null(spline_window_size)) {
-    if (n_sites < 5L) {
+  if (!is.null(spline_window_bp_size) || !is.null(spline_window_cpg_size)) {
+    if (is.null(spline_window_bp_size) && n_sites < 5L) {
       warning("Skipping LOESS: fewer than five valid CpGs.")
     } else {
-      fit <- stats::loess(coefficient ~ cpg_index, data = df_plot,
-                          span = min(spline_window_size / n_sites, 1),
-                          degree = 1, control = stats::loess.control(
-                            surface = "direct"))
       trend <- data.frame(cpg_index = seq(1, n_sites,
                                           length.out = max(200, n_sites)))
-      trend$estimate <- as.numeric(stats::predict(fit, newdata = trend))
+      if (is.null(spline_window_bp_size)) {
+        fit <- stats::loess(coefficient ~ cpg_index, data = df_plot,
+                            span = min(spline_window_cpg_size / n_sites, 1),
+                            degree = 1, control = stats::loess.control(
+                              surface = "direct"))
+        trend$estimate <- as.numeric(stats::predict(fit, newdata = trend))
+      } else {
+        positions <- if (n_sites == 1L) rep(df_plot$MAPINFO, nrow(trend)) else
+          stats::approx(df_plot$cpg_index, df_plot$MAPINFO,
+                        xout = trend$cpg_index)$y
+        # Center and scale each local fit to avoid large genomic coordinates.
+        trend$estimate <- vapply(positions, function(position) {
+          distance <- (df_plot$MAPINFO - position) /
+            (spline_window_bp_size / 2)
+          inside <- abs(distance) < 1
+          if (length(unique(df_plot$MAPINFO[inside])) < 2L) return(NA_real_)
+          local_x <- distance[inside]
+          weights <- (1 - abs(local_x)^3)^3
+          fit <- stats::lm.wfit(cbind(1, local_x),
+                               df_plot$coefficient[inside], w = weights)
+          if (fit$rank < 2L) NA_real_ else unname(fit$coefficients[1])
+        }, numeric(1))
+      }
       # Insert zero crossings so both fills meet the curve at its sign changes.
       crossing <- which(head(trend$estimate, -1) *
                           tail(trend$estimate, -1) < 0)
@@ -133,19 +181,22 @@ plot_icr_cpg_diffs <- function(
         trend <- rbind(trend, zeros)
         trend <- trend[order(trend$cpg_index), ]
       }
+      # Separate finite runs so neither lines nor fills bridge sparse regions.
+      trend$segment <- cumsum(!is.finite(trend$estimate))
+      trend <- trend[is.finite(trend$estimate), ]
       # Draw fills first so they remain behind the estimates and SE segments.
       gg <- gg + ggplot2::geom_ribbon(
-        data = trend, ggplot2::aes(y = cpg_index, xmin = 0,
+        data = trend, ggplot2::aes(y = cpg_index, xmin = 0, group = segment,
                                     xmax = pmax(estimate, 0)),
         inherit.aes = FALSE, orientation = "y", fill = "red",
         alpha = 0.4, colour = NA) +
         ggplot2::geom_ribbon(
-          data = trend, ggplot2::aes(y = cpg_index,
+          data = trend, ggplot2::aes(y = cpg_index, group = segment,
                                       xmin = pmin(estimate, 0), xmax = 0),
           inherit.aes = FALSE, orientation = "y", fill = "blue",
           alpha = 0.4, colour = NA) +
         ggplot2::geom_path(
-        data = trend, ggplot2::aes(x = estimate, y = cpg_index),
+        data = trend, ggplot2::aes(x = estimate, y = cpg_index, group = segment),
         inherit.aes = FALSE, colour = "black", linewidth = 0.7)
     }
   }
@@ -155,7 +206,81 @@ plot_icr_cpg_diffs <- function(
       ggplot2::aes(x = lower, xend = upper, yend = cpg_index),
       colour = "grey60", alpha = 0.6, linewidth = 1) +
     ggplot2::geom_point(colour = "black", size = 1.05)
+  .export_icr_cpg_diffs(gg, icr_id, export_plot, output_path)
   return(gg)
+}
+
+
+#' Plot CpG estimates and standard errors as full-height rows
+#'
+#' @description A row-based version of [plot_icr_cpg_diffs()]. Grey rectangles
+#'   span estimate plus or minus one standard error and the full CpG row height.
+#'   Black vertical lines mark the estimates and span the full row height.
+#' @inheritParams plot_icr_cpg_diffs
+#' @details Uses the same manifest, filtering, genomic order, smoothing options,
+#'   and symmetric coefficient axis as [plot_icr_cpg_diffs()]. Each row extends
+#'   from CpG index minus 0.5 to index plus 0.5. Estimate lines use the same
+#'   bounds as the SE rectangles, so their heights adapt to the number of CpGs
+#'   and panel height. Line width is fixed; line position marks the estimate.
+#'   Light grey SE rectangles and estimate lines are drawn beneath the
+#'   smoothing layers and the zero reference line.
+#' @returns A ggplot object with the plotted rows in its `data`. Files are
+#'   written only when `export_plot = TRUE`. Missing-value handling is inherited
+#'   from [plot_icr_cpg_diffs()].
+#' @export
+plot_icr_cpg_diffs_rows <- function(
+    df_cpg, icr_id, coeff_colname = "cpg_glm_estimate",
+    coeff_se_colname = "cpg_glm_estimate_se", spline_window_cpg_size = 5,
+    spline_window_bp_size = NULL, export_plot = FALSE, output_path = NULL) {
+  gg <- plot_icr_cpg_diffs(
+    df_cpg, icr_id, coeff_colname = coeff_colname,
+    coeff_se_colname = coeff_se_colname,
+    spline_window_cpg_size = spline_window_cpg_size,
+    spline_window_bp_size = spline_window_bp_size, export_plot = FALSE)
+
+  # Replace only the estimate and SE layers; retain the shared smoothing code.
+  for (i in seq_along(gg$layers)) {
+    if (inherits(gg$layers[[i]]$geom, "GeomSegment")) {
+      gg$layers[[i]] <- ggplot2::geom_rect(
+        ggplot2::aes(xmin = lower, xmax = upper,
+                      ymin = cpg_index - 0.5, ymax = cpg_index + 0.5),
+        fill = "grey80", alpha = 0.4, colour = NA)
+    } else if (inherits(gg$layers[[i]]$geom, "GeomPoint")) {
+      gg$layers[[i]] <- ggplot2::geom_segment(
+        ggplot2::aes(x = coefficient, xend = coefficient,
+                      y = cpg_index - 0.5, yend = cpg_index + 0.5),
+        colour = "black", linewidth = 0.6, lineend = "butt")
+    }
+  }
+  # Draw row marks first, leaving the smoother and zero reference on top.
+  row_layers <- vapply(gg$layers, function(layer) {
+    inherits(layer$geom, "GeomRect") || inherits(layer$geom, "GeomSegment")
+  }, logical(1))
+  gg$layers <- c(gg$layers[row_layers], gg$layers[!row_layers])
+  .export_icr_cpg_diffs(gg, icr_id, export_plot, output_path)
+  gg
+}
+
+# Shared export path; the rows function calls this after replacing its layers.
+.export_icr_cpg_diffs <- function(gg, icr_id, export_plot, output_path) {
+  if (!is.logical(export_plot) || length(export_plot) != 1L ||
+      is.na(export_plot)) stop("export_plot must be TRUE or FALSE.")
+  if (!export_plot) return(invisible(NULL))
+  if (!is.character(output_path) || length(output_path) != 1L ||
+      is.na(output_path) || !nzchar(output_path)) {
+    stop("output_path must be an output directory when export_plot is TRUE.")
+  }
+  icr_metadata <- add_metadata_to_imp_sites(icr_id, imp_type = "icr")
+  zinc_finger_str <- c("-", "+")[as.integer(icr_metadata$is_icr_zinc[1]) + 1L]
+  icf_conf_str <- c("1" = "High", "2" = "Medium", "3" = "Low")[
+    as.character(icr_metadata$icr_conf[1])]
+  if (is.na(icf_conf_str)) icf_conf_str <- "Unknown"
+  filename <- file.path(output_path, sprintf("diff_Est_%sZF_%s_%s.jpg",
+                                            zinc_finger_str, icf_conf_str, icr_id))
+  dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
+  cowplot::save_plot(filename = filename, plot = gg,
+                     base_height = 4, base_width = 4.5)
+  invisible(filename)
 }
 
 
@@ -297,24 +422,24 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
       legend.position = legend.position) 
   
   
-  # Connect group means and fill each curve down to zero without stacking.
-  gg2 <- ggplot(data = df_summary,
-                aes(x = cpg_id_rank, y = beta_mean, group = group)) +
-    geom_ribbon(aes(ymin = 0, ymax = beta_mean, fill = group),
-                alpha = 0.2, colour = NA) +
-    geom_line(aes(color = group), linewidth = 0.5) +
-    scale_color_manual(values = c("blue", "red")) +
-    scale_fill_manual(values = c("blue", "red")) +
-    # Site ranks follow the same genomic order as the dot plot.
-    scale_x_continuous(breaks = seq_len(nrow(sub_mat_cpg_beta))) +
-    coord_cartesian(xlim = range(df_summary$cpg_id_rank),
-                    ylim = padded_xlim) +
-    xlab("CpG Sites") + ylab(ytext) +
-    ggtitle(sprintf("%s (%d CpGs) %sZF: %s", icr_id, total_cpgs,
-                    zinc_finger_str, icr_metadata$Nearest.Transcript)) +
-    theme_classic(base_size = 7) +
-    theme(plot.title = element_text(size = 6),
-          legend.position = legend.position)
+  # # Connect group means and fill each curve down to zero without stacking.
+  # gg2 <- ggplot(data = df_summary,
+  #               aes(x = cpg_id_rank, y = beta_mean, group = group)) +
+  #   geom_ribbon(aes(ymin = 0, ymax = beta_mean, fill = group),
+  #               alpha = 0.2, colour = NA) +
+  #   geom_line(aes(color = group), linewidth = 0.5) +
+  #   scale_color_manual(values = c("blue", "red")) +
+  #   scale_fill_manual(values = c("blue", "red")) +
+  #   # Site ranks follow the same genomic order as the dot plot.
+  #   scale_x_continuous(breaks = seq_len(nrow(sub_mat_cpg_beta))) +
+  #   coord_cartesian(xlim = range(df_summary$cpg_id_rank),
+  #                   ylim = padded_xlim) +
+  #   xlab("CpG Sites") + ylab(ytext) +
+  #   ggtitle(sprintf("%s (%d CpGs) %sZF: %s", icr_id, total_cpgs,
+  #                   zinc_finger_str, icr_metadata$Nearest.Transcript)) +
+  #   theme_classic(base_size = 7) +
+  #   theme(plot.title = element_text(size = 6),
+  #         legend.position = legend.position)
 
   # Export
   plot_path <-
@@ -325,15 +450,15 @@ plot_icr_dotplot <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
     cowplot::save_plot(filename =  paste0(output_path, "/", sprintf(
       "dot_Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg"), 
       plot = gg,base_height = 2, base_width = 2.5)
-    cowplot::save_plot(filename =  paste0(output_path, "/", sprintf(
-      "line_Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg"), 
-      plot = gg2,base_height = 2, base_width = 2.5)
+    # cowplot::save_plot(filename =  paste0(output_path, "/", sprintf(
+    #   "line_Beta_%sZF_%s_%s", zinc_finger_str, icf_conf_str, icr_id), ".jpg"), 
+    #   plot = gg2,base_height = 2, base_width = 2.5)
   }
   
   # cat(sprintf("%s, cpg_subset: %s\n", icr_id, paste0(max_sig_hwindow, collapse = ": ")))
   
   # Export
-  return(list(dot_plot = gg, line_plot = gg2, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
+  return(list(dot_plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
 }
 
 

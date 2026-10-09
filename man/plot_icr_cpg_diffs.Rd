@@ -7,9 +7,13 @@
 plot_icr_cpg_diffs(
   df_cpg,
   icr_id,
+  title_extra = "",
   coeff_colname = "cpg_glm_estimate",
   coeff_se_colname = "cpg_glm_estimate_se",
-  spline_window_size = 5
+  spline_window_cpg_size = 5,
+  spline_window_bp_size = NULL,
+  export_plot = FALSE,
+  output_path = NULL
 )
 }
 \arguments{
@@ -24,14 +28,29 @@ before calling; duplicate CpG results within the ICR are rejected.}
 \item{coeff_se_colname}{Numeric standard error column on the same scale as
 the coefficient. Standard errors must be nonnegative.}
 
-\item{spline_window_size}{Approximate number of neighboring CpGs used by
+\item{spline_window_cpg_size}{Approximate number of neighboring CpGs used by
 LOESS, an integer of at least 5. Defaults to 5; NULL disables smoothing.
 Larger values smooth more. The window is capped at the plotted CpG count.}
+
+\item{spline_window_bp_size}{Full genomic window width in base pairs, a
+positive finite number. Defaults to NULL. When supplied, overrides
+\code{spline_window_cpg_size}, including its validation. For example, 1000 uses
+sites within 500 bp on either side of each prediction position.}
+
+\item{export_plot}{Logical; save the finished plot as a JPEG when TRUE.
+Defaults to FALSE. The ggplot object is returned in either case.}
+
+\item{output_path}{Output directory, required when \code{export_plot = TRUE}.
+Missing directories are created. The filename is
+\verb{diff_Est_<+ or ->ZF_<High, Medium, or Low>_<icr_id>.jpg}, using the same
+metadata as \code{\link[=plot_icr_dotplot]{plot_icr_dotplot()}}. Unknown confidence is labeled Unknown.
+Images are 2 inches high and 2.5 inches wide. Existing files are overwritten;
+both diff plotting functions use the same filename convention.}
 }
 \value{
 A ggplot object. Its \code{data} contains the plotted rows, genomic
 positions, CpG indices, coefficients, standard errors, and interval bounds.
-No files are written.
+Files are written only when \code{export_plot = TRUE}.
 }
 \description{
 Plot one coefficient per CpG, ordered by increasing genomic
@@ -47,10 +66,18 @@ Only CpGs present in \code{df_cpg} are plotted. Rows with missing or nonfinite
 coefficients, standard errors, or positions are omitted with a warning.
 Indices number the remaining CpGs
 in genomic order; for large ICRs only a subset of index ticks is displayed.
-LOESS fits coefficient against CpG index (not base-pair distance), using
-degree 1 and span = min(spline_window_size / n_cpgs, 1). Despite the argument
+In CpG mode, LOESS fits coefficient against CpG index, using
+degree 1 and span = min(spline_window_cpg_size / n_cpgs, 1). Despite the argument
 name, this is a local regression, not a spline. With fewer than five valid
-CpGs, smoothing is skipped with a warning. SEs do not weight the smoother.
+CpGs, CpG-mode smoothing is skipped with a warning.
+In bp mode, local linear regression uses tricube distance weights within
+half the specified window width; sites at the boundary have zero weight.
+Predictions requiring fewer than two distinct positively weighted genomic
+positions are left as gaps, without widening the window. Prediction
+positions are interpolated from MAPINFO along the numbered CpG axis.
+Both window arguments set to NULL disable smoothing. SEs do not weight
+either smoother. Calls using the old \code{spline_window_size} argument must
+use \code{spline_window_cpg_size} instead.
 The x-axis is symmetric about zero and includes all SE endpoints and
 smoothed values, with equal padding on both sides.
 }
