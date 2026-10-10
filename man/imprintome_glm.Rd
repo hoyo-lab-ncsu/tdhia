@@ -45,14 +45,14 @@ p-values in each adjusted result table.}
 \item{max_p_val}{Adjusted p-value threshold for printed summaries.
 Does not filter the returned results.}
 
-\item{impute_na}{Logical; enable MICE imputation in fit_model() for
+\item{impute_na}{Logical; enable MICE imputation in fit_model_glm() for
 missing model values remaining after the requested row removals.}
 
 \item{n.cores}{Number of parallel workers. NULL uses the detected core
 count minus one, with a minimum of one.}
 
 \item{db_flag}{Logical; save debugging environments to imprintome_glm.RData
-and study_imprint2.RData, and enable debugging in GLM_parallel().}
+and study_imprint2.RData, and enable debugging in single_imprint_glm().}
 
 \item{rm.na.R}{Logical; remove samples missing any response-column value
 before fitting any models.}
@@ -78,7 +78,7 @@ is the response, methylation site IDs appear in Response; when beta is
 the first predictor, they appear in Variable.
 Tables contain Response, Variable, Estimate, StdError, Statistic, P_VAL,
 Confounder, ADJ_P_VAL, Family, Formula, Model_Id, and aic, as described
-in GLM_parallel(), with ADJ_P_VAL filled by apply_fdr_correction().
+in single_imprint_glm(), with ADJ_P_VAL filled by apply_fdr_correction().
 The example_formula attribute holds the first fitted formula.
 }
 \description{
@@ -91,13 +91,13 @@ are aligned to response rows by sample ID. Models vary over methylation
 sites while retaining the same study covariates. Requested missing-value
 removal is performed across the entire selected response or predictor
 table, so missingness at one site can exclude a sample from every model.
-Remaining missingness is handled by fit_model().
+Remaining missingness is handled by fit_model_glm().
 
 Each result table is sorted by raw p-value, replacing missing raw p-values
 with 1 before applying the package's FDR correction. Fitting failures caught
-by GLM_parallel() can produce placeholder rows with missing estimates and
+by single_imprint_glm() can produce placeholder rows with missing estimates and
 p-values of 1; see that function for debug-file behavior.
 }
 \seealso{
-\code{\link[=GLM_parallel]{GLM_parallel()}}, \code{\link[=fit_model]{fit_model()}}, \code{\link[=apply_fdr_correction]{apply_fdr_correction()}}
+\code{\link[=single_imprint_glm]{single_imprint_glm()}}, \code{\link[=fit_model_glm]{fit_model_glm()}}, \code{\link[=apply_fdr_correction]{apply_fdr_correction()}}
 }

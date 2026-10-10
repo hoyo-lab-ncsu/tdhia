@@ -55,8 +55,8 @@ Files are written only when \code{export_plot = TRUE}.
 \description{
 Plot one coefficient per CpG, ordered by increasing genomic
 position from top to bottom. Black points and grey segments show estimates
-plus or minus one standard error. An optional black LOESS curve shows the
-trend, with transparent red fill between positive smoothed values and zero
+plus or minus one standard error. An optional smoother shows the
+trend through transparent red fill between positive smoothed values and zero
 and blue fill between negative smoothed values and zero.
 }
 \details{
@@ -80,4 +80,5 @@ either smoother. Calls using the old \code{spline_window_size} argument must
 use \code{spline_window_cpg_size} instead.
 The x-axis is symmetric about zero and includes all SE endpoints and
 smoothed values, with equal padding on both sides.
+The y-axis has no expansion beyond the plotted geometry.
 }

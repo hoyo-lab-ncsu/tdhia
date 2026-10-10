@@ -114,7 +114,8 @@ tdhia_stat_tests <- function(
   }
   
   # Set model variables
-  model_str <- paste0(primary_var, " ~ beta + ", paste0(predictor_vars,collapse = " + "))
+  beta_response_model <- paste0(primary_var, " ~ beta + ", paste0(predictor_vars,collapse = " + "))
+  beta_predictor_model <- paste0("beta ~  ", primary_var, " + ", paste0(predictor_vars,collapse = " + "))
   
   # Extract columns used in study data
   study_columns <- c(unname(primary_var), predictor_vars)
@@ -204,6 +205,12 @@ tdhia_stat_tests <- function(
   
   # CpG GLM                                                            ##########  
   #_____________________________________________________________________________
+  
+  # Produce two models beta response and beta predictor model
+  # 1) Both model outputs are stored
+  # 2) Either may be chosen for the recorded results
+  # 3) Beta response model is used for adjusted fitted methylation difference
+  
   df_cpg_glm_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "_df_cpg_glm.rds"))
   df_cpg_glm <- cache_result(df_cpg_glm_path, {
     tdhia::imprintome_glm(
@@ -212,6 +219,8 @@ tdhia_stat_tests <- function(
       n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
+  
+  
   # Add to CpG-level results
   df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% 
     select(Variable, Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
@@ -339,7 +348,7 @@ tdhia_stat_tests <- function(
   
   
   # Summarize number of significant sites at cpg level
-  df_cpg_summary <- df_cpg %>% select(contains("adj_pval")) %>%
+  df_cpg_summary <- df_cpg %>% select(matches("cpg.*adj_pval")) %>%
     summarise(across(where(is.numeric), ~ sum(.x < 0.05, na.rm = TRUE))) %>% 
     mutate(primary_var = primary_var, model_group = model_group, .before = 1)
   # Summarize number of significant sites at cpg level
@@ -351,7 +360,7 @@ tdhia_stat_tests <- function(
   # Add metadata to results tables
   if (add_genomic_metadata) {
     df_cpg <-  df_cpg %>% left_join(tdhia::add_metadata_to_imp_sites(
-      df_cpg$cpg_id, imp_type = "cpg"), by = join_by("cpg_id"), keep = F,multiple = "first")
+      df_cpg$cpg_id, imp_type = "cpg") %>% select(-icr_id), by = join_by("cpg_id"), keep = F,multiple = "first")
     df_icr <-  df_icr %>% left_join(tdhia::add_metadata_to_imp_sites(
       df_icr$icr_id, imp_type = "icr"), by = join_by("icr_id"), keep = F,multiple = "first")
   }
@@ -411,14 +420,18 @@ tdhia_stat_summary_plots<- function (df_all_test, out_path) {
   
   prefixes <-attr(df_all_test$df_icr, "prefix")
   
+  cpg_prefixes <- prefixes[grepl("^cpg", prefixes)]
+  
+  icr_prefixes <- prefixes[grepl("^icr", prefixes)]
+  
   
   df_cpg_summary <- df_all_test$df_cpg %>%
     tidyr::pivot_longer(
-      cols = matches(paste0("^(", paste(prefixes, collapse = "|"), ").*adj_pval")),
+      cols = matches(paste0("^(", paste(cpg_prefixes, collapse = "|"), ").*adj_pval")),
       names_to = "pval_col", values_to = "adj_pval" ) %>%
     dplyr::mutate(
       method = stringr::str_extract(
-        pval_col, paste0("^(", paste(prefixes, collapse = "|"), ")"))
+        pval_col, paste0("^(", paste(cpg_prefixes, collapse = "|"), ")"))
     ) %>%
     dplyr::filter(adj_pval < 0.05) %>%
     dplyr::group_by(model_group, primary_var, method) %>%
@@ -435,11 +448,11 @@ tdhia_stat_summary_plots<- function (df_all_test, out_path) {
   
   df_icr_summary <- df_all_test$df_icr %>%
     tidyr::pivot_longer(
-      cols = matches(paste0("^(", paste(prefixes, collapse = "|"), ").*adj_pval")),
+      cols = matches(paste0("^(", paste(icr_prefixes, collapse = "|"), ").*adj_pval")),
       names_to = "pval_col", values_to = "adj_pval" ) %>%
     dplyr::mutate(
       method = stringr::str_extract(
-        pval_col, paste0("^(", paste(prefixes, collapse = "|"), ")"))
+        pval_col, paste0("^(", paste(icr_prefixes, collapse = "|"), ")"))
     ) %>%
     dplyr::filter(adj_pval < 0.05) %>%
     dplyr::group_by(model_group, primary_var, method) %>%
@@ -543,7 +556,8 @@ tdhia_stat_export_tables <- function(df_all_test, out_path) {
 
 
 
-tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data,df_cpg_beta, df_cpg_sig_colname, out_path, manual_range, db_flag = F) {
+tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
+                                        df_cpg_sig_colname, out_path, manual_range, db_flag = F) {
   
   if (db_flag) {save(list = ls(all.names = TRUE), file = "tdhia_stat_export_dot_plots.RData")}
   # load(file = "tdhia_stat_export_dot_plots.RData")
@@ -599,32 +613,32 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data,df_cpg_beta, 
     
     for (m in seq_along(sig_icrs)) {
     # Plot call for each ICR
-    # out <- plot_icr_dotplot(
-    #   mat_cpg_beta = df_cpg_beta, sig_cpgs = sig_cpgs, df_patient_groups = df_patient_groups, 
-    #   icr_id = sig_icrs[m], xlab_txt = "", plot_height_width = c(5,3),
-    #   output_path = subout_path,
-    #   max_sig_hwindow = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]], db_flag = F,
-    #   filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value", 
-    #                  sample_colname = "patient_id", overwrite_plot = T) 
+    out <- plot_icr_dotplot(
+      mat_cpg_beta = df_cpg_beta, sig_cpgs = sig_cpgs, df_patient_groups = df_patient_groups,
+      icr_id = sig_icrs[m], xlab_txt = "", plot_height_width = c(5,3),
+      output_path = paste0(subout_path, "_dot_plot_point"),
+      max_sig_hwindow = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]], db_flag = F,
+      filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value",
+                     sample_colname = "patient_id", overwrite_plot = T)
   
       # a(b)
     pval = df_all_test$df_icr[[pval_colname]][df_all_test$df_icr$icr_id==sig_icrs[m]]
       
       
-    gg <- plot_icr_cpg_diffs(
+    plot_icr_cpg_diffs(
       df_cpg = df_all_test$df_cpg,
       title_extra = sprintf(", p-val=%.1E", pval),
       icr_id = sig_icrs[m],spline_window_bp_size = 250,
       export_plot = TRUE,
-      output_path = subout_path)
+      output_path = paste0(subout_path, "_plot_point_diff"))
     
-    # gg <- plot_icr_cpg_diffs_rows(
-    #   df_cpg = df_all_test$df_cpg,
-    #   icr_id = sig_icrs[m],spline_window_bp_size = 150,
-    #   export_plot = TRUE,
-    #   output_path = subout_path)
-    # print(gg)
-    
+    plot_icr_cpg_diffs_rows(
+      df_cpg = df_all_test$df_cpg,
+      title_extra = sprintf(", p-val=%.1E", pval),
+      icr_id = sig_icrs[m], spline_window_bp_size = 250,
+      export_plot = TRUE,
+      output_path = paste0(subout_path, "_plot_row_diff"))
+
       
     }
     

@@ -9,6 +9,7 @@ plot_icr_cpg_diffs_rows(
   icr_id,
   coeff_colname = "cpg_glm_estimate",
   coeff_se_colname = "cpg_glm_estimate_se",
+  title_extra = "",
   spline_window_cpg_size = 5,
   spline_window_bp_size = NULL,
   export_plot = FALSE,

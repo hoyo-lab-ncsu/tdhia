@@ -5,8 +5,8 @@
 #'
 #' @description Plot one coefficient per CpG, ordered by increasing genomic
 #'   position from top to bottom. Black points and grey segments show estimates
-#'   plus or minus one standard error. An optional black LOESS curve shows the
-#'   trend, with transparent red fill between positive smoothed values and zero
+#'   plus or minus one standard error. An optional smoother shows the
+#'   trend through transparent red fill between positive smoothed values and zero
 #'   and blue fill between negative smoothed values and zero.
 #' @param df_cpg Data frame containing `cpg_id` and the selected coefficient
 #'   and standard error columns. Subset to one primary variable and model group
@@ -50,6 +50,7 @@
 #'   use `spline_window_cpg_size` instead.
 #'   The x-axis is symmetric about zero and includes all SE endpoints and
 #'   smoothed values, with equal padding on both sides.
+#'   The y-axis has no expansion beyond the plotted geometry.
 #' @returns A ggplot object. Its `data` contains the plotted rows, genomic
 #'   positions, CpG indices, coefficients, standard errors, and interval bounds.
 #'   Files are written only when `export_plot = TRUE`.
@@ -134,7 +135,7 @@ plot_icr_cpg_diffs <- function(
       if (bound == 0) bound <- 1
       c(-bound, bound)
     }) +
-    ggplot2::scale_y_reverse(breaks = ticks) +
+    ggplot2::scale_y_reverse(breaks = ticks, expand = c(0, 0)) +
     ggplot2::labs(x = coeff_colname, y = "CpG index (genomic order)",
                   title = paste0(title, " ", title_extra)) +
     ggplot2::theme_classic(base_size = 10)
@@ -197,7 +198,7 @@ plot_icr_cpg_diffs <- function(
           alpha = 0.4, colour = NA) +
         ggplot2::geom_path(
         data = trend, ggplot2::aes(x = estimate, y = cpg_index, group = segment),
-        inherit.aes = FALSE, colour = "black", linewidth = 0.7)
+        inherit.aes = FALSE, colour = "transparent", linewidth = 0.7)
     }
   }
   gg <- gg +
@@ -230,10 +231,10 @@ plot_icr_cpg_diffs <- function(
 #' @export
 plot_icr_cpg_diffs_rows <- function(
     df_cpg, icr_id, coeff_colname = "cpg_glm_estimate",
-    coeff_se_colname = "cpg_glm_estimate_se", spline_window_cpg_size = 5,
+    coeff_se_colname = "cpg_glm_estimate_se", title_extra ="", spline_window_cpg_size = 5,
     spline_window_bp_size = NULL, export_plot = FALSE, output_path = NULL) {
   gg <- plot_icr_cpg_diffs(
-    df_cpg, icr_id, coeff_colname = coeff_colname,
+    df_cpg = df_cpg, title_extra = title_extra, icr_id = icr_id, coeff_colname = coeff_colname,
     coeff_se_colname = coeff_se_colname,
     spline_window_cpg_size = spline_window_cpg_size,
     spline_window_bp_size = spline_window_bp_size, export_plot = FALSE)
