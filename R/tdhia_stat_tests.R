@@ -15,6 +15,10 @@
 #' @param betas List returned by [tdhia_pipeline()], including `input_args`
 #'   and `probe_beta`. The pipeline is rerun from these inputs to prepare
 #'   methylation data for the tests; this argument is not a beta matrix.
+#' @param meth_preferred_role determines whether betas are a predictor variable
+#'  or response variable in the model equation for methods that have flexibility 
+#'  with model structure. Must either be "predictor" or "response". 
+#'  Default: "predictor"
 #' @param study_data Data frame with one row per sample and columns named by
 #'   `primary_var` and `predictor_vars`. Row names must be sample identifiers
 #'   matching the methylation matrix column names and pipeline sample IDs.
@@ -94,11 +98,14 @@
 #'
 #' @export
 tdhia_stat_tests <- function( 
-    primary_var, predictor_vars, betas, study_data, m_value_transform = T, 
+    primary_var, predictor_vars, betas, meth_preferred_role = c("predictor","response"),
+    study_data, m_value_transform = T, 
     data_cache_path, model_group = "default", impute_na = TRUE, 
     n.cores = max(c(parallel::detectCores()-4, 1)), verbose = T, 
     family = NULL,db_flag = FALSE, overwrite_stats_cache = F,
     overwrite_betas_cache = F, add_genomic_metadata = T) {
+  # Define matched ags
+  meth_preferred_role <- match.arg(meth_preferred_role, several.ok = FALSE)
   
   if (db_flag) {save(list = ls(all.names = TRUE), file = "tdhia_stat_tests.RData")}
   # load(file = "tdhia_stat_tests.RData")
@@ -114,8 +121,8 @@ tdhia_stat_tests <- function(
   }
   
   # Set model variables
-  beta_response_model <- paste0(primary_var, " ~ beta + ", paste0(predictor_vars,collapse = " + "))
-  beta_predictor_model <- paste0("beta ~  ", primary_var, " + ", paste0(predictor_vars,collapse = " + "))
+  beta_predictor_model_str <- paste0(primary_var, " ~ beta + ", paste0(predictor_vars,collapse = " + "))
+  beta_response_model_str <- paste0("beta ~  ", primary_var, " + ", paste0(predictor_vars,collapse = " + "))
   
   # Extract columns used in study data
   study_columns <- c(unname(primary_var), predictor_vars)
@@ -134,7 +141,7 @@ tdhia_stat_tests <- function(
     betas_na$input_args$probe_data_cache <- betas_na$probe_beta
     betas_na$input_args$set_failed_betas_na <- T
     
-    betas_na$input_args$db_flag=T
+    betas_na$input_args$db_flag = F
     betas_na <- do.call(what = tdhia::tdhia_pipeline, args = betas_na$input_args)
     # Discard patients that were filtered in processing
     study_data_na <-  study_data_na %>% rownames_to_column("patient_id") %>% 
@@ -159,7 +166,7 @@ tdhia_stat_tests <- function(
     betas_complete$input_args$idat_basenames <- rownames(study_data_complete)
     # Keeps all measurements
     betas_complete$input_args$set_failed_betas_na <- F
-    betas_complete$input_args$db_flag=T
+    betas_complete$input_args$db_flag = F
     betas_complete <- do.call(what = tdhia::tdhia_pipeline, args = betas_complete$input_args)
     # Discard patients that were filtered in processing
     study_data_complete <-  study_data_complete %>% rownames_to_column("patient_id") %>% 
@@ -206,20 +213,36 @@ tdhia_stat_tests <- function(
   # CpG GLM                                                            ##########  
   #_____________________________________________________________________________
   
-  # Produce two models beta response and beta predictor model
+  # Produce two models: beta response and beta predictor model
   # 1) Both model outputs are stored
-  # 2) Either may be chosen for the recorded results
+  # 2) Either may be chosen for the recorded results (specified by user)
   # 3) Beta response model is used for adjusted fitted methylation difference
   
-  df_cpg_glm_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "_df_cpg_glm.rds"))
-  df_cpg_glm <- cache_result(df_cpg_glm_path, {
+  # Beta predictor results
+  df_cpg_glm_beta_predictor_path = file.path(data_cache_path, paste0("beta_predictor", model_group, "_", primary_var, "_df_cpg_glm.rds"))
+  df_cpg_glm_beta_predictor <- cache_result(df_cpg_glm_beta_predictor_path, {
     tdhia::imprintome_glm(
-      model_str = model_str, study_data = data_na$study_data,
+      model_str = beta_predictor_model_str, study_data = data_na$study_data,
       betas = data_na$betas$cpg_beta$cpg_beta_df, family = family, m_value_transform = m_value_transform,
       n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
   
+  # Beta response results
+  df_cpg_glm_beta_response_path = file.path(data_cache_path, paste0("beta_response", model_group, "_", primary_var, "_df_cpg_glm.rds"))
+  df_cpg_glm_beta_response <- cache_result(df_cpg_glm_beta_response_path, {
+    tdhia::imprintome_glm(
+      model_str = beta_predictor_model_str, study_data = data_na$study_data,
+      betas = data_na$betas$cpg_beta$cpg_beta_df, family = family, m_value_transform = m_value_transform,
+      n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
+      verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
+  }, overwrite = overwrite_stats_cache)
+  
+  # Assign model results for specified for beta (as response or predictor)
+  if (meth_preferred_role == "response")
+    df_cpg_glm <- df_cpg_glm_beta_response
+  else if (meth_preferred_role == "predictor")
+    df_cpg_glm <- df_cpg_glm_beta_predictor
   
   # Add to CpG-level results
   df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% 
