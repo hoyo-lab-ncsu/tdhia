@@ -33,7 +33,8 @@
 #' @param rm.na.P Logical; remove samples missing any primary-predictor
 #'   column value before fitting any models.
 #' @param m_value_transform Logical; convert betas to M-values using
-#'   sesame::BetaValueToMValue(). Defaults to TRUE.
+#'   sesame::BetaValueToMValue(). Defaults to TRUE. For methylation responses,
+#'   fitted contrast means are back-transformed to beta values for output.
 #' @param rm.na.Pe Logical; remove samples missing any covariate value.
 #' @param rm.na.all Logical; enable all three row-removal flags.
 #' @param verbose Logical; print progress and model information. The final
@@ -46,6 +47,23 @@
 #' removal is performed across the entire selected response or predictor
 #' table, so missingness at one site can exclude a sample from every model.
 #' Remaining missingness is handled by fit_model_glm().
+#' Each model also reports a standardized fitted-response contrast for its
+#' primary predictor; see [fit_model_glm()] for grouping and missingness rules.
+#' For methylation responses, contrast_fitted_low and contrast_fitted_high are
+#' back-transformed from fitted M-value means to beta values when
+#' `m_value_transform = TRUE`, using plogis(M * log(2)). contrast_fitted_diff is
+#' then recalculated as beta high minus beta low. These are back-transformed
+#' means, rather than averages of individually back-transformed predictions.
+#' With `m_value_transform = FALSE`, contrasts already use the beta response
+#' scale. When methylation is a predictor, contrasts retain the other response's
+#' units. Model coefficients and grouping metadata retain their original scale.
+#' CpG and ICR identifiers continue to appear in Response or Variable according
+#' to the model direction. Missing contrast values remain NA.
+#' Contrast SEs use the model coefficient covariance and the delta method.
+#' Beta-scale SEs include the derivative of the M-value back-transformation;
+#' difference SEs account for covariance between the fitted low and high means.
+#' Parallel workers receive the current fitter and its internal helpers,
+#' including when this package was loaded with devtools::load_all().
 #'
 #' Each result table is sorted by raw p-value, replacing missing raw p-values
 #' with 1 before applying the package's FDR correction. Fitting failures caught
@@ -61,6 +79,15 @@
 #'   Confounder, ADJ_P_VAL, Family, Formula, Model_Id, and aic, as described
 #'   in single_imprint_glm(), with ADJ_P_VAL filled by apply_fdr_correction().
 #'   The example_formula attribute holds the first fitted formula.
+#'   Contrast columns are contrast_fitted_low, contrast_fitted_high,
+#'   contrast_fitted_diff (high minus low), contrast_group_var,
+#'   contrast_group_low, contrast_group_high, contrast_n_low, contrast_n_high,
+#'   and contrast_cutoff. These describe the primary predictor's model-level
+#'   contrast and are repeated on covariate rows, not recalculated for them.
+#'   constrast_backtransformed is TRUE when M-value methylation-response
+#'   contrasts were converted to beta values, otherwise FALSE.
+#'   contrast_fitted_low_se, contrast_fitted_high_se, and
+#'   contrast_fitted_diff_se describe uncertainty on the reported contrast scale.
 #' @seealso [single_imprint_glm()], [fit_model_glm()], [apply_fdr_correction()]
 #' @importFrom magrittr %>%
 #' @importFrom foreach %dopar%
@@ -254,12 +281,22 @@ imprintome_glm <- function (
     )
   }
   
+  # Local copies let workers resolve the current helpers after load_all().
+  worker_functions <- c("fit_model_glm", "single_imprint_glm",
+                        ".glm_empty_contrast", ".glm_contrast_definition",
+                        ".glm_fitted_contrast", ".glm_contrast_se")
+  for (name in worker_functions) {
+    worker_function <- get(name, envir = environment(), inherits = TRUE)
+    environment(worker_function) <- environment()
+    assign(name, worker_function)
+  }
+
   # Fit models
   df_fits <-
     foreach::foreach(
       x = par_ind,
       .combine = rbind,
-      .export = c("fit_model_glm", "single_imprint_glm"),
+      .export = worker_functions, .noexport = worker_functions,
       .packages = "magrittr",
       .options.snow = opts
     ) %dopar% {
@@ -268,6 +305,33 @@ imprintome_glm <- function (
   
   # Guarantee a data frame for downstream `$` operations
   df_fits <- as.data.frame(df_fits, stringsAsFactors = FALSE)
+
+  # Convert the two fitted M means separately, then calculate the beta difference.
+  df_fits$constrast_backtransformed <- FALSE
+  if (m_value_transform && out$response == "beta") {
+    df_fits$contrast_fitted_low <- stats::plogis(
+      df_fits$contrast_fitted_low * log(2))
+    df_fits$contrast_fitted_high <- stats::plogis(
+      df_fits$contrast_fitted_high * log(2))
+    # Recover the native covariance from Var(high - low), then apply the Jacobian.
+    low_var <- df_fits$contrast_fitted_low_se^2
+    high_var <- df_fits$contrast_fitted_high_se^2
+    covariance <- (low_var + high_var - df_fits$contrast_fitted_diff_se^2) / 2
+    low_derivative <- log(2) * df_fits$contrast_fitted_low *
+      (1 - df_fits$contrast_fitted_low)
+    high_derivative <- log(2) * df_fits$contrast_fitted_high *
+      (1 - df_fits$contrast_fitted_high)
+    df_fits$contrast_fitted_low_se <- low_derivative *
+      df_fits$contrast_fitted_low_se
+    df_fits$contrast_fitted_high_se <- high_derivative *
+      df_fits$contrast_fitted_high_se
+    df_fits$contrast_fitted_diff_se <- sqrt(pmax(0,
+      high_derivative^2 * high_var + low_derivative^2 * low_var -
+        2 * high_derivative * low_derivative * covariance))
+    df_fits$contrast_fitted_diff <- df_fits$contrast_fitted_high -
+      df_fits$contrast_fitted_low
+    df_fits$constrast_backtransformed <- TRUE
+  }
   
   if (verbose) {close(pb); pb <- NULL; cat("\n")}
   
@@ -296,7 +360,17 @@ imprintome_glm <- function (
   names(dfs_sep) <- model_vars
   # If cpg or ICR sites are a predictor, label the dataframe "imp_site"
   if (!is.null(P)) {
-    df_temp <- list(df_fits[df_fits$Variable %in% colnames(P),])
+    # Two-level factors have level-suffixed coefficient names in the model.
+    primary_coef_names <- colnames(P)
+    for (variable in colnames(P)) {
+      if (is.factor(P[[variable]]) || is.character(P[[variable]])) {
+        factor_coef_names <- tryCatch(colnames(stats::model.matrix(
+          stats::reformulate(variable), data = P[variable]))[-1],
+          error = function(e) character())
+        primary_coef_names <- c(primary_coef_names, factor_coef_names)
+      }
+    }
+    df_temp <- list(df_fits[df_fits$Variable %in% primary_coef_names,])
     names(df_temp) <- "imp_site"
     dfs_sep <- c(df_temp, dfs_sep)
   }
@@ -405,7 +479,9 @@ summarize_study <- function(dfs, varnames = NULL, max_p_val = 0.05,
 #' @param .fit_model Fitting function with arguments model_data,
 #'   formula_string, family, impute_na, and n_imputes, in that order.
 #'   Must return a list containing cf (a coefficient table including an
-#'   intercept row) and aic. Defaults to fit_model_glm().
+#'   intercept row) and aic. May also return a one-row contrast data frame.
+#'   Missing contrast fields from custom fitters are filled with NA.
+#'   Defaults to fit_model_glm().
 #'
 #' @details
 #' The model uses the selected R column as response, the selected P column
@@ -428,6 +504,16 @@ summarize_study <- function(dfs, varnames = NULL, max_p_val = 0.05,
 #'   - Family and Formula: family specification and constructed formula.
 #'   - Model_Id: maximum of the selected response and predictor indices.
 #'   - aic: model AIC, or mean AIC for imputed fits.
+#'   - contrast_fitted_low, contrast_fitted_high, contrast_fitted_diff:
+#'     standardized response predictions and high minus low difference.
+#'   - contrast_fitted_low_se, contrast_fitted_high_se, contrast_fitted_diff_se:
+#'     approximate SEs from the joint fitted-mean covariance.
+#'   - contrast_group_var, contrast_group_low, contrast_group_high:
+#'     primary predictor name and the labels defining contrast direction.
+#'   - contrast_n_low, contrast_n_high, contrast_cutoff: observed group counts
+#'     and median cutoff (NA for binary predictors). See [fit_model_glm()].
+#'   These model-level fields repeat on every coefficient row. With no primary
+#'   predictor, a failed fit, or a custom fitter without contrasts, they are NA.
 #' @seealso [fit_model_glm()], [imprintome_glm()]
 #' @importFrom magrittr %>%
 #' @export
@@ -521,6 +607,12 @@ single_imprint_glm = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
   df_res$Formula <- formula_string
   df_res$Model_Id <-max(c(Rind, Pind))
   df_res$aic <- aic
+  contrast <- .glm_empty_contrast()
+  if (!is.null(P) && !is.null(model_out$contrast)) {
+    fields <- intersect(names(contrast), names(model_out$contrast))
+    contrast[fields] <- model_out$contrast[fields]
+  }
+  for (field in names(contrast)) df_res[[field]] <- contrast[[field]][1]
   if (verbose) {print(cf)}
   
   
@@ -548,11 +640,57 @@ single_imprint_glm = function(R, Rind = 1, P = NULL, Pind = 1, Pe = NULL,
 #' missing-data handling. Both branches remove a trailing TRUE suffix from
 #' the first non-intercept coefficient's name.
 #'
-#' @return A named list with cf and aic. The cf table includes the intercept
-#'   and has coefficient names as row names, with columns Estimate, StdError,
+#' The first variable on the right-hand side defines the contrast groups.
+#' Continuous numeric predictors use Low (<= median) and High (> median),
+#' evaluated at their within-group means. Numeric predictors with two observed
+#' values use smaller versus larger; logical predictors use FALSE versus TRUE.
+#' Factors or character predictors with two observed levels use the first
+#' versus second factor level (alphabetical order for character predictors),
+#' retaining the actual labels. Factors or character predictors with more than
+#' two observed levels do not receive a two-group contrast. Continuous predictors
+#' remain continuous in the original model.
+#'
+#' Predictions replace only the primary predictor, using identical covariate
+#' rows for low and high, then average on the fitted response scale. Gaussian
+#' predictions retain the response units; binomial predictions are probabilities
+#' of the model's event (second response factor level or numeric 1).
+#' contrast_fitted_diff is high minus low; contrast_cutoff is NA for binary
+#' predictors. This fitter retains the response scale; [imprintome_glm()]
+#' back-transforms methylation-response contrasts when M-values were requested.
+#'
+#' Direct-fit groups and counts use the samples retained by glm(). For multiple
+#' imputation, the median, memberships, and counts use observed predictor values
+#' before imputation and remain fixed across completed data sets. Samples with
+#' missing predictor values can contribute to fitting, but are excluded from
+#' the contrast population. Covariates are taken from each completed data set;
+#' fitted predictions and contrasts are averaged across the imputed fits.
+#' Joint low/high covariance is pooled by Rubin's rules: mean within-imputation
+#' covariance plus (1 + 1/m) times the between-imputation covariance. Counts can
+#' differ by site and need not equal the total fitted n.
+#'
+#' Approximate contrast SEs use the gradient of each averaged response prediction
+#' and vcov() from the fitted GLM. The difference SE includes covariance between
+#' the low and high predictions. SEs condition on the reference covariate rows,
+#' grouping cutoff, and within-group predictor values; they describe uncertainty
+#' in fitted means, not individual sample variation. No confidence intervals
+#' are returned. An unavailable SE (including aliased coefficients) is NA and
+#' issues a warning without discarding valid point estimates.
+#'
+#' An unavailable contrast (empty group, unsupported predictor, or failed
+#' prediction) has NA fitted values, without discarding the fitted coefficients.
+#' Available grouping metadata are retained. Prediction failures issue a warning.
+#'
+#' @return A named list with cf, aic, and contrast. The cf table includes the
+#'   intercept and has coefficient names as row names, with columns Estimate, StdError,
 #'   Statistic, and P_VAL. The aic value is the fitted model's AIC or the mean
 #'   AIC across imputed-data models. Statistic and P_VAL come from the direct
 #'   GLM summary or pooled coefficient summary, respectively.
+#'   contrast is a one-row data frame with contrast_fitted_low,
+#'   contrast_fitted_high, contrast_fitted_diff, contrast_group_var,
+#'   contrast_group_low, contrast_group_high, contrast_n_low, contrast_n_high,
+#'   contrast_cutoff, contrast_fitted_low_se, contrast_fitted_high_se, and
+#'   contrast_fitted_diff_se. Its internal contrast_vcov attribute stores the
+#'   2-by-2 joint covariance in low/high order. The coefficient table is unchanged.
 #' @seealso [single_imprint_glm()]
 #' @export
 fit_model_glm <- function(model_data, formula_string, family, impute_na, n_imputes) {
@@ -576,6 +714,35 @@ fit_model_glm <- function(model_data, formula_string, family, impute_na, n_imput
     colnames(cf) <- c("Estimate", "StdError", "Statistic", "P_VAL")
     
     aic <- mean(sapply(fits$analyses, function(x) x$aic))
+    # Freeze observed memberships before imputation, then pool fitted contrasts.
+    definition <- .glm_contrast_definition(model_data, formula_string)
+    contrasts <- lapply(seq_along(fits$analyses), function(i) {
+      completed_data <- mice::complete(imp, i)
+      # with.mids() fits unlabelled vectors, so model row names are row indices.
+      if (!is.null(fits$analyses[[i]]$na.action)) {
+        completed_data <- completed_data[-as.integer(fits$analyses[[i]]$na.action),
+                                        , drop = FALSE]
+      }
+      .glm_fitted_contrast(fits$analyses[[i]], completed_data, definition)
+    })
+    contrast <- definition$summary
+    for (field in c("contrast_fitted_low", "contrast_fitted_high",
+                    "contrast_fitted_diff")) {
+      contrast[[field]] <- mean(vapply(contrasts, function(x) x[[field]],
+                                      numeric(1)))
+    }
+    # Pool the two means jointly so their shared uncertainty is retained.
+    fitted_means <- vapply(contrasts, function(x) c(x$contrast_fitted_low,
+                           x$contrast_fitted_high), numeric(2))
+    covariance <- Reduce("+", lapply(contrasts, attr, "contrast_vcov")) /
+      length(contrasts)
+    if (length(contrasts) > 1L) {
+      covariance <- covariance + (1 + 1 / length(contrasts)) *
+        stats::cov(t(fitted_means))
+    }
+    standard_errors <- .glm_contrast_se(covariance)
+    contrast[names(standard_errors)] <- standard_errors
+    attr(contrast, "contrast_vcov") <- covariance
     
   } else {
     # Either imputation is disabled, or imputation is not needed
@@ -590,9 +757,141 @@ fit_model_glm <- function(model_data, formula_string, family, impute_na, n_imput
     rownames(cf)[2] <- stringr::str_replace(rownames(cf)[2], "TRUE$","")
     colnames(cf)[2:4] <-c("StdError", "Statistic", "P_VAL")
     aic <- mod$aic
+    # Use only fitted records, so omitted samples do not affect the cutoff/counts.
+    fitted_data <- model_data[match(rownames(mod$model), rownames(model_data)),
+                              , drop = FALSE]
+    definition <- .glm_contrast_definition(fitted_data, formula_string)
+    contrast <- .glm_fitted_contrast(mod, fitted_data, definition)
     
   }
-  return(list(cf = cf, aic = aic))
+  return(list(cf = cf, aic = aic, contrast = contrast))
+}
+
+# A consistent schema also allows failed fits and legacy custom fitters to bind.
+.glm_empty_contrast <- function() {
+  contrast <- data.frame(
+    contrast_fitted_low = NA_real_, contrast_fitted_high = NA_real_,
+    contrast_fitted_diff = NA_real_, contrast_group_var = NA_character_,
+    contrast_group_low = NA_character_, contrast_group_high = NA_character_,
+    contrast_n_low = NA_integer_, contrast_n_high = NA_integer_,
+    contrast_cutoff = NA_real_, contrast_fitted_low_se = NA_real_,
+    contrast_fitted_high_se = NA_real_, contrast_fitted_diff_se = NA_real_)
+  attr(contrast, "contrast_vcov") <- matrix(NA_real_, 2L, 2L)
+  contrast
+}
+
+# Read low, high, and high-minus-low uncertainty from a joint covariance matrix.
+.glm_contrast_se <- function(covariance) {
+  gradients <- rbind(c(1, 0), c(0, 1), c(-1, 1))
+  variances <- diag(gradients %*% covariance %*% t(gradients))
+  stats::setNames(as.list(sqrt(pmax(variances, 0))),
+    c("contrast_fitted_low_se", "contrast_fitted_high_se",
+      "contrast_fitted_diff_se"))
+}
+
+# Define direction from observed values, never from imputed group assignments.
+.glm_contrast_definition <- function(model_data, formula_string) {
+  summary <- .glm_empty_contrast()
+  formula <- stats::as.formula(formula_string)
+  variables <- if (length(formula) == 3L) all.vars(formula[[3]]) else character()
+  variable <- variables[1]
+  definition <- list(summary = summary, low = NULL, high = NULL,
+                     sample_ids = character())
+  if (!length(variables) || !variable %in% names(model_data)) return(definition)
+  definition$summary$contrast_group_var <- variable
+  x <- model_data[[variable]]
+  observed <- if (is.numeric(x)) is.finite(x) else !is.na(x)
+  values <- unique(x[observed])
+
+  if (is.factor(x) || is.character(x)) {
+    levels <- if (is.factor(x)) levels(x) else sort(unique(x[observed]))
+    levels <- levels[levels %in% as.character(values)]
+    if (length(levels) != 2L) return(definition)
+    low_group <- observed & as.character(x) == levels[1]
+    high_group <- observed & as.character(x) == levels[2]
+    definition$low <- x[which(low_group)[1]]
+    definition$high <- x[which(high_group)[1]]
+    labels <- levels
+  } else if (is.numeric(x) || is.logical(x)) {
+    if (length(values) == 2L) {
+      values <- sort(values)
+      low_group <- observed & x == values[1]
+      high_group <- observed & x == values[2]
+      definition$low <- values[1]
+      definition$high <- values[2]
+      labels <- as.character(values)
+    } else {
+      if (!length(values)) return(definition)
+      cutoff <- stats::median(x[observed])
+      low_group <- observed & x <= cutoff
+      high_group <- observed & x > cutoff
+      definition$summary$contrast_cutoff <- cutoff
+      definition$low <- mean(x[low_group], na.rm = TRUE)
+      definition$high <- mean(x[high_group], na.rm = TRUE)
+      labels <- c("Low", "High")
+    }
+  } else return(definition)
+
+  definition$summary$contrast_group_low <- labels[1]
+  definition$summary$contrast_group_high <- labels[2]
+  definition$summary$contrast_n_low <- sum(low_group, na.rm = TRUE)
+  definition$summary$contrast_n_high <- sum(high_group, na.rm = TRUE)
+  definition$sample_ids <- rownames(model_data)[observed]
+  definition
+}
+
+# Standardize both groups over the same fitted covariate rows on response scale.
+.glm_fitted_contrast <- function(mod, model_data, definition) {
+  summary <- definition$summary
+  counts <- c(summary$contrast_n_low, summary$contrast_n_high)
+  if (anyNA(counts) || any(counts == 0L)) return(summary)
+  # The caller supplies fitted records, retaining the original sample names.
+  eligible <- rownames(model_data) %in% definition$sample_ids
+  low_data <- high_data <- model_data[eligible, , drop = FALSE]
+  if (!nrow(low_data)) return(summary)
+  variable <- summary$contrast_group_var
+  low_data[[variable]] <- rep(definition$low, nrow(low_data))
+  high_data[[variable]] <- rep(definition$high, nrow(high_data))
+
+  summary <- tryCatch({
+    low <- stats::predict(mod, newdata = low_data, type = "response")
+    high <- stats::predict(mod, newdata = high_data, type = "response")
+    if (any(!is.finite(low)) || any(!is.finite(high))) {
+      stop("nonfinite fitted response predictions")
+    }
+    summary$contrast_fitted_low <- mean(low)
+    summary$contrast_fitted_high <- mean(high)
+    summary$contrast_fitted_diff <- mean(high - low)
+    summary
+  }, error = function(e) {
+    warning("Fitted contrast unavailable for ", variable, ": ",
+            conditionMessage(e), call. = FALSE)
+    summary
+  })
+  if (any(!is.finite(c(summary$contrast_fitted_low,
+                       summary$contrast_fitted_high)))) return(summary)
+
+  # Differentiate the average response prediction, retaining shared coefficients.
+  tryCatch({
+    if (anyNA(stats::coef(mod))) stop("aliased model coefficients")
+    gradient <- function(data) {
+      design <- stats::model.matrix(stats::delete.response(stats::terms(mod)),
+        data, contrasts.arg = mod$contrasts, xlev = mod$xlevels)
+      eta <- stats::predict(mod, newdata = data, type = "link")
+      colMeans(design * mod$family$mu.eta(eta))
+    }
+    gradients <- rbind(gradient(low_data), gradient(high_data))
+    covariance <- gradients %*% stats::vcov(mod) %*% t(gradients)
+    if (any(!is.finite(covariance))) stop("nonfinite fitted-mean covariance")
+    standard_errors <- .glm_contrast_se(covariance)
+    summary[names(standard_errors)] <- standard_errors
+    attr(summary, "contrast_vcov") <- covariance
+    summary
+  }, error = function(e) {
+    warning("Fitted contrast SE unavailable for ", variable, ": ",
+            conditionMessage(e), call. = FALSE)
+    summary
+  })
 }
 
 

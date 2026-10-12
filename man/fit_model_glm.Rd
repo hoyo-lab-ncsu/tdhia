@@ -21,11 +21,17 @@ n_imputes is greater than zero.}
 Zero bypasses imputation even when impute_na is TRUE.}
 }
 \value{
-A named list with cf and aic. The cf table includes the intercept
-and has coefficient names as row names, with columns Estimate, StdError,
+A named list with cf, aic, and contrast. The cf table includes the
+intercept and has coefficient names as row names, with columns Estimate, StdError,
 Statistic, and P_VAL. The aic value is the fitted model's AIC or the mean
 AIC across imputed-data models. Statistic and P_VAL come from the direct
 GLM summary or pooled coefficient summary, respectively.
+contrast is a one-row data frame with contrast_fitted_low,
+contrast_fitted_high, contrast_fitted_diff, contrast_group_var,
+contrast_group_low, contrast_group_high, contrast_n_low, contrast_n_high,
+contrast_cutoff, contrast_fitted_low_se, contrast_fitted_high_se, and
+contrast_fitted_diff_se. Its internal contrast_vcov attribute stores the
+2-by-2 joint covariance in low/high order. The coefficient table is unchanged.
 }
 \description{
 Fits a generalized linear model directly or fits and pools models across
@@ -36,6 +42,46 @@ The imputation branch uses maxit = 20 and seed = 0, then pools coefficient
 estimates with mice::pool(). The direct branch uses the usual glm()
 missing-data handling. Both branches remove a trailing TRUE suffix from
 the first non-intercept coefficient's name.
+
+The first variable on the right-hand side defines the contrast groups.
+Continuous numeric predictors use Low (<= median) and High (> median),
+evaluated at their within-group means. Numeric predictors with two observed
+values use smaller versus larger; logical predictors use FALSE versus TRUE.
+Factors or character predictors with two observed levels use the first
+versus second factor level (alphabetical order for character predictors),
+retaining the actual labels. Factors or character predictors with more than
+two observed levels do not receive a two-group contrast. Continuous predictors
+remain continuous in the original model.
+
+Predictions replace only the primary predictor, using identical covariate
+rows for low and high, then average on the fitted response scale. Gaussian
+predictions retain the response units; binomial predictions are probabilities
+of the model's event (second response factor level or numeric 1).
+contrast_fitted_diff is high minus low; contrast_cutoff is NA for binary
+predictors. This fitter retains the response scale; \code{\link[=imprintome_glm]{imprintome_glm()}}
+back-transforms methylation-response contrasts when M-values were requested.
+
+Direct-fit groups and counts use the samples retained by glm(). For multiple
+imputation, the median, memberships, and counts use observed predictor values
+before imputation and remain fixed across completed data sets. Samples with
+missing predictor values can contribute to fitting, but are excluded from
+the contrast population. Covariates are taken from each completed data set;
+fitted predictions and contrasts are averaged across the imputed fits.
+Joint low/high covariance is pooled by Rubin's rules: mean within-imputation
+covariance plus (1 + 1/m) times the between-imputation covariance. Counts can
+differ by site and need not equal the total fitted n.
+
+Approximate contrast SEs use the gradient of each averaged response prediction
+and vcov() from the fitted GLM. The difference SE includes covariance between
+the low and high predictions. SEs condition on the reference covariate rows,
+grouping cutoff, and within-group predictor values; they describe uncertainty
+in fitted means, not individual sample variation. No confidence intervals
+are returned. An unavailable SE (including aliased coefficients) is NA and
+issues a warning without discarding valid point estimates.
+
+An unavailable contrast (empty group, unsupported predictor, or failed
+prediction) has NA fitted values, without discarding the fitted coefficients.
+Available grouping metadata are retained. Prediction failures issue a warning.
 }
 \seealso{
 \code{\link[=single_imprint_glm]{single_imprint_glm()}}

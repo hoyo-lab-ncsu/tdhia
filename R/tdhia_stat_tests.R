@@ -120,10 +120,7 @@ tdhia_stat_tests <- function(
     result
   }
   
-  # Set model variables
-  beta_predictor_model_str <- paste0(primary_var, " ~ beta + ", paste0(predictor_vars,collapse = " + "))
-  beta_response_model_str <- paste0("beta ~  ", primary_var, " + ", paste0(predictor_vars,collapse = " + "))
-  
+
   # Extract columns used in study data
   study_columns <- c(unname(primary_var), predictor_vars)
   study_columns <- study_columns[study_columns != "beta"]
@@ -213,6 +210,15 @@ tdhia_stat_tests <- function(
   # CpG GLM                                                            ##########  
   #_____________________________________________________________________________
   
+  # Set model variables
+  beta_predictor_model_str <- paste0(primary_var, " ~ beta + ", paste0(predictor_vars,collapse = " + "))
+  beta_predictor_model_family <- if (length(unique(study_data[[primary_var]])) ==2 ) {
+     "binomial"} else {"gaussian"}
+  
+  beta_response_model_str <- paste0("beta ~  ", primary_var, " + ", paste0(predictor_vars,collapse = " + "))
+  beta_response_model_family <- "gaussian"
+  
+  
   # Produce two models: beta response and beta predictor model
   # 1) Both model outputs are stored
   # 2) Either may be chosen for the recorded results (specified by user)
@@ -223,7 +229,7 @@ tdhia_stat_tests <- function(
   df_cpg_glm_beta_predictor <- cache_result(df_cpg_glm_beta_predictor_path, {
     tdhia::imprintome_glm(
       model_str = beta_predictor_model_str, study_data = data_na$study_data,
-      betas = data_na$betas$cpg_beta$cpg_beta_df, family = family, m_value_transform = m_value_transform,
+      betas = data_na$betas$cpg_beta$cpg_beta_df, family = beta_predictor_model_family, m_value_transform = m_value_transform,
       n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
@@ -232,17 +238,18 @@ tdhia_stat_tests <- function(
   df_cpg_glm_beta_response_path = file.path(data_cache_path, paste0("beta_response", model_group, "_", primary_var, "_df_cpg_glm.rds"))
   df_cpg_glm_beta_response <- cache_result(df_cpg_glm_beta_response_path, {
     tdhia::imprintome_glm(
-      model_str = beta_predictor_model_str, study_data = data_na$study_data,
-      betas = data_na$betas$cpg_beta$cpg_beta_df, family = family, m_value_transform = m_value_transform,
+      model_str = beta_response_model_str, study_data = data_na$study_data,
+      betas = data_na$betas$cpg_beta$cpg_beta_df, family = beta_response_model_family, m_value_transform = m_value_transform,
       n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
   
   # Assign model results for specified for beta (as response or predictor)
-  if (meth_preferred_role == "response")
+  if (meth_preferred_role == "response") {
     df_cpg_glm <- df_cpg_glm_beta_response
-  else if (meth_preferred_role == "predictor")
+  } else if (meth_preferred_role == "predictor") {
     df_cpg_glm <- df_cpg_glm_beta_predictor
+  }
   
   # Add to CpG-level results
   df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% 
@@ -261,6 +268,17 @@ tdhia_stat_tests <- function(
       cpg_glm_raw_pval_min = min(cpg_glm_raw_pval), cpg_glm_adj_pval_min = min(cpg_glm_adj_pval),
       cpg_glm_family = cpg_glm_family[1]
     ), by = join_by(icr_id) )
+  
+  
+  # Add contrasts to cpg level results
+  df_cpg <- df_cpg %>% left_join(
+    df_cpg_glm_beta_response$imp_site %>% select(
+      c(Response, contrast_fitted_low, contrast_fitted_high, contrast_group_high,
+        contrast_group_low, contrast_fitted_diff, contrast_fitted_diff_se)) %>%
+      rename(cpg_id = Response ), by = join_by(cpg_id))
+
+  # Add Contrasts to icr level results
+  
   
   
   # ICR GLM                                                    #################
@@ -636,20 +654,22 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
     
     for (m in seq_along(sig_icrs)) {
     # Plot call for each ICR
-    out <- plot_icr_dotplot(
-      mat_cpg_beta = df_cpg_beta, sig_cpgs = sig_cpgs, df_patient_groups = df_patient_groups,
-      icr_id = sig_icrs[m], xlab_txt = "", plot_height_width = c(5,3),
-      output_path = paste0(subout_path, "_dot_plot_point"),
-      max_sig_hwindow = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]], db_flag = F,
-      filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value",
-                     sample_colname = "patient_id", overwrite_plot = T)
+    # out <- plot_icr_dotplot(
+    #   mat_cpg_beta = df_cpg_beta, sig_cpgs = sig_cpgs, df_patient_groups = df_patient_groups,
+    #   icr_id = sig_icrs[m], xlab_txt = "", plot_height_width = c(5,3),
+    #   output_path = paste0(subout_path, "_dot_plot_point"),
+    #   max_sig_hwindow = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]], db_flag = F,
+    #   filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value",
+    #                  sample_colname = "patient_id", overwrite_plot = T)
   
       # a(b)
     pval = df_all_test$df_icr[[pval_colname]][df_all_test$df_icr$icr_id==sig_icrs[m]]
       
-      
+      #contrast_fitted_diff
     plot_icr_cpg_diffs(
       df_cpg = df_all_test$df_cpg,
+      coeff_colname = "contrast_fitted_diff",
+      coeff_se_colname = "contrast_fitted_diff_se",
       title_extra = sprintf(", p-val=%.1E", pval),
       icr_id = sig_icrs[m],spline_window_bp_size = 250,
       export_plot = TRUE,
@@ -657,6 +677,8 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
     
     plot_icr_cpg_diffs_rows(
       df_cpg = df_all_test$df_cpg,
+      coeff_colname = "contrast_fitted_diff",
+      coeff_se_colname = "contrast_fitted_diff_se",
       title_extra = sprintf(", p-val=%.1E", pval),
       icr_id = sig_icrs[m], spline_window_bp_size = 250,
       export_plot = TRUE,

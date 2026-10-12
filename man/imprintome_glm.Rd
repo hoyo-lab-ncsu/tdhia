@@ -61,7 +61,8 @@ before fitting any models.}
 column value before fitting any models.}
 
 \item{m_value_transform}{Logical; convert betas to M-values using
-sesame::BetaValueToMValue(). Defaults to TRUE.}
+sesame::BetaValueToMValue(). Defaults to TRUE. For methylation responses,
+fitted contrast means are back-transformed to beta values for output.}
 
 \item{rm.na.Pe}{Logical; remove samples missing any covariate value.}
 
@@ -80,6 +81,15 @@ Tables contain Response, Variable, Estimate, StdError, Statistic, P_VAL,
 Confounder, ADJ_P_VAL, Family, Formula, Model_Id, and aic, as described
 in single_imprint_glm(), with ADJ_P_VAL filled by apply_fdr_correction().
 The example_formula attribute holds the first fitted formula.
+Contrast columns are contrast_fitted_low, contrast_fitted_high,
+contrast_fitted_diff (high minus low), contrast_group_var,
+contrast_group_low, contrast_group_high, contrast_n_low, contrast_n_high,
+and contrast_cutoff. These describe the primary predictor's model-level
+contrast and are repeated on covariate rows, not recalculated for them.
+constrast_backtransformed is TRUE when M-value methylation-response
+contrasts were converted to beta values, otherwise FALSE.
+contrast_fitted_low_se, contrast_fitted_high_se, and
+contrast_fitted_diff_se describe uncertainty on the reported contrast scale.
 }
 \description{
 Fits generalized linear models with methylation as either the response
@@ -92,6 +102,23 @@ sites while retaining the same study covariates. Requested missing-value
 removal is performed across the entire selected response or predictor
 table, so missingness at one site can exclude a sample from every model.
 Remaining missingness is handled by fit_model_glm().
+Each model also reports a standardized fitted-response contrast for its
+primary predictor; see \code{\link[=fit_model_glm]{fit_model_glm()}} for grouping and missingness rules.
+For methylation responses, contrast_fitted_low and contrast_fitted_high are
+back-transformed from fitted M-value means to beta values when
+\code{m_value_transform = TRUE}, using plogis(M * log(2)). contrast_fitted_diff is
+then recalculated as beta high minus beta low. These are back-transformed
+means, rather than averages of individually back-transformed predictions.
+With \code{m_value_transform = FALSE}, contrasts already use the beta response
+scale. When methylation is a predictor, contrasts retain the other response's
+units. Model coefficients and grouping metadata retain their original scale.
+CpG and ICR identifiers continue to appear in Response or Variable according
+to the model direction. Missing contrast values remain NA.
+Contrast SEs use the model coefficient covariance and the delta method.
+Beta-scale SEs include the derivative of the M-value back-transformation;
+difference SEs account for covariance between the fitted low and high means.
+Parallel workers receive the current fitter and its internal helpers,
+including when this package was loaded with devtools::load_all().
 
 Each result table is sorted by raw p-value, replacing missing raw p-values
 with 1 before applying the package's FDR correction. Fitting failures caught

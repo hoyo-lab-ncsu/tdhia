@@ -43,7 +43,9 @@ in the working directory. Failure snapshots can be written even if FALSE.}
 \item{.fit_model}{Fitting function with arguments model_data,
 formula_string, family, impute_na, and n_imputes, in that order.
 Must return a list containing cf (a coefficient table including an
-intercept row) and aic. Defaults to fit_model_glm().}
+intercept row) and aic. May also return a one-row contrast data frame.
+Missing contrast fields from custom fitters are filled with NA.
+Defaults to fit_model_glm().}
 }
 \value{
 A data frame with one row per non-intercept coefficient:
@@ -56,6 +58,16 @@ implementation does not mark additional covariates as confounders.
 \item Family and Formula: family specification and constructed formula.
 \item Model_Id: maximum of the selected response and predictor indices.
 \item aic: model AIC, or mean AIC for imputed fits.
+\item contrast_fitted_low, contrast_fitted_high, contrast_fitted_diff:
+standardized response predictions and high minus low difference.
+\item contrast_fitted_low_se, contrast_fitted_high_se, contrast_fitted_diff_se:
+approximate SEs from the joint fitted-mean covariance.
+\item contrast_group_var, contrast_group_low, contrast_group_high:
+primary predictor name and the labels defining contrast direction.
+\item contrast_n_low, contrast_n_high, contrast_cutoff: observed group counts
+and median cutoff (NA for binary predictors). See \code{\link[=fit_model_glm]{fit_model_glm()}}.
+These model-level fields repeat on every coefficient row. With no primary
+predictor, a failed fit, or a custom fitter without contrasts, they are NA.
 }
 }
 \description{

@@ -8,6 +8,7 @@ tdhia_stat_tests(
   primary_var,
   predictor_vars,
   betas,
+  meth_preferred_role = c("predictor", "response"),
   study_data,
   m_value_transform = T,
   data_cache_path,
@@ -35,6 +36,11 @@ principal component regression.}
 \item{betas}{List returned by \code{\link[=tdhia_pipeline]{tdhia_pipeline()}}, including \code{input_args}
 and \code{probe_beta}. The pipeline is rerun from these inputs to prepare
 methylation data for the tests; this argument is not a beta matrix.}
+
+\item{meth_preferred_role}{determines whether betas are a predictor variable
+or response variable in the model equation for methods that have flexibility
+with model structure. Must either be "predictor" or "response".
+Default: "predictor"}
 
 \item{study_data}{Data frame with one row per sample and columns named by
 \code{primary_var} and \code{predictor_vars}. Row names must be sample identifiers
