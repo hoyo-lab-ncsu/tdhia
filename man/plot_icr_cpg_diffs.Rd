@@ -8,6 +8,7 @@ plot_icr_cpg_diffs(
   df_cpg,
   icr_id,
   title_extra = "",
+  xlabel = NULL,
   coeff_colname = "cpg_glm_estimate",
   coeff_se_colname = "cpg_glm_estimate_se",
   spline_window_cpg_size = 5,

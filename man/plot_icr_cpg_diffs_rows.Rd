@@ -8,6 +8,7 @@ plot_icr_cpg_diffs_rows(
   df_cpg,
   icr_id,
   coeff_colname = "cpg_glm_estimate",
+  xlabel = NULL,
   coeff_se_colname = "cpg_glm_estimate_se",
   title_extra = "",
   spline_window_cpg_size = 5,
@@ -58,9 +59,15 @@ span estimate plus or minus one standard error and the full CpG row height.
 Black vertical lines mark the estimates and span the full row height.
 }
 \details{
-Uses the same manifest, filtering, genomic order, smoothing options,
-and symmetric coefficient axis as \code{\link[=plot_icr_cpg_diffs]{plot_icr_cpg_diffs()}}. Each row extends
-from CpG index minus 0.5 to index plus 0.5. Estimate lines use the same
+Uses the same manifest, filtering, genomic order, and smoothing
+options as \code{\link[=plot_icr_cpg_diffs]{plot_icr_cpg_diffs()}}. The x-axis is symmetric about zero,
+with a half-range equal to the largest absolute coefficient plus the mean
+standard error across the plotted CpGs, without extra axis padding.
+If all coefficients and SEs are zero, the half-range defaults to 1.
+SE rectangles and smoothed values outside the visible range are clipped
+at the panel boundary; their underlying values are retained.
+Each row extends from CpG index minus 0.5 to index plus 0.5.
+Estimate lines use the same
 bounds as the SE rectangles, so their heights adapt to the number of CpGs
 and panel height. Line width is fixed; line position marks the estimate.
 Light grey SE rectangles and estimate lines are drawn beneath the

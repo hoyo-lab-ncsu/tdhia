@@ -102,7 +102,7 @@ tdhia_stat_tests <- function(
     study_data, m_value_transform = T, 
     data_cache_path, model_group = "default", impute_na = TRUE, 
     n.cores = max(c(parallel::detectCores()-4, 1)), verbose = T, 
-    family = NULL,db_flag = FALSE, overwrite_stats_cache = F,
+    family = NULL, db_flag = FALSE, overwrite_stats_cache = F,
     overwrite_betas_cache = F, add_genomic_metadata = T) {
   # Define matched ags
   meth_preferred_role <- match.arg(meth_preferred_role, several.ok = FALSE)
@@ -230,7 +230,7 @@ tdhia_stat_tests <- function(
     tdhia::imprintome_glm(
       model_str = beta_predictor_model_str, study_data = data_na$study_data,
       betas = data_na$betas$cpg_beta$cpg_beta_df, family = beta_predictor_model_family, m_value_transform = m_value_transform,
-      n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
+      n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
   
@@ -240,7 +240,7 @@ tdhia_stat_tests <- function(
     tdhia::imprintome_glm(
       model_str = beta_response_model_str, study_data = data_na$study_data,
       betas = data_na$betas$cpg_beta$cpg_beta_df, family = beta_response_model_family, m_value_transform = m_value_transform,
-      n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
+      n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
   
@@ -275,7 +275,9 @@ tdhia_stat_tests <- function(
     df_cpg_glm_beta_response$imp_site %>% select(
       c(Response, contrast_fitted_low, contrast_fitted_high, contrast_group_high,
         contrast_group_low, contrast_fitted_diff, contrast_fitted_diff_se)) %>%
-      rename(cpg_id = Response ), by = join_by(cpg_id))
+      rename(cpg_id = Response, contrast_fitted_beta_diff = contrast_fitted_diff, 
+             contrast_fitted_beta_diff_se = contrast_fitted_diff_se ), 
+    by = join_by(cpg_id))
 
   # Add Contrasts to icr level results
   
@@ -286,9 +288,9 @@ tdhia_stat_tests <- function(
   df_icr_glm_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "df_icr_glm.rds"))
   df_icr_glm <- cache_result(df_icr_glm_path, {
     tdhia::imprintome_glm(
-      model_str = model_str, study_data = data_na$study_data,
+      model_str = beta_predictor_model_str, study_data = data_na$study_data,
       betas = data_na$betas$icr_beta$icr_beta_df, family = family, m_value_transform = m_value_transform,
-      n_p_adj = nrow(data_na$betas$icr_beta$icr_beta_df), db_flag = T, rm.na.all = !impute_na,
+      n_p_adj = nrow(data_na$betas$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = FALSE)
   
@@ -311,7 +313,7 @@ tdhia_stat_tests <- function(
       cpg_betas = as.data.frame(data_complete$betas$cpg_beta$cpg_beta_df),
       df_study = data_complete$study_data,  response = unname(primary_var),
       predictors = predictor_vars[-1],  method = "optimal.adj",
-      out_type = "C",  icr_ids = NULL,  min_cpg = 3,  db_flag = FALSE,
+      out_type = "C",  icr_ids = NULL,  min_cpg = 3,  db_flag = db_flag,
       m_value_transform = m_value_transform,  scaling = TRUE,  verbose = verbose,
       n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
@@ -349,7 +351,7 @@ tdhia_stat_tests <- function(
     tdhia::cpg_dml_test(
       df_study = data_complete$study_data, predictors = c(primary_var, predictor_vars),
       cpg_beta = data_complete$betas$cpg_beta$cpg_beta_df,
-      pvalue_threshold = 0.001, db_flag = F, sample_name = "patient_id", correlation_check = F,
+      pvalue_threshold = 0.001, db_flag = db_flag, sample_name = "patient_id", correlation_check = F,
       m_value_transform = m_value_transform,
       beadchip_correction = F, verbose = T)
   }, overwrite = overwrite_stats_cache)
@@ -377,7 +379,7 @@ tdhia_stat_tests <- function(
   df_icr_lancaster <- cache_result(df_icr_lancaster_path, {
     tdhia::icr_dmr_test(
       df_dml = df_cpg_limma$df_dml, chr_lens = df_cpg_limma$chr_lens,
-      pval_threshold = 0.05, fdr_sig_threshold = 0.0001, verbose = T, db_flag = F)
+      pval_threshold = 0.05, fdr_sig_threshold = 0.0001, verbose = T, db_flag = db_flag)
   }, overwrite = overwrite_stats_cache)
  
   df_icr_lancaster_formatted <- df_icr_lancaster$ICR_summary %>% rename(icr_id = ICR_id, combined_adj_pval = FDR) %>% 
@@ -668,19 +670,21 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
       #contrast_fitted_diff
     plot_icr_cpg_diffs(
       df_cpg = df_all_test$df_cpg,
-      coeff_colname = "contrast_fitted_diff",
-      coeff_se_colname = "contrast_fitted_diff_se",
+      coeff_colname = "contrast_fitted_beta_diff",
+      coeff_se_colname = "contrast_fitted_beta_diff_se",
       title_extra = sprintf(", p-val=%.1E", pval),
       icr_id = sig_icrs[m],spline_window_bp_size = 250,
+      xlabel = expression("Model Fitted "~ Delta * beta),
       export_plot = TRUE,
       output_path = paste0(subout_path, "_plot_point_diff"))
     
     plot_icr_cpg_diffs_rows(
       df_cpg = df_all_test$df_cpg,
-      coeff_colname = "contrast_fitted_diff",
-      coeff_se_colname = "contrast_fitted_diff_se",
+      coeff_colname = "contrast_fitted_beta_diff",
+      coeff_se_colname = "contrast_fitted_beta_diff_se",
       title_extra = sprintf(", p-val=%.1E", pval),
       icr_id = sig_icrs[m], spline_window_bp_size = 250,
+      xlabel = expression("Model Fitted "~ Delta * beta),
       export_plot = TRUE,
       output_path = paste0(subout_path, "_plot_row_diff"))
 

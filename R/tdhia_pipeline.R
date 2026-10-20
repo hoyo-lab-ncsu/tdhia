@@ -81,9 +81,18 @@ tdhia_pipeline <- function(
   data_beta = list()
   
   # 1) process idat files to probe data
-  if ( is.null(probe_data_cache) ||
-       (is.character(probe_data_cache) && !file.exists(probe_data_cache)) ||
-       (is.list(probe_data_cache) && overwrite_probe_cache) ) {
+  
+  
+  if (is.list(probe_data_cache)) {
+    # If probe_data_cache is a probe_data object, then assign
+    verbosecat("Using processed probe data from input argument.\n")
+    data_beta$probe_beta <- probe_data_cache
+  } else if (is.character(probe_data_cache) && file.exists(probe_data_cache) && 
+             !overwrite_probe_cache) { 
+    # Load if probe_data_cache is a path
+    verbosecat("Loading processed probe data from cache file.\n")
+    data_beta$probe_beta <- readRDS(probe_data_cache)
+  } else {
     # If probe_data_cache is null, OR is a path and does not exist, then process
     verbosecat("Processing probe data.\n")
     data_beta$probe_beta <-
@@ -95,17 +104,10 @@ tdhia_pipeline <- function(
     
     # Save data to disk if probe_data_cache is a path
     if (is.character(probe_data_cache)) saveRDS(data_beta$probe_beta, file = probe_data_cache)
-    
-  } else if (is.list(probe_data_cache)) {
-    # If probe_data_cache is a probe_data object, then assign
-    verbosecat("Using processed probe data from input argument.\n")
-    data_beta$probe_beta <- probe_data_cache
-  } else if (is.character(probe_data_cache)) { 
-    # Load if probe_data_cache is a path
-    verbosecat("Loading processed probe data from cache file.\n")
-    data_beta$probe_beta <- readRDS(probe_data_cache)
-  } else { stop("probe_beta_cache logic flawed, something went wrong")}
-
+  }
+  
+  
+  
   # Ensure that requested idats match the ones in probe beta
   if (!is.null(idat_basenames)) {
     data_beta$probe_beta <- subset_probe_beta(data_beta$probe_beta, idat_basenames)

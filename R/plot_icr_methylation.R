@@ -56,7 +56,7 @@
 #'   Files are written only when `export_plot = TRUE`.
 #' @export
 plot_icr_cpg_diffs <- function(
-    df_cpg, icr_id, title_extra = "",
+    df_cpg, icr_id, title_extra = "", xlabel = NULL,
     coeff_colname = "cpg_glm_estimate",
     coeff_se_colname = "cpg_glm_estimate_se", spline_window_cpg_size = 5,
     spline_window_bp_size = NULL, export_plot = FALSE, output_path = NULL) {
@@ -136,7 +136,8 @@ plot_icr_cpg_diffs <- function(
       c(-bound, bound)
     }) +
     ggplot2::scale_y_reverse(breaks = ticks, expand = c(0, 0)) +
-    ggplot2::labs(x = coeff_colname, y = "CpG index (genomic order)",
+    ggplot2::labs(x = if (is.null(xlabel)) coeff_colname else xlabel, 
+                  y = "CpG index (genomic order)",
                   title = paste0(title, " ", title_extra)) +
     ggplot2::theme_classic(base_size = 10)
   
@@ -218,9 +219,15 @@ plot_icr_cpg_diffs <- function(
 #'   span estimate plus or minus one standard error and the full CpG row height.
 #'   Black vertical lines mark the estimates and span the full row height.
 #' @inheritParams plot_icr_cpg_diffs
-#' @details Uses the same manifest, filtering, genomic order, smoothing options,
-#'   and symmetric coefficient axis as [plot_icr_cpg_diffs()]. Each row extends
-#'   from CpG index minus 0.5 to index plus 0.5. Estimate lines use the same
+#' @details Uses the same manifest, filtering, genomic order, and smoothing
+#'   options as [plot_icr_cpg_diffs()]. The x-axis is symmetric about zero,
+#'   with a half-range equal to the largest absolute coefficient plus the mean
+#'   standard error across the plotted CpGs, without extra axis padding.
+#'   If all coefficients and SEs are zero, the half-range defaults to 1.
+#'   SE rectangles and smoothed values outside the visible range are clipped
+#'   at the panel boundary; their underlying values are retained.
+#'   Each row extends from CpG index minus 0.5 to index plus 0.5.
+#'   Estimate lines use the same
 #'   bounds as the SE rectangles, so their heights adapt to the number of CpGs
 #'   and panel height. Line width is fixed; line position marks the estimate.
 #'   Light grey SE rectangles and estimate lines are drawn beneath the
@@ -230,12 +237,12 @@ plot_icr_cpg_diffs <- function(
 #'   from [plot_icr_cpg_diffs()].
 #' @export
 plot_icr_cpg_diffs_rows <- function(
-    df_cpg, icr_id, coeff_colname = "cpg_glm_estimate",
+    df_cpg, icr_id, coeff_colname = "cpg_glm_estimate", xlabel = NULL,
     coeff_se_colname = "cpg_glm_estimate_se", title_extra ="", spline_window_cpg_size = 5,
     spline_window_bp_size = NULL, export_plot = FALSE, output_path = NULL) {
   gg <- plot_icr_cpg_diffs(
     df_cpg = df_cpg, title_extra = title_extra, icr_id = icr_id, coeff_colname = coeff_colname,
-    coeff_se_colname = coeff_se_colname,
+    coeff_se_colname = coeff_se_colname, xlabel = xlabel,
     spline_window_cpg_size = spline_window_cpg_size,
     spline_window_bp_size = spline_window_bp_size, export_plot = FALSE)
 
@@ -258,6 +265,11 @@ plot_icr_cpg_diffs_rows <- function(
     inherits(layer$geom, "GeomRect") || inherits(layer$geom, "GeomSegment")
   }, logical(1))
   gg$layers <- c(gg$layers[row_layers], gg$layers[!row_layers])
+
+  # Zoom using the average SE; retain full intervals for boundary clipping.
+  bound <- max(abs(gg$data$coefficient)) + mean(gg$data$coefficient_se)
+  if (bound == 0) bound <- 1
+  gg <- gg + ggplot2::coord_cartesian(xlim = c(-bound, bound), expand = FALSE)
   .export_icr_cpg_diffs(gg, icr_id, export_plot, output_path)
   gg
 }
