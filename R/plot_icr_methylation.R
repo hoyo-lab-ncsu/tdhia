@@ -609,3 +609,167 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   # Export
   return(list(plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
 }
+
+#' Count shared and exclusive significant ICRs between response variables
+#'
+#' @param df_icr ICR results containing `icr_id`, `primary_var`, `model_group`,
+#'   and the significance column selected by `icr_sig_colname`.
+#' @param primary_var_ref Single reference response variable name, matched
+#'   against `primary_var` in `df_icr`.
+#' @param primary_vars Character vector of response variable names to compare
+#'   with the reference. Comparisons retain the supplied order.
+#' @param icr_sig_colname Name of a logical, numeric binary, or numeric p-value
+#'   column used for selection. Logical TRUE and numeric 1 mean significant.
+#'   Numeric columns whose observed values are all 0 or 1 are treated as binary.
+#'   Otherwise, supply p-values (adjusted p-values for adjusted significance).
+#' @param icr_sig_pval_threh P-value threshold, default 0.05. P-values must be
+#'   strictly below this threshold. Ignored for binary significance columns.
+#' @param model_group Single model group to select from `df_icr`.
+#' @param output_path Optional output directory. NULL (default) disables CSV
+#'   export. Otherwise, missing directories are created and both tables are
+#'   saved as `<primary_var_ref>_shared_icr_summary.csv` and
+#'   `<primary_var_ref>_shared_icrs_long.csv`, without row names. Existing files
+#'   with these names are overwritten.
+#' @details Selection uses the supplied significance results without
+#'   recalculating them. Binary detection uses the full supplied column,
+#'   ignoring missing values, before selecting the model group. Missing results,
+#'   nonfinite p-values, and missing or empty ICR identifiers are excluded.
+#'   Each significant ICR is counted once per response variable,
+#'   even if it appears in multiple rows. Requested responses must be present
+#'   in the selected model group; responses with no significant ICRs are
+#'   represented by empty sets.
+#' @returns A named list with two data frames:
+#'   \describe{
+#'     \item{summary}{One row per entry in `primary_vars`, with columns
+#'       `primary_a` (the reference), `primary_b` (the comparison), `n_a` (ICRs
+#'       significant only for A), `n_b` (ICRs significant only for B), and
+#'       `n_shared` (ICRs significant for both).}
+#'     \item{shared_icrs}{Long table with columns `primary_a`, `primary_b`, and
+#'       `shared_icr_id`, followed by metadata from
+#'       [add_metadata_to_imp_sites()] with `imp_type = "icr"`: `is_icr_zinc`,
+#'       `ZFP57`, `ZFP445`, `icr_conf`, `Genomic.Coordinates`,
+#'       `Nearest.Transcript`, and `Distance.to.Nearest.Transcript`.
+#'       Each response-pair/ICR combination appears once.
+#'       ICRs shared across several comparisons appear once per pair. Pairs
+#'       without shared ICRs have no rows. An empty result retains the key and
+#'       metadata columns. ICRs without annotations are retained, using the
+#'       metadata helper's missing-value and membership defaults. Comparisons
+#'       retain their first supplied order, and ICRs follow their order in the
+#'       reference results.}
+#'   }
+#'   Access the counts with `$summary`; the function previously returned the
+#'   counts data frame directly. Both tables are returned regardless of whether
+#'   CSV export is enabled.
+#' @examples
+#' df_icr <- data.frame(
+#'   primary_var = c("response_a", "response_a", "response_b", "response_b"),
+#'   model_group = "all", icr_id = c("ICR_1", "ICR_2", "ICR_2", "ICR_3"),
+#'   adjusted_pval = c(0.01, 0.02, 0.03, 0.04))
+#' overlap <- shared_icrs_reponse_vars(
+#'   df_icr, "response_a", "response_b", "adjusted_pval", 0.05, "all")
+#' overlap$summary
+#' overlap$shared_icrs
+#' df_icr$significant <- df_icr$adjusted_pval < 0.05
+#' shared_icrs_reponse_vars(
+#'   df_icr, "response_a", "response_b", "significant", model_group = "all")
+#' @export
+shared_icrs_reponse_vars <- function(
+    df_icr, primary_var_ref, primary_vars, icr_sig_colname,
+    icr_sig_pval_threh = 0.05, model_group, output_path = NULL) {
+  required <- c("icr_id", "primary_var", "model_group", icr_sig_colname)
+  missing_cols <- setdiff(required, names(df_icr))
+  if (length(missing_cols)) {
+    stop("Missing columns in df_icr: ", paste(missing_cols, collapse = ", "))
+  }
+  if (!is.character(primary_var_ref) || length(primary_var_ref) != 1L ||
+      !is.character(primary_vars) ||
+      anyNA(c(primary_var_ref, primary_vars))) {
+    stop("Supply one reference name and a vector of nonmissing response names.")
+  }
+  if (length(model_group) != 1L || is.na(model_group)) {
+    stop("model_group must select one nonmissing model group.")
+  }
+  sig_values <- df_icr[[icr_sig_colname]]
+  if (!is.numeric(sig_values) && !is.logical(sig_values)) {
+    stop("icr_sig_colname must select a logical or numeric column.")
+  }
+  observed_values <- sig_values[!is.na(sig_values)]
+  is_binary <- is.logical(sig_values) ||
+    (length(observed_values) > 0L && all(observed_values %in% c(0, 1)))
+  if (!is_binary && (!is.numeric(icr_sig_pval_threh) ||
+      length(icr_sig_pval_threh) != 1L || !is.finite(icr_sig_pval_threh) ||
+      icr_sig_pval_threh < 0 || icr_sig_pval_threh > 1)) {
+    stop("icr_sig_pval_threh must be a single number between 0 and 1.")
+  }
+
+  # Restrict the model before identifying each response's significant ICRs.
+  df_group <- df_icr[which(df_icr$model_group == model_group), , drop = FALSE]
+  if (!nrow(df_group)) stop("No results for model_group: ", model_group)
+  missing_vars <- setdiff(c(primary_var_ref, primary_vars), df_group$primary_var)
+  if (length(missing_vars)) {
+    stop("Response variables absent from selected model group: ",
+         paste(missing_vars, collapse = ", "))
+  }
+  # Binary flags bypass the threshold, including its validation.
+  sig_values <- df_group[[icr_sig_colname]]
+  significant <- if (is_binary) {
+    !is.na(sig_values) & sig_values == 1
+  } else {
+    is.finite(sig_values) & sig_values < icr_sig_pval_threh
+  }
+  keep <- significant &
+    !is.na(df_group$icr_id) & nzchar(as.character(df_group$icr_id))
+  df_sig <- df_group[which(keep), , drop = FALSE]
+  reference_icrs <- unique(as.character(df_sig$icr_id[
+    which(df_sig$primary_var == primary_var_ref)]))
+
+  # Preallocate to preserve column types, including for an empty comparison list.
+  result <- data.frame(
+    primary_a = rep(primary_var_ref, length(primary_vars)),
+    primary_b = primary_vars, n_a = integer(length(primary_vars)),
+    n_b = integer(length(primary_vars)), n_shared = integer(length(primary_vars)),
+    stringsAsFactors = FALSE)
+  shared_rows <- vector("list", length(primary_vars))
+  for (i in seq_along(primary_vars)) {
+    comparison_icrs <- unique(as.character(df_sig$icr_id[
+      which(df_sig$primary_var == primary_vars[i])]))
+    shared_icrs <- intersect(reference_icrs, comparison_icrs)
+    result$n_a[i] <- length(setdiff(reference_icrs, comparison_icrs))
+    result$n_b[i] <- length(setdiff(comparison_icrs, reference_icrs))
+    result$n_shared[i] <- length(shared_icrs)
+    shared_rows[[i]] <- data.frame(
+      primary_a = rep(primary_var_ref, length(shared_icrs)),
+      primary_b = rep(primary_vars[i], length(shared_icrs)),
+      shared_icr_id = shared_icrs, stringsAsFactors = FALSE)
+  }
+
+  # Keep one row per pair/ICR, including when comparison names are repeated.
+  shared_table <- if (length(shared_rows)) {
+    unique(do.call(rbind, shared_rows))
+  } else {
+    data.frame(primary_a = character(), primary_b = character(),
+               shared_icr_id = character(), stringsAsFactors = FALSE)
+  }
+  rownames(shared_table) <- NULL
+
+  # Annotate each distinct ICR once, then match it across response pairs.
+  metadata <- tdhia::add_metadata_to_imp_sites(
+    unique(shared_table$shared_icr_id), imp_type = "icr", db_flag = FALSE)
+  shared_table <- dplyr::left_join(
+    shared_table, metadata, by = c("shared_icr_id" = "icr_id"),
+    relationship = "many-to-one")
+
+  # Export the returned tables, retaining column headers for empty results.
+  if (!is.null(output_path)) {
+    if (!is.character(output_path) || length(output_path) != 1L ||
+        is.na(output_path) || !nzchar(output_path)) {
+      stop("output_path must be NULL or a single nonempty directory path.")
+    }
+    dir.create(output_path, recursive = TRUE, showWarnings = FALSE)
+    utils::write.csv(result, file.path(output_path,
+      paste0(primary_var_ref, "_shared_icr_summary.csv")), row.names = FALSE)
+    utils::write.csv(shared_table, file.path(output_path,
+      paste0(primary_var_ref, "_shared_icrs_long.csv")), row.names = FALSE)
+  }
+  return(list(summary = result, shared_icrs = shared_table))
+}

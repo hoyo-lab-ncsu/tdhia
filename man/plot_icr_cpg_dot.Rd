@@ -20,9 +20,11 @@ plot_icr_cpg_dot(
 )
 }
 \arguments{
-\item{df_cpg}{Data frame containing \code{cpg_id} and the selected value and
-p-value columns. Subset to one primary variable and model group before
-calling; duplicate CpG results within the ICR are rejected.}
+\item{df_cpg}{Data frame containing \code{cpg_id}, \code{is_icr_zinc},
+\code{Nearest.Transcript}, and the selected value and p-value columns. Subset
+to one primary variable and model group before calling; duplicate CpG
+results within the ICR are rejected. Supply the QC-passing CpGs before
+restricting the displayed window so the title reports the full ICR count.}
 
 \item{icr_id}{Single ICR identifier, such as \code{"ICR_10"}.}
 
@@ -40,7 +42,8 @@ reordered if the blue value exceeds the red value at a CpG.}
 A CpG is marked when its supplied p-value is strictly below this threshold.
 No statistical tests or multiple-testing adjustments are performed.}
 
-\item{title_extra}{Text appended to the ICR identifier in the plot title.}
+\item{title_extra}{Text appended to the ICR count, ZF status, and transcript
+title. Include any desired separator, such as \code{", p-val=0.001"}.}
 
 \item{xlabel}{Optional vertical value-axis label. The argument name is
 retained so existing calls still label the fitted values. Defaults to
@@ -62,11 +65,15 @@ Defaults to FALSE. The ggplot object is returned in either case.}
 \item{output_path}{Output directory, required when \code{export_plot = TRUE}.
 Missing directories are created. The filename is
 \verb{dot_Est_<+ or ->ZF_<High, Medium, or Low>_<icr_id>.jpg}, using the ICR
-metadata. Unknown confidence is labeled Unknown. Images are 4 inches high
-and 4.5 inches wide. Existing files are overwritten.}
+metadata. Unknown confidence is labeled Unknown. Images are 2.5 inches high
+and 3 inches wide. Existing files are overwritten.}
+
+\item{legend_position}{Legend placement passed to \code{theme(legend.position)}.
+Defaults to \code{"none"}.}
 }
 \value{
-A ggplot object. Its \code{data} contains the retained input rows plus
+A ggplot object, or NULL if no finite CpG pairs remain. Its \code{data}
+contains the retained input rows plus
 \code{MAPINFO}, \code{cpg_index}, \code{low_value}, \code{high_value}, and \code{significant}.
 Files are written only when \code{export_plot = TRUE}.
 }
@@ -82,13 +89,18 @@ solid-circle shape and fill behavior.
 This function prepares its data and builds its plot independently.
 CpG membership and positions come from
 \code{tdhia::manifest_v1A2_design_scores}, using \code{icr_id} and \code{MAPINFO}.
+The title follows \verb{ICR_ID (N CpGs) +ZF/-ZF: transcripts}. N counts all
+input rows belonging to the requested ICR before finite-value filtering
+and windowing. ZF status comes from the first nonmissing \code{is_icr_zinc}
+value in those rows. Distinct nonmissing, nonempty \code{Nearest.Transcript}
+values are joined with commas. Missing annotations are labeled Unknown.
 Only CpGs present in \code{df_cpg} are plotted. Rows with missing or nonfinite
 low values, high values, or positions are omitted with a warning, so every
 retained CpG has both dots. Missing p-values do not remove CpGs.
 Windowing occurs after filtering and genomic ordering, without recomputing
 p-values or their significance. Original CpG indices are retained after
 windowing. When the final plot contains 23 or fewer CpGs, every site is
-labeled by its \code{cpg_id}, with labels rotated vertically. Larger selections
+labeled by its \code{cpg_id}, with rotated labels. Larger selections
 show a subset of numeric index ticks.
 The value axis includes both series within the selected window, with
 padding for asterisks above the values. It is not forced symmetric about

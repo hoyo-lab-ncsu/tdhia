@@ -516,16 +516,16 @@ tdhia_stat_summary_plots<- function (df_all_test, out_path) {
       n_zf = length(icr_id[is_icr_zinc]),
       n_not_zf = length(icr_id[!is_icr_zinc]),
       .groups = "drop"
-    )
+    )  %>% arrange(primary_var)
   
   
   df_icr_summary <- df_all_test$df_icr %>%
     tidyr::pivot_longer(
-      cols = matches(paste0("^(", paste(icr_prefixes, collapse = "|"), ").*adj_pval")),
+      cols = matches(paste0("^(", paste(prefixes, collapse = "|"), ").*adj_pval.*")),
       names_to = "pval_col", values_to = "adj_pval" ) %>%
     dplyr::mutate(
       method = stringr::str_extract(
-        pval_col, paste0("^(", paste(icr_prefixes, collapse = "|"), ")"))
+        pval_col, paste0("^(", paste(prefixes, collapse = "|"), ")"))
     ) %>%
     dplyr::filter(adj_pval < 0.05) %>%
     dplyr::group_by(model_group, primary_var, method) %>%
@@ -537,7 +537,7 @@ tdhia_stat_summary_plots<- function (df_all_test, out_path) {
       n_zf = sum(is_icr_zinc, na.rm = TRUE),
       n_not_zf = sum(!is_icr_zinc, na.rm = TRUE),
       .groups = "drop"
-    )
+    ) %>% arrange(primary_var)
   
   
   if (!is.null(out_path)) {
@@ -698,7 +698,7 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
       df_sub_cpg <- df_all_test$df_cpg %>% filter(
         primary_var == this_primary_var, model_group == this_model_group) 
       
-      # Get manual range for zoomed in dot plot
+      # Get manual range for zoomed in dot
       this_manual_range = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]]
       
       
@@ -717,6 +717,8 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
       export_plot = TRUE, max_sig_hwindow = this_manual_range,
       output_path = paste0(subout_path, "_plot_dot"))
     # if (is.null(out)) browser()
+    
+    
     
       #contrast_fitted_diff
     # plot_icr_cpg_diffs(

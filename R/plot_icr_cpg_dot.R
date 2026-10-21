@@ -6,9 +6,11 @@
 #'   supplied p-value threshold. No smoothing curves are drawn.
 #'   Dots match [plot_icr_dotplot()]: size 1.5, alpha 0.5, and the default
 #'   solid-circle shape and fill behavior.
-#' @param df_cpg Data frame containing `cpg_id` and the selected value and
-#'   p-value columns. Subset to one primary variable and model group before
-#'   calling; duplicate CpG results within the ICR are rejected.
+#' @param df_cpg Data frame containing `cpg_id`, `is_icr_zinc`,
+#'   `Nearest.Transcript`, and the selected value and p-value columns. Subset
+#'   to one primary variable and model group before calling; duplicate CpG
+#'   results within the ICR are rejected. Supply the QC-passing CpGs before
+#'   restricting the displayed window so the title reports the full ICR count.
 #' @param icr_id Single ICR identifier, such as `"ICR_10"`.
 #' @param low_colname Numeric column plotted as blue dots. Defaults to
 #'   `"contrast_fitted_low"`. Values are plotted directly, without averaging.
@@ -20,7 +22,8 @@
 #' @param cpg_sig_thresh P-value threshold between 0 and 1. Defaults to 0.05.
 #'   A CpG is marked when its supplied p-value is strictly below this threshold.
 #'   No statistical tests or multiple-testing adjustments are performed.
-#' @param title_extra Text appended to the ICR identifier in the plot title.
+#' @param title_extra Text appended to the ICR count, ZF status, and transcript
+#'   title. Include any desired separator, such as `", p-val=0.001"`.
 #' @param xlabel Optional vertical value-axis label. The argument name is
 #'   retained so existing calls still label the fitted values. Defaults to
 #'   `"Model fitted value"` when NULL. Expressions are supported.
@@ -38,25 +41,33 @@
 #' @param output_path Output directory, required when `export_plot = TRUE`.
 #'   Missing directories are created. The filename is
 #'   `dot_Est_<+ or ->ZF_<High, Medium, or Low>_<icr_id>.jpg`, using the ICR
-#'   metadata. Unknown confidence is labeled Unknown. Images are 4 inches high
-#'   and 4.5 inches wide. Existing files are overwritten.
+#'   metadata. Unknown confidence is labeled Unknown. Images are 2.5 inches high
+#'   and 3 inches wide. Existing files are overwritten.
+#' @param legend_position Legend placement passed to `theme(legend.position)`.
+#'   Defaults to `"none"`.
 #' @details This function prepares its data and builds its plot independently.
 #'   CpG membership and positions come from
 #'   `tdhia::manifest_v1A2_design_scores`, using `icr_id` and `MAPINFO`.
+#'   The title follows `ICR_ID (N CpGs) +ZF/-ZF: transcripts`. N counts all
+#'   input rows belonging to the requested ICR before finite-value filtering
+#'   and windowing. ZF status comes from the first nonmissing `is_icr_zinc`
+#'   value in those rows. Distinct nonmissing, nonempty `Nearest.Transcript`
+#'   values are joined with commas. Missing annotations are labeled Unknown.
 #'   Only CpGs present in `df_cpg` are plotted. Rows with missing or nonfinite
 #'   low values, high values, or positions are omitted with a warning, so every
 #'   retained CpG has both dots. Missing p-values do not remove CpGs.
 #'   Windowing occurs after filtering and genomic ordering, without recomputing
 #'   p-values or their significance. Original CpG indices are retained after
 #'   windowing. When the final plot contains 23 or fewer CpGs, every site is
-#'   labeled by its `cpg_id`, with labels rotated vertically. Larger selections
+#'   labeled by its `cpg_id`, with rotated labels. Larger selections
 #'   show a subset of numeric index ticks.
 #'   The value axis includes both series within the selected window, with
 #'   padding for asterisks above the values. It is not forced symmetric about
 #'   zero because the plotted values are levels rather than differences.
 #'   The former `spline_window_cpg_size` and `spline_window_bp_size` arguments
 #'   have been removed; remove them from existing calls.
-#' @returns A ggplot object. Its `data` contains the retained input rows plus
+#' @returns A ggplot object, or NULL if no finite CpG pairs remain. Its `data`
+#'   contains the retained input rows plus
 #'   `MAPINFO`, `cpg_index`, `low_value`, `high_value`, and `significant`.
 #'   Files are written only when `export_plot = TRUE`.
 #' @export
@@ -66,7 +77,8 @@ plot_icr_cpg_dot <- function(
     cpg_sig_thresh = 0.05, title_extra = "", xlabel = NULL,
     max_sig_hwindow = NULL, export_plot = FALSE, output_path = NULL, legend_position = "none") {
   
-  required <- c("cpg_id", low_colname, high_colname, cpg_sig_colname)
+  required <- c("cpg_id", "is_icr_zinc", "Nearest.Transcript", low_colname,
+                high_colname, cpg_sig_colname)
   missing_cols <- setdiff(required, names(df_cpg))
   if (length(missing_cols)) {
     stop("Missing columns in df_cpg: ", paste(missing_cols, collapse = ", "))
@@ -106,6 +118,20 @@ plot_icr_cpg_dot <- function(
     stop("Multiple results per CpG; subset df_cpg to one primary variable ",
          "and model group before plotting.")
   }
+
+  # Keep the full ICR count and metadata before filtering values or zooming.
+  total_cpgs <- nrow(df_plot)
+  zinc_values <- df_plot$is_icr_zinc[!is.na(df_plot$is_icr_zinc)]
+  zinc_label <- if (!length(zinc_values)) "Unknown ZF" else
+    if (zinc_values[1]) "+ZF" else "-ZF"
+  transcripts <- unique(trimws(as.character(df_plot$Nearest.Transcript)))
+  transcripts <- transcripts[!is.na(transcripts) & nzchar(transcripts)]
+  transcript_label <- if (length(transcripts)) {
+    paste(transcripts, collapse = ", ")
+  } else {"Unknown"}
+  title <- sprintf("%s (%d CpGs) %s: %s", icr_id, total_cpgs, zinc_label,
+                    transcript_label)
+
   df_plot$MAPINFO <- sites$MAPINFO[match(df_plot$cpg_id, sites$cpg_id)]
   df_plot$low_value <- df_plot[[low_colname]]
   df_plot$high_value <- df_plot[[high_colname]]
@@ -154,7 +180,7 @@ plot_icr_cpg_dot <- function(
   }
 
   # Label small windows by CpG name; keep numeric indices for larger windows.
-  named_sites <- nrow(df_plot) <= 23L
+  named_sites <- nrow(df_plot) <= 27L
   index_range <- range(df_plot$cpg_index)
   ticks <- if (named_sites) df_plot$cpg_index else
     sort(unique(c(index_range, pretty(index_range, n = 8))))
@@ -180,9 +206,10 @@ plot_icr_cpg_dot <- function(
                     "CpG index (genomic order)",
                   y = if (is.null(xlabel)) "Model fitted value" else xlabel,
                   colour = NULL,
-                  title = paste0(icr_id, " ", title_extra)) +
+                  title = paste0(title, title_extra)) +
     ggplot2::theme_classic(base_size = 7) +
-    ggplot2::theme(legend.position = legend_position)
+    ggplot2::theme(legend.position = legend_position,
+                    plot.title = ggplot2::element_text(size = 6))
   if (named_sites) {
     gg <- gg + ggplot2::theme(axis.text.x = ggplot2::element_text(
       angle = 45, vjust = 1, hjust = 1))
