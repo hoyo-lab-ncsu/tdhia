@@ -15,7 +15,8 @@ plot_icr_cpg_dot(
   xlabel = NULL,
   max_sig_hwindow = NULL,
   export_plot = FALSE,
-  output_path = NULL
+  output_path = NULL,
+  legend_position = "none"
 )
 }
 \arguments{

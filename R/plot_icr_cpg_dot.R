@@ -64,7 +64,8 @@ plot_icr_cpg_dot <- function(
     df_cpg, icr_id, low_colname = "contrast_fitted_low",
     high_colname = "contrast_fitted_high", cpg_sig_colname = "cpg_glm_adj_pval",
     cpg_sig_thresh = 0.05, title_extra = "", xlabel = NULL,
-    max_sig_hwindow = NULL, export_plot = FALSE, output_path = NULL) {
+    max_sig_hwindow = NULL, export_plot = FALSE, output_path = NULL, legend_position = "none") {
+  
   required <- c("cpg_id", low_colname, high_colname, cpg_sig_colname)
   missing_cols <- setdiff(required, names(df_cpg))
   if (length(missing_cols)) {
@@ -119,8 +120,12 @@ plot_icr_cpg_dot <- function(
   if (any(!keep)) warning("Omitting ", sum(!keep), " CpG(s) with missing ",
                           "or nonfinite low values, high values, or positions.")
   df_plot <- df_plot[keep, , drop = FALSE]
-  if (!nrow(df_plot)) 
-    stop("No finite CpG results remain for ", icr_id, "."); return(NULL)
+  if (!nrow(df_plot)) {
+    return(NULL);
+    save(list = ls(all.names = TRUE), file = "plot_icr_cpg_dot.RData")# load(file = "plot_icr_cpg_dot.RData")
+    stop("No finite CpG results remain for ", icr_id, "."); 
+  }
+    
   df_plot <- df_plot[order(df_plot$MAPINFO, df_plot$cpg_id), , drop = FALSE]
   df_plot$cpg_index <- seq_len(nrow(df_plot))
   p_value <- df_plot[[cpg_sig_colname]]
@@ -176,11 +181,11 @@ plot_icr_cpg_dot <- function(
                   y = if (is.null(xlabel)) "Model fitted value" else xlabel,
                   colour = NULL,
                   title = paste0(icr_id, " ", title_extra)) +
-    ggplot2::theme_classic(base_size = 10) +
-    ggplot2::theme(legend.position = "bottom")
+    ggplot2::theme_classic(base_size = 7) +
+    ggplot2::theme(legend.position = legend_position)
   if (named_sites) {
     gg <- gg + ggplot2::theme(axis.text.x = ggplot2::element_text(
-      angle = 90, vjust = 0.5, hjust = 1))
+      angle = 45, vjust = 1, hjust = 1))
   }
   gg <- gg + ggplot2::geom_point(ggplot2::aes(y = low_value, colour = "Low"),
                                  size = 1.5, alpha = 0.5) +

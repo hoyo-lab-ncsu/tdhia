@@ -698,8 +698,8 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
       df_sub_cpg <- df_all_test$df_cpg %>% filter(
         primary_var == this_primary_var, model_group == this_model_group) 
       
-      
-      
+      # Get manual range for zoomed in dot plot
+      this_manual_range = manual_range[[this_model_group]][[this_primary_var]][[this_analysis_prefix]][[sig_icrs[m]]]
       
       
       # a(b)
@@ -714,9 +714,9 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
       title_extra = sprintf(", p-val=%.1E", pval),
       icr_id = sig_icrs[m],
       xlabel = expression("Model Fitted "~beta),
-      export_plot = TRUE,
+      export_plot = TRUE, max_sig_hwindow = this_manual_range,
       output_path = paste0(subout_path, "_plot_dot"))
-    if (is.null(out)) browser;
+    # if (is.null(out)) browser()
     
       #contrast_fitted_diff
     # plot_icr_cpg_diffs(
@@ -729,7 +729,7 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
     #   export_plot = TRUE,
     #   output_path = paste0(subout_path, "_plot_point_diff"))
     
-    plot_icr_cpg_diffs_rows(
+    out <- plot_icr_cpg_diffs_rows(
       df_cpg = df_sub_cpg,
       coeff_colname = "contrast_fitted_beta_diff",
       coeff_se_colname = "contrast_fitted_beta_diff_se",
@@ -738,7 +738,7 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
       xlabel = expression("Model Fitted "~ Delta * beta),
       export_plot = TRUE,
       output_path = paste0(subout_path, "_plot_row_diff"))
-
+    # if (is.null(out)) browser()
       
     }
     

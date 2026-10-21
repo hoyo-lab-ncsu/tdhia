@@ -118,7 +118,12 @@ plot_icr_cpg_diffs_rows <- function(
   if (any(!keep)) warning("Omitting ", sum(!keep), " CpG(s) with missing ",
                           "or nonfinite coefficients, SEs, or positions.")
   df_plot <- df_plot[keep, , drop = FALSE]
-  if (!nrow(df_plot)) stop("No finite CpG results remain for ", icr_id, ".")
+  if (!nrow(df_plot)) {
+    return(NULL);
+    save(list = ls(all.names = TRUE), file = "plot_icr_cpg_diffs_rows.RData")# load(file = "plot_icr_cpg_diffs_rows.RData")
+    stop("No finite CpG results remain for ", icr_id, "."); return(NULL)
+  }
+    
   df_plot <- df_plot[order(df_plot$MAPINFO, df_plot$cpg_id), , drop = FALSE]
   df_plot$cpg_index <- seq_len(nrow(df_plot))
   df_plot$lower <- df_plot$coefficient - df_plot$coefficient_se
