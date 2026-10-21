@@ -6,8 +6,8 @@
 #' tables and counts significant results for each adjusted p-value column.
 #'
 #' @param primary_var Character string naming a column in `study_data`. Used
-#'   as the response in GLM, SKAT, and principal component regression, and as
-#'   the first predictor in the limma analysis.
+#'   as the non-methylation variable in GLMs, the response in SKAT and principal
+#'   component regression, and the first predictor in the limma analysis.
 #' @param predictor_vars Nonempty character vector of additional column names
 #'   in `study_data`. All are included in GLM and limma models. The current
 #'   implementation uses only `predictor_vars[-1]` as covariates for SKAT and
@@ -37,30 +37,36 @@
 #' @param verbose Logical; whether to print progress from this function and
 #'   helpers that receive this argument. Limma and Lancaster helpers are
 #'   currently called with verbose output enabled regardless of this value.
-#' @param family Character string specifying the GLM family, such as
-#'   `"gaussian"` or `"binomial"`, also passed to principal component regression.
-#'   If `NULL`, uses `"binomial"` when `study_data[[primary_var]]` has exactly
-#'   two unique values, and `"gaussian"` otherwise. Missing values count as a
-#'   unique value in this inference. SKAT is always called with `out_type = "C"`
-#'   (continuous response), independently of this argument.
 #' @param db_flag Logical; whether to save the function's initial environment
 #'   to `tdhia_stat_tests.RData` in the working directory. Defaults to `FALSE`.
 #'   Pipeline and GLM helpers are called with their own debug flags enabled
 #'   even when this argument is `FALSE`.
-#' @param overwrite_stats_cache Logical; whether to recompute cached CpG GLM, SKAT,
-#'   principal component regression, limma, and Lancaster results. Defaults
-#'   to `FALSE`. Existing ICR GLM results are always reused, even when `TRUE`.
+#' @param overwrite_stats_cache Logical; whether to recompute cached CpG and
+#'   ICR GLM, SKAT, principal component regression, limma, and Lancaster results.
+#'   Defaults to `FALSE`. Use TRUE to refresh results cached under an older
+#'   family inference rule.
 #' @param add_genomic_metadata Logical; whether to join genomic annotations
 #'   from [add_metadata_to_imp_sites()] to the CpG and ICR result tables.
 #'   Defaults to `TRUE`.
 #'
 #' @details
-#' The GLM formula is `primary_var ~ beta + predictor_vars`, with the named
-#' predictors joined by `+` and `beta` representing each methylation site.
+#' GLMs fit both `primary_var ~ beta + predictor_vars` and
+#' `beta ~ primary_var + predictor_vars`, with the named predictors joined by
+#' `+` and `beta` representing each methylation site. `meth_preferred_role`
+#' chooses the reported coefficient statistics at both CpG and ICR levels.
+#' The CpG fitted beta contrasts always come from methylation-response models.
 #' GLMs use pipeline output with failed beta measurements set to missing.
 #' The other tests use samples with complete study variables and pipeline
 #' output that retains failed beta measurements. Samples removed by pipeline
 #' filtering are excluded from the corresponding prepared study data.
+#'
+#' Model families are inferred automatically; there is no `family` input.
+#' Exactly two distinct nonmissing values in `study_data[[primary_var]]` select
+#' `"binomial"` for methylation-predictor GLMs and principal component regression.
+#' All other counts select `"gaussian"`. Missing outcomes are ignored only when
+#' inferring the family; the existing fitting and imputation rules still apply.
+#' Methylation-response GLMs always use `"gaussian"`. SKAT continues to use
+#' `out_type = "C"` (continuous response).
 #'
 #' SKAT uses `method = "optimal.adj"`, scaling, and at least three CpGs per
 #' ICR. Principal component regression also requires at least three CpGs and
@@ -102,7 +108,7 @@ tdhia_stat_tests <- function(
     study_data, m_value_transform = T, 
     data_cache_path, model_group = "default", impute_na = TRUE, 
     n.cores = max(c(parallel::detectCores()-4, 1)), verbose = T, 
-    family = NULL, db_flag = FALSE, overwrite_stats_cache = F,
+    db_flag = FALSE, overwrite_stats_cache = F,
     overwrite_betas_cache = F, add_genomic_metadata = T) {
   # Define matched ags
   meth_preferred_role <- match.arg(meth_preferred_role, several.ok = FALSE)
@@ -193,13 +199,14 @@ tdhia_stat_tests <- function(
                        icr_id = icr_ids)
   rm(cpg_ids, icr_ids)
   
-  # Parse model string, test if response is binomial or not
-  if (is.null(family)) {
-    if (length(unique(study_data[[primary_var]])) ==2 ) {
-      family <- "binomial"
-    } else {family <- "gaussian"}
-    verbosecat(sprintf("Inferred model from response var: %s\n", family))
-  }
+  # Infer once from observed outcomes so missing values do not create a level.
+  observed_primary <- study_data[[primary_var]]
+  observed_primary <- observed_primary[!is.na(observed_primary)]
+  beta_predictor_model_family <- if (length(unique(observed_primary)) == 2L) {
+    "binomial"
+  } else {"gaussian"}
+  verbosecat(sprintf("Inferred model from response var: %s\n",
+                     beta_predictor_model_family))
   
   
   # Helper function for summarizing cpg level results in icr table
@@ -212,8 +219,6 @@ tdhia_stat_tests <- function(
   
   # Set model variables
   beta_predictor_model_str <- paste0(primary_var, " ~ beta + ", paste0(predictor_vars,collapse = " + "))
-  beta_predictor_model_family <- if (length(unique(study_data[[primary_var]])) ==2 ) {
-     "binomial"} else {"gaussian"}
   
   beta_response_model_str <- paste0("beta ~  ", primary_var, " + ", paste0(predictor_vars,collapse = " + "))
   beta_response_model_family <- "gaussian"
@@ -225,36 +230,38 @@ tdhia_stat_tests <- function(
   # 3) Beta response model is used for adjusted fitted methylation difference
   
   # Beta predictor results
-  df_cpg_glm_beta_predictor_path = file.path(data_cache_path, paste0("beta_predictor", model_group, "_", primary_var, "_df_cpg_glm.rds"))
+  df_cpg_glm_beta_predictor_path = file.path(data_cache_path, paste0("beta_predictor_", model_group, "_", primary_var, "_df_cpg_glm.rds"))
   df_cpg_glm_beta_predictor <- cache_result(df_cpg_glm_beta_predictor_path, {
     tdhia::imprintome_glm(
       model_str = beta_predictor_model_str, study_data = data_na$study_data,
       betas = data_na$betas$cpg_beta$cpg_beta_df, family = beta_predictor_model_family, m_value_transform = m_value_transform,
-      n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
+      n_p_adj = nrow(data_na$betas$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
   
   # Beta response results
-  df_cpg_glm_beta_response_path = file.path(data_cache_path, paste0("beta_response", model_group, "_", primary_var, "_df_cpg_glm.rds"))
+  df_cpg_glm_beta_response_path = file.path(data_cache_path, paste0("beta_response_", model_group, "_", primary_var, "_df_cpg_glm.rds"))
   df_cpg_glm_beta_response <- cache_result(df_cpg_glm_beta_response_path, {
     tdhia::imprintome_glm(
       model_str = beta_response_model_str, study_data = data_na$study_data,
       betas = data_na$betas$cpg_beta$cpg_beta_df, family = beta_response_model_family, m_value_transform = m_value_transform,
-      n_p_adj = nrow(data_na$betas_na$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
+      n_p_adj = nrow(data_na$betas$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
   }, overwrite = overwrite_stats_cache)
   
   # Assign model results for specified for beta (as response or predictor)
   if (meth_preferred_role == "response") {
     df_cpg_glm <- df_cpg_glm_beta_response
+    imp_site_column = "Response"
   } else if (meth_preferred_role == "predictor") {
     df_cpg_glm <- df_cpg_glm_beta_predictor
+    imp_site_column = "Variable"
   }
   
   # Add to CpG-level results
   df_cpg_glm_formatted <- df_cpg_glm$imp_site %>% 
-    select(Variable, Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
-    rename(cpg_id = Variable, cpg_glm_estimate = Estimate, cpg_glm_statistic = Statistic,
+    select(!!sym(imp_site_column), Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
+    rename(cpg_id = !!sym(imp_site_column), cpg_glm_estimate = Estimate, cpg_glm_statistic = Statistic,
            cpg_glm_estimate_se = StdError,
            cpg_glm_raw_pval = P_VAL, cpg_glm_adj_pval = ADJ_P_VAL, cpg_glm_family = Family) %>%
     left_join(  tdhia::mapping_cpg_icr_ids %>% select(ICR_id, CpG_id) %>% distinct() %>% 
@@ -270,7 +277,7 @@ tdhia_stat_tests <- function(
     ), by = join_by(icr_id) )
   
   
-  # Add contrasts to cpg level results
+  # Add contrasts to cpg level results using beta_response model
   df_cpg <- df_cpg %>% left_join(
     df_cpg_glm_beta_response$imp_site %>% select(
       c(Response, contrast_fitted_low, contrast_fitted_high, contrast_group_high,
@@ -280,23 +287,46 @@ tdhia_stat_tests <- function(
     by = join_by(cpg_id))
 
   # Add Contrasts to icr level results
-  
+  # TODO
   
   
   # ICR GLM                                                    #################
   #_____________________________________________________________________________
-  df_icr_glm_path = file.path(data_cache_path, paste0(model_group, "_", primary_var, "df_icr_glm.rds"))
-  df_icr_glm <- cache_result(df_icr_glm_path, {
+  
+  df_icr_glm_beta_response_path = file.path(data_cache_path, paste0("beta_response_", model_group, "_", primary_var, "df_icr_glm.rds"))
+  df_icr_glm_beta_response <- cache_result(df_icr_glm_beta_response_path, {
     tdhia::imprintome_glm(
-      model_str = beta_predictor_model_str, study_data = data_na$study_data,
-      betas = data_na$betas$icr_beta$icr_beta_df, family = family, m_value_transform = m_value_transform,
+      model_str = beta_response_model_str, study_data = data_na$study_data,
+      betas = data_na$betas$icr_beta$icr_beta_df, family = beta_response_model_family, 
+      m_value_transform = m_value_transform,
       n_p_adj = nrow(data_na$betas$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
       verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
-  }, overwrite = FALSE)
+  }, overwrite = overwrite_stats_cache)
+  
+  
+  df_icr_glm_beta_predictor_path = file.path(data_cache_path, paste0("beta_predictor_", model_group, "_", primary_var, "df_icr_glm.rds"))
+  df_icr_glm_beta_predictor <- cache_result(df_icr_glm_beta_predictor_path, {
+    tdhia::imprintome_glm(
+      model_str = beta_predictor_model_str, study_data = data_na$study_data,
+      betas = data_na$betas$icr_beta$icr_beta_df, family = beta_predictor_model_family, 
+      m_value_transform = m_value_transform,
+      n_p_adj = nrow(data_na$betas$icr_beta$icr_beta_df), db_flag = db_flag, rm.na.all = !impute_na,
+      verbose = verbose, impute_na = impute_na, max_p_val = 0.05, n.cores = n.cores)
+  }, overwrite = overwrite_stats_cache)
+  
+  
+  
+  # Assign model results for specified for beta (as response or predictor)
+  if (meth_preferred_role == "response") {
+    df_icr_glm <- df_icr_glm_beta_response
+  } else if (meth_preferred_role == "predictor") {
+    df_icr_glm <- df_icr_glm_beta_predictor
+  }
+  
   
   df_icr_glm_formatted <- df_icr_glm$imp_site %>% 
-    select(Variable, Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
-    rename(icr_id = Variable, icr_glm_estimate = Estimate, icr_glm_statistic = Statistic,
+    select(!!sym(imp_site_column), Estimate, StdError, Statistic, P_VAL, ADJ_P_VAL, Family) %>%
+    rename(icr_id = !!sym(imp_site_column), icr_glm_estimate = Estimate, icr_glm_statistic = Statistic,
            icr_glm_estimate_se = StdError,
            icr_glm_raw_pval = P_VAL, icr_glm_adj_pval = ADJ_P_VAL, icr_glm_family = Family)
   # Add to ICR-level results
@@ -334,8 +364,8 @@ tdhia_stat_tests <- function(
       m_value_transform = m_value_transform,  data_norm_type = "n1", pct_variance = 0.80,
       df_study = data_complete$study_data %>% rename(Patient_ID = patient_id),
       outcome = unname(primary_var),  covariates = predictor_vars[-1],
-      Patient_ID = "Patient_ID",  family = family,  icr_ids = NULL,
-      min_cpg = 3,  verbose = verbose,  n.cores = 1)
+      Patient_ID = "Patient_ID", family = beta_predictor_model_family,
+      icr_ids = NULL, min_cpg = 3, verbose = verbose, n.cores = 1)
   }, overwrite = overwrite_stats_cache)
   df_icr_pcr_formatted <- df_icr_pcr %>% rename(icr_id = ICR_id, adj_pval = adj_p_value ) %>% 
     rename_with(~ paste0("icr_pcr_", .), -icr_id)
@@ -664,22 +694,43 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
     #   filter_na_group = T, legend.position = "none", ytext = "Mean Beta Value",
     #                  sample_colname = "patient_id", overwrite_plot = T)
   
+      
+      df_sub_cpg <- df_all_test$df_cpg %>% filter(
+        primary_var == this_primary_var, model_group == this_model_group) 
+      
+      
+      
+      
+      
       # a(b)
     pval = df_all_test$df_icr[[pval_colname]][df_all_test$df_icr$icr_id==sig_icrs[m]]
       
-      #contrast_fitted_diff
-    plot_icr_cpg_diffs(
-      df_cpg = df_all_test$df_cpg,
-      coeff_colname = "contrast_fitted_beta_diff",
-      coeff_se_colname = "contrast_fitted_beta_diff_se",
+    
+    out <- plot_icr_cpg_dot(
+      df_cpg = df_sub_cpg,
+      low_colname = "contrast_fitted_low",
+      high_colname = "contrast_fitted_high",
+      cpg_sig_colname = "cpg_glm_adj_pval",
       title_extra = sprintf(", p-val=%.1E", pval),
-      icr_id = sig_icrs[m],spline_window_bp_size = 250,
-      xlabel = expression("Model Fitted "~ Delta * beta),
+      icr_id = sig_icrs[m],
+      xlabel = expression("Model Fitted "~beta),
       export_plot = TRUE,
-      output_path = paste0(subout_path, "_plot_point_diff"))
+      output_path = paste0(subout_path, "_plot_dot"))
+    if (is.null(out)) browser;
+    
+      #contrast_fitted_diff
+    # plot_icr_cpg_diffs(
+    #   df_cpg = df_all_test$df_cpg,
+    #   coeff_colname = "contrast_fitted_beta_diff",
+    #   coeff_se_colname = "contrast_fitted_beta_diff_se",
+    #   title_extra = sprintf(", p-val=%.1E", pval),
+    #   icr_id = sig_icrs[m],spline_window_bp_size = 250,
+    #   xlabel = expression("Model Fitted "~ Delta * beta),
+    #   export_plot = TRUE,
+    #   output_path = paste0(subout_path, "_plot_point_diff"))
     
     plot_icr_cpg_diffs_rows(
-      df_cpg = df_all_test$df_cpg,
+      df_cpg = df_sub_cpg,
       coeff_colname = "contrast_fitted_beta_diff",
       coeff_se_colname = "contrast_fitted_beta_diff_se",
       title_extra = sprintf(", p-val=%.1E", pval),

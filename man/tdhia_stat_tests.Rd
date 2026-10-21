@@ -16,7 +16,6 @@ tdhia_stat_tests(
   impute_na = TRUE,
   n.cores = max(c(parallel::detectCores() - 4, 1)),
   verbose = T,
-  family = NULL,
   db_flag = FALSE,
   overwrite_stats_cache = F,
   overwrite_betas_cache = F,
@@ -25,8 +24,8 @@ tdhia_stat_tests(
 }
 \arguments{
 \item{primary_var}{Character string naming a column in \code{study_data}. Used
-as the response in GLM, SKAT, and principal component regression, and as
-the first predictor in the limma analysis.}
+as the non-methylation variable in GLMs, the response in SKAT and principal
+component regression, and the first predictor in the limma analysis.}
 
 \item{predictor_vars}{Nonempty character vector of additional column names
 in \code{study_data}. All are included in GLM and limma models. The current
@@ -67,21 +66,15 @@ component regression is always run with one core.}
 helpers that receive this argument. Limma and Lancaster helpers are
 currently called with verbose output enabled regardless of this value.}
 
-\item{family}{Character string specifying the GLM family, such as
-\code{"gaussian"} or \code{"binomial"}, also passed to principal component regression.
-If \code{NULL}, uses \code{"binomial"} when \code{study_data[[primary_var]]} has exactly
-two unique values, and \code{"gaussian"} otherwise. Missing values count as a
-unique value in this inference. SKAT is always called with \code{out_type = "C"}
-(continuous response), independently of this argument.}
-
 \item{db_flag}{Logical; whether to save the function's initial environment
 to \code{tdhia_stat_tests.RData} in the working directory. Defaults to \code{FALSE}.
 Pipeline and GLM helpers are called with their own debug flags enabled
 even when this argument is \code{FALSE}.}
 
-\item{overwrite_stats_cache}{Logical; whether to recompute cached CpG GLM, SKAT,
-principal component regression, limma, and Lancaster results. Defaults
-to \code{FALSE}. Existing ICR GLM results are always reused, even when \code{TRUE}.}
+\item{overwrite_stats_cache}{Logical; whether to recompute cached CpG and
+ICR GLM, SKAT, principal component regression, limma, and Lancaster results.
+Defaults to \code{FALSE}. Use TRUE to refresh results cached under an older
+family inference rule.}
 
 \item{add_genomic_metadata}{Logical; whether to join genomic annotations
 from \code{\link[=add_metadata_to_imp_sites]{add_metadata_to_imp_sites()}} to the CpG and ICR result tables.
@@ -115,12 +108,23 @@ at imprinting control region (ICR) level. Combines results into annotated
 tables and counts significant results for each adjusted p-value column.
 }
 \details{
-The GLM formula is \code{primary_var ~ beta + predictor_vars}, with the named
-predictors joined by \code{+} and \code{beta} representing each methylation site.
+GLMs fit both \code{primary_var ~ beta + predictor_vars} and
+\code{beta ~ primary_var + predictor_vars}, with the named predictors joined by
+\code{+} and \code{beta} representing each methylation site. \code{meth_preferred_role}
+chooses the reported coefficient statistics at both CpG and ICR levels.
+The CpG fitted beta contrasts always come from methylation-response models.
 GLMs use pipeline output with failed beta measurements set to missing.
 The other tests use samples with complete study variables and pipeline
 output that retains failed beta measurements. Samples removed by pipeline
 filtering are excluded from the corresponding prepared study data.
+
+Model families are inferred automatically; there is no \code{family} input.
+Exactly two distinct nonmissing values in \code{study_data[[primary_var]]} select
+\code{"binomial"} for methylation-predictor GLMs and principal component regression.
+All other counts select \code{"gaussian"}. Missing outcomes are ignored only when
+inferring the family; the existing fitting and imputation rules still apply.
+Methylation-response GLMs always use \code{"gaussian"}. SKAT continues to use
+\code{out_type = "C"} (continuous response).
 
 SKAT uses \code{method = "optimal.adj"}, scaling, and at least three CpGs per
 ICR. Principal component regression also requires at least three CpGs and

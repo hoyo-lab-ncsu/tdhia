@@ -26,8 +26,12 @@ before calling; duplicate CpG results within the ICR are rejected.}
 
 \item{coeff_colname}{Name of the numeric coefficient column.}
 
+\item{xlabel}{Optional x-axis label. Defaults to \code{coeff_colname} when NULL.}
+
 \item{coeff_se_colname}{Numeric standard error column on the same scale as
 the coefficient. Standard errors must be nonnegative.}
+
+\item{title_extra}{Text appended to the ICR identifier in the plot title.}
 
 \item{spline_window_cpg_size}{Approximate number of neighboring CpGs used by
 LOESS, an integer of at least 5. Defaults to 5; NULL disables smoothing.
@@ -45,31 +49,48 @@ Defaults to FALSE. The ggplot object is returned in either case.}
 Missing directories are created. The filename is
 \verb{diff_Est_<+ or ->ZF_<High, Medium, or Low>_<icr_id>.jpg}, using the same
 metadata as \code{\link[=plot_icr_dotplot]{plot_icr_dotplot()}}. Unknown confidence is labeled Unknown.
-Images are 2 inches high and 2.5 inches wide. Existing files are overwritten;
-both diff plotting functions use the same filename convention.}
+Images are 4 inches high and 4.5 inches wide. Existing files are overwritten.}
 }
 \value{
-A ggplot object with the plotted rows in its \code{data}. Files are
-written only when \code{export_plot = TRUE}. Missing-value handling is inherited
-from \code{\link[=plot_icr_cpg_diffs]{plot_icr_cpg_diffs()}}.
+A ggplot object. Its \code{data} contains the plotted rows, genomic
+positions, CpG indices, coefficients, standard errors, and interval bounds.
+Files are written only when \code{export_plot = TRUE}.
 }
 \description{
-A row-based version of \code{\link[=plot_icr_cpg_diffs]{plot_icr_cpg_diffs()}}. Grey rectangles
-span estimate plus or minus one standard error and the full CpG row height.
-Black vertical lines mark the estimates and span the full row height.
+Plot one coefficient per CpG in genomic order using full-height
+rows. Grey rectangles span estimate plus or minus one standard error.
+Black vertical lines mark the estimates. This function prepares its data,
+fits its optional local trend, and builds its plot independently.
 }
 \details{
-Uses the same manifest, filtering, genomic order, and smoothing
-options as \code{\link[=plot_icr_cpg_diffs]{plot_icr_cpg_diffs()}}. The x-axis is symmetric about zero,
-with a half-range equal to the largest absolute coefficient plus the mean
-standard error across the plotted CpGs, without extra axis padding.
+CpG membership and positions come from
+\code{tdhia::manifest_v1A2_design_scores}, using \code{icr_id} and \code{MAPINFO}.
+Only CpGs present in \code{df_cpg} are plotted. Rows with missing or nonfinite
+coefficients, standard errors, or positions are omitted with a warning.
+Indices number the remaining CpGs in genomic order from top to bottom;
+for large ICRs only a subset of index ticks is displayed.
+In CpG mode, LOESS fits coefficient against CpG index, using degree 1 and
+span = min(spline_window_cpg_size / n_cpgs, 1). Despite the argument name,
+this is a local regression, not a spline. With fewer than five valid CpGs,
+CpG-mode smoothing is skipped with a warning.
+In bp mode, local linear regression uses tricube distance weights within
+half the specified window width; sites at the boundary have zero weight.
+Predictions requiring fewer than two distinct positively weighted genomic
+positions are left as gaps, without widening the window. Prediction
+positions are interpolated from MAPINFO along the numbered CpG axis.
+Both window arguments set to NULL disable smoothing. SEs do not weight
+either smoother. Positive smoothed values have transparent red fill to
+zero, and negative values have transparent blue fill to zero.
+The x-axis is symmetric about zero, with a half-range equal to the largest
+absolute coefficient plus the mean standard error across the plotted CpGs,
+without extra axis padding.
 If all coefficients and SEs are zero, the half-range defaults to 1.
 SE rectangles and smoothed values outside the visible range are clipped
 at the panel boundary; their underlying values are retained.
-Each row extends from CpG index minus 0.5 to index plus 0.5.
-Estimate lines use the same
-bounds as the SE rectangles, so their heights adapt to the number of CpGs
-and panel height. Line width is fixed; line position marks the estimate.
+Each row extends from CpG index minus 0.5 to index plus 0.5. Estimate lines
+use the same bounds as the SE rectangles, so their heights adapt to the
+number of CpGs and panel height. Line width is fixed; line position marks
+the estimate. The y-axis has no expansion beyond the plotted geometry.
 Light grey SE rectangles and estimate lines are drawn beneath the
 smoothing layers and the zero reference line.
 }

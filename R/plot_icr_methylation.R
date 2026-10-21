@@ -1,20 +1,18 @@
-
-
-
-#' Plot CpG estimates, standard errors, and a local trend within an ICR
+#' Plot CpG estimates and standard errors as full-height rows
 #'
-#' @description Plot one coefficient per CpG, ordered by increasing genomic
-#'   position from top to bottom. Black points and grey segments show estimates
-#'   plus or minus one standard error. An optional smoother shows the
-#'   trend through transparent red fill between positive smoothed values and zero
-#'   and blue fill between negative smoothed values and zero.
+#' @description Plot one coefficient per CpG in genomic order using full-height
+#'   rows. Grey rectangles span estimate plus or minus one standard error.
+#'   Black vertical lines mark the estimates. This function prepares its data,
+#'   fits its optional local trend, and builds its plot independently.
 #' @param df_cpg Data frame containing `cpg_id` and the selected coefficient
 #'   and standard error columns. Subset to one primary variable and model group
 #'   before calling; duplicate CpG results within the ICR are rejected.
 #' @param icr_id Single ICR identifier, such as `"ICR_10"`.
 #' @param coeff_colname Name of the numeric coefficient column.
+#' @param xlabel Optional x-axis label. Defaults to `coeff_colname` when NULL.
 #' @param coeff_se_colname Numeric standard error column on the same scale as
 #'   the coefficient. Standard errors must be nonnegative.
+#' @param title_extra Text appended to the ICR identifier in the plot title.
 #' @param spline_window_cpg_size Approximate number of neighboring CpGs used by
 #'   LOESS, an integer of at least 5. Defaults to 5; NULL disables smoothing.
 #'   Larger values smooth more. The window is capped at the plotted CpG count.
@@ -28,41 +26,46 @@
 #'   Missing directories are created. The filename is
 #'   `diff_Est_<+ or ->ZF_<High, Medium, or Low>_<icr_id>.jpg`, using the same
 #'   metadata as [plot_icr_dotplot()]. Unknown confidence is labeled Unknown.
-#'   Images are 2 inches high and 2.5 inches wide. Existing files are overwritten;
-#'   both diff plotting functions use the same filename convention.
+#'   Images are 4 inches high and 4.5 inches wide. Existing files are overwritten.
 #' @details CpG membership and positions come from
 #'   `tdhia::manifest_v1A2_design_scores`, using `icr_id` and `MAPINFO`.
 #'   Only CpGs present in `df_cpg` are plotted. Rows with missing or nonfinite
 #'   coefficients, standard errors, or positions are omitted with a warning.
-#'   Indices number the remaining CpGs
-#'   in genomic order; for large ICRs only a subset of index ticks is displayed.
-#'   In CpG mode, LOESS fits coefficient against CpG index, using
-#'   degree 1 and span = min(spline_window_cpg_size / n_cpgs, 1). Despite the argument
-#'   name, this is a local regression, not a spline. With fewer than five valid
-#'   CpGs, CpG-mode smoothing is skipped with a warning.
+#'   Indices number the remaining CpGs in genomic order from top to bottom;
+#'   for large ICRs only a subset of index ticks is displayed.
+#'   In CpG mode, LOESS fits coefficient against CpG index, using degree 1 and
+#'   span = min(spline_window_cpg_size / n_cpgs, 1). Despite the argument name,
+#'   this is a local regression, not a spline. With fewer than five valid CpGs,
+#'   CpG-mode smoothing is skipped with a warning.
 #'   In bp mode, local linear regression uses tricube distance weights within
 #'   half the specified window width; sites at the boundary have zero weight.
 #'   Predictions requiring fewer than two distinct positively weighted genomic
 #'   positions are left as gaps, without widening the window. Prediction
 #'   positions are interpolated from MAPINFO along the numbered CpG axis.
 #'   Both window arguments set to NULL disable smoothing. SEs do not weight
-#'   either smoother. Calls using the old `spline_window_size` argument must
-#'   use `spline_window_cpg_size` instead.
-#'   The x-axis is symmetric about zero and includes all SE endpoints and
-#'   smoothed values, with equal padding on both sides.
-#'   The y-axis has no expansion beyond the plotted geometry.
+#'   either smoother. Positive smoothed values have transparent red fill to
+#'   zero, and negative values have transparent blue fill to zero.
+#'   The x-axis is symmetric about zero, with a half-range equal to the largest
+#'   absolute coefficient plus the mean standard error across the plotted CpGs,
+#'   without extra axis padding.
+#'   If all coefficients and SEs are zero, the half-range defaults to 1.
+#'   SE rectangles and smoothed values outside the visible range are clipped
+#'   at the panel boundary; their underlying values are retained.
+#'   Each row extends from CpG index minus 0.5 to index plus 0.5. Estimate lines
+#'   use the same bounds as the SE rectangles, so their heights adapt to the
+#'   number of CpGs and panel height. Line width is fixed; line position marks
+#'   the estimate. The y-axis has no expansion beyond the plotted geometry.
+#'   Light grey SE rectangles and estimate lines are drawn beneath the
+#'   smoothing layers and the zero reference line.
 #' @returns A ggplot object. Its `data` contains the plotted rows, genomic
 #'   positions, CpG indices, coefficients, standard errors, and interval bounds.
 #'   Files are written only when `export_plot = TRUE`.
 #' @export
-plot_icr_cpg_diffs <- function(
-    df_cpg, icr_id, title_extra = "", xlabel = NULL,
-    coeff_colname = "cpg_glm_estimate",
-    coeff_se_colname = "cpg_glm_estimate_se", spline_window_cpg_size = 5,
+plot_icr_cpg_diffs_rows <- function(
+    df_cpg, icr_id, coeff_colname = "cpg_glm_estimate", xlabel = NULL,
+    coeff_se_colname = "cpg_glm_estimate_se", title_extra = "",
+    spline_window_cpg_size = 5,
     spline_window_bp_size = NULL, export_plot = FALSE, output_path = NULL) {
-  # if(TRUE) save(list = ls(all.names = TRUE), file = "plot_icr_cpg_diffs.RData")
-  # load(file = "plot_icr_cpg_diffs.RData")
-  
   required <- c("cpg_id", coeff_colname, coeff_se_colname)
   missing_cols <- setdiff(required, names(df_cpg))
   if (length(missing_cols)) {
@@ -109,7 +112,7 @@ plot_icr_cpg_diffs <- function(
     stop("Standard errors must be nonnegative.")
   }
 
-  # Remove unavailable results before assigning consecutive site indices.
+  # Filter before numbering so visible CpG indices remain consecutive.
   keep <- is.finite(df_plot$coefficient) &
     is.finite(df_plot$coefficient_se) & is.finite(df_plot$MAPINFO)
   if (any(!keep)) warning("Omitting ", sum(!keep), " CpG(s) with missing ",
@@ -121,27 +124,38 @@ plot_icr_cpg_diffs <- function(
   df_plot$lower <- df_plot$coefficient - df_plot$coefficient_se
   df_plot$upper <- df_plot$coefficient + df_plot$coefficient_se
 
-  # Keep the index axis readable even for ICRs containing hundreds of CpGs.
+  # Keep ticks readable while retaining the full height of every CpG row.
   n_sites <- nrow(df_plot)
   ticks <- if (n_sites <= 20L) seq_len(n_sites) else
     sort(unique(c(1, pretty(c(1, n_sites), n = 8), n_sites)))
   ticks <- ticks[ticks >= 1 & ticks <= n_sites]
-  title <- sprintf("%s", icr_id)
+  bound <- max(abs(df_plot$coefficient)) + mean(df_plot$coefficient_se)
+  if (bound == 0) bound <- 1
 
+  # Draw row geometry first so smoothing fills and the zero line stay on top.
   gg <- ggplot2::ggplot(df_plot, ggplot2::aes(x = coefficient, y = cpg_index)) +
-    # Scale limits include all layers, including the SEs and LOESS curve.
+    ggplot2::geom_rect(
+      ggplot2::aes(xmin = lower, xmax = upper,
+                    ymin = cpg_index - 0.5, ymax = cpg_index + 0.5),
+      fill = "grey80", alpha = 0.4, colour = NA) +
+    ggplot2::geom_segment(
+      ggplot2::aes(x = coefficient, xend = coefficient,
+                    y = cpg_index - 0.5, yend = cpg_index + 0.5),
+      colour = "black", linewidth = 0.6, lineend = "butt") +
     ggplot2::scale_x_continuous(limits = function(limits) {
-      bound <- max(abs(limits))
-      if (bound == 0) bound <- 1
-      c(-bound, bound)
+      extent <- max(abs(limits))
+      if (extent == 0) extent <- 1
+      c(-extent, extent)
     }) +
     ggplot2::scale_y_reverse(breaks = ticks, expand = c(0, 0)) +
-    ggplot2::labs(x = if (is.null(xlabel)) coeff_colname else xlabel, 
+    # Zoom without discarding SE rectangles that extend outside the panel.
+    ggplot2::coord_cartesian(xlim = c(-bound, bound), expand = FALSE) +
+    ggplot2::labs(x = if (is.null(xlabel)) coeff_colname else xlabel,
                   y = "CpG index (genomic order)",
-                  title = paste0(title, " ", title_extra)) +
+                  title = paste0(icr_id, " ", title_extra)) +
     ggplot2::theme_classic(base_size = 10)
-  
-  # Predict in index order; geom_path follows CpGs rather than sorting by x.
+
+  # Fit the local trend directly from this function's ordered CpG data.
   if (!is.null(spline_window_bp_size) || !is.null(spline_window_cpg_size)) {
     if (is.null(spline_window_bp_size) && n_sites < 5L) {
       warning("Skipping LOESS: fewer than five valid CpGs.")
@@ -158,7 +172,7 @@ plot_icr_cpg_diffs <- function(
         positions <- if (n_sites == 1L) rep(df_plot$MAPINFO, nrow(trend)) else
           stats::approx(df_plot$cpg_index, df_plot$MAPINFO,
                         xout = trend$cpg_index)$y
-        # Center and scale each local fit to avoid large genomic coordinates.
+        # Center each local fit to avoid large genomic coordinates.
         trend$estimate <- vapply(positions, function(position) {
           distance <- (df_plot$MAPINFO - position) /
             (spline_window_bp_size / 2)
@@ -171,7 +185,7 @@ plot_icr_cpg_diffs <- function(
           if (fit$rank < 2L) NA_real_ else unname(fit$coefficients[1])
         }, numeric(1))
       }
-      # Insert zero crossings so both fills meet the curve at its sign changes.
+      # Insert zero crossings so positive and negative fills meet at zero.
       crossing <- which(head(trend$estimate, -1) *
                           tail(trend$estimate, -1) < 0)
       if (length(crossing)) {
@@ -183,10 +197,9 @@ plot_icr_cpg_diffs <- function(
         trend <- rbind(trend, zeros)
         trend <- trend[order(trend$cpg_index), ]
       }
-      # Separate finite runs so neither lines nor fills bridge sparse regions.
+      # Leave gaps where a local fit cannot be estimated from nearby CpGs.
       trend$segment <- cumsum(!is.finite(trend$estimate))
       trend <- trend[is.finite(trend$estimate), ]
-      # Draw fills first so they remain behind the estimates and SE segments.
       gg <- gg + ggplot2::geom_ribbon(
         data = trend, ggplot2::aes(y = cpg_index, xmin = 0, group = segment,
                                     xmax = pmax(estimate, 0)),
@@ -198,83 +211,16 @@ plot_icr_cpg_diffs <- function(
           inherit.aes = FALSE, orientation = "y", fill = "blue",
           alpha = 0.4, colour = NA) +
         ggplot2::geom_path(
-        data = trend, ggplot2::aes(x = estimate, y = cpg_index, group = segment),
-        inherit.aes = FALSE, colour = "transparent", linewidth = 0.7)
+          data = trend, ggplot2::aes(x = estimate, y = cpg_index, group = segment),
+          inherit.aes = FALSE, colour = "transparent", linewidth = 0.7)
     }
   }
-  gg <- gg +
-    ggplot2::geom_vline(xintercept = 0, colour = "black", linewidth = 1) +
-    ggplot2::geom_segment(
-      ggplot2::aes(x = lower, xend = upper, yend = cpg_index),
-      colour = "grey60", alpha = 0.6, linewidth = 1) +
-    ggplot2::geom_point(colour = "black", size = 1.05)
-  .export_icr_cpg_diffs(gg, icr_id, export_plot, output_path)
-  return(gg)
-}
-
-
-#' Plot CpG estimates and standard errors as full-height rows
-#'
-#' @description A row-based version of [plot_icr_cpg_diffs()]. Grey rectangles
-#'   span estimate plus or minus one standard error and the full CpG row height.
-#'   Black vertical lines mark the estimates and span the full row height.
-#' @inheritParams plot_icr_cpg_diffs
-#' @details Uses the same manifest, filtering, genomic order, and smoothing
-#'   options as [plot_icr_cpg_diffs()]. The x-axis is symmetric about zero,
-#'   with a half-range equal to the largest absolute coefficient plus the mean
-#'   standard error across the plotted CpGs, without extra axis padding.
-#'   If all coefficients and SEs are zero, the half-range defaults to 1.
-#'   SE rectangles and smoothed values outside the visible range are clipped
-#'   at the panel boundary; their underlying values are retained.
-#'   Each row extends from CpG index minus 0.5 to index plus 0.5.
-#'   Estimate lines use the same
-#'   bounds as the SE rectangles, so their heights adapt to the number of CpGs
-#'   and panel height. Line width is fixed; line position marks the estimate.
-#'   Light grey SE rectangles and estimate lines are drawn beneath the
-#'   smoothing layers and the zero reference line.
-#' @returns A ggplot object with the plotted rows in its `data`. Files are
-#'   written only when `export_plot = TRUE`. Missing-value handling is inherited
-#'   from [plot_icr_cpg_diffs()].
-#' @export
-plot_icr_cpg_diffs_rows <- function(
-    df_cpg, icr_id, coeff_colname = "cpg_glm_estimate", xlabel = NULL,
-    coeff_se_colname = "cpg_glm_estimate_se", title_extra ="", spline_window_cpg_size = 5,
-    spline_window_bp_size = NULL, export_plot = FALSE, output_path = NULL) {
-  gg <- plot_icr_cpg_diffs(
-    df_cpg = df_cpg, title_extra = title_extra, icr_id = icr_id, coeff_colname = coeff_colname,
-    coeff_se_colname = coeff_se_colname, xlabel = xlabel,
-    spline_window_cpg_size = spline_window_cpg_size,
-    spline_window_bp_size = spline_window_bp_size, export_plot = FALSE)
-
-  # Replace only the estimate and SE layers; retain the shared smoothing code.
-  for (i in seq_along(gg$layers)) {
-    if (inherits(gg$layers[[i]]$geom, "GeomSegment")) {
-      gg$layers[[i]] <- ggplot2::geom_rect(
-        ggplot2::aes(xmin = lower, xmax = upper,
-                      ymin = cpg_index - 0.5, ymax = cpg_index + 0.5),
-        fill = "grey80", alpha = 0.4, colour = NA)
-    } else if (inherits(gg$layers[[i]]$geom, "GeomPoint")) {
-      gg$layers[[i]] <- ggplot2::geom_segment(
-        ggplot2::aes(x = coefficient, xend = coefficient,
-                      y = cpg_index - 0.5, yend = cpg_index + 0.5),
-        colour = "black", linewidth = 0.6, lineend = "butt")
-    }
-  }
-  # Draw row marks first, leaving the smoother and zero reference on top.
-  row_layers <- vapply(gg$layers, function(layer) {
-    inherits(layer$geom, "GeomRect") || inherits(layer$geom, "GeomSegment")
-  }, logical(1))
-  gg$layers <- c(gg$layers[row_layers], gg$layers[!row_layers])
-
-  # Zoom using the average SE; retain full intervals for boundary clipping.
-  bound <- max(abs(gg$data$coefficient)) + mean(gg$data$coefficient_se)
-  if (bound == 0) bound <- 1
-  gg <- gg + ggplot2::coord_cartesian(xlim = c(-bound, bound), expand = FALSE)
+  gg <- gg + ggplot2::geom_vline(xintercept = 0, colour = "black", linewidth = 1)
   .export_icr_cpg_diffs(gg, icr_id, export_plot, output_path)
   gg
 }
 
-# Shared export path; the rows function calls this after replacing its layers.
+# Export the row plot using the ICR metadata and established JPEG filename.
 .export_icr_cpg_diffs <- function(gg, icr_id, export_plot, output_path) {
   if (!is.logical(export_plot) || length(export_plot) != 1L ||
       is.na(export_plot)) stop("export_plot must be TRUE or FALSE.")
