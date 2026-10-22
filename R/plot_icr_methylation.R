@@ -610,7 +610,7 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
   return(list(plot = gg, df_summary = df_summary, cpg_beta_plotted = sub_mat_cpg_beta))
 }
 
-#' Count shared and exclusive significant ICRs between response variables
+#' Count significant and shared ICRs between response variables
 #'
 #' @param df_icr ICR results containing `icr_id`, `primary_var`, `model_group`,
 #'   and the significance column selected by `icr_sig_colname`.
@@ -641,9 +641,9 @@ plot_icr_diffbar <- function(mat_cpg_beta, sig_cpgs = NA, df_patient_groups, icr
 #' @returns A named list with two data frames:
 #'   \describe{
 #'     \item{summary}{One row per entry in `primary_vars`, with columns
-#'       `primary_a` (the reference), `primary_b` (the comparison), `n_a` (ICRs
-#'       significant only for A), `n_b` (ICRs significant only for B), and
-#'       `n_shared` (ICRs significant for both).}
+#'       `primary_a` (the reference), `primary_b` (the comparison), `n_a` (total
+#'       significant ICRs for A), `n_b` (total significant ICRs for B), and
+#'       `n_shared` (ICRs significant for both). Both totals include shared ICRs.}
 #'     \item{shared_icrs}{Long table with columns `primary_a`, `primary_b`, and
 #'       `shared_icr_id`, followed by metadata from
 #'       [add_metadata_to_imp_sites()] with `imp_type = "icr"`: `is_icr_zinc`,
@@ -734,8 +734,8 @@ shared_icrs_reponse_vars <- function(
     comparison_icrs <- unique(as.character(df_sig$icr_id[
       which(df_sig$primary_var == primary_vars[i])]))
     shared_icrs <- intersect(reference_icrs, comparison_icrs)
-    result$n_a[i] <- length(setdiff(reference_icrs, comparison_icrs))
-    result$n_b[i] <- length(setdiff(comparison_icrs, reference_icrs))
+    result$n_a[i] <- length(reference_icrs)
+    result$n_b[i] <- length(comparison_icrs)
     result$n_shared[i] <- length(shared_icrs)
     shared_rows[[i]] <- data.frame(
       primary_a = rep(primary_var_ref, length(shared_icrs)),

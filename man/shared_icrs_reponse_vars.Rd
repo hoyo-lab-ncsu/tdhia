@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_icr_methylation.R
 \name{shared_icrs_reponse_vars}
 \alias{shared_icrs_reponse_vars}
-\title{Count shared and exclusive significant ICRs between response variables}
+\title{Count significant and shared ICRs between response variables}
 \usage{
 shared_icrs_reponse_vars(
   df_icr,
@@ -44,9 +44,9 @@ with these names are overwritten.}
 A named list with two data frames:
 \describe{
 \item{summary}{One row per entry in \code{primary_vars}, with columns
-\code{primary_a} (the reference), \code{primary_b} (the comparison), \code{n_a} (ICRs
-significant only for A), \code{n_b} (ICRs significant only for B), and
-\code{n_shared} (ICRs significant for both).}
+\code{primary_a} (the reference), \code{primary_b} (the comparison), \code{n_a} (total
+significant ICRs for A), \code{n_b} (total significant ICRs for B), and
+\code{n_shared} (ICRs significant for both). Both totals include shared ICRs.}
 \item{shared_icrs}{Long table with columns \code{primary_a}, \code{primary_b}, and
 \code{shared_icr_id}, followed by metadata from
 \code{\link[=add_metadata_to_imp_sites]{add_metadata_to_imp_sites()}} with \code{imp_type = "icr"}: \code{is_icr_zinc},
@@ -65,7 +65,7 @@ counts data frame directly. Both tables are returned regardless of whether
 CSV export is enabled.
 }
 \description{
-Count shared and exclusive significant ICRs between response variables
+Count significant and shared ICRs between response variables
 }
 \details{
 Selection uses the supplied significance results without
