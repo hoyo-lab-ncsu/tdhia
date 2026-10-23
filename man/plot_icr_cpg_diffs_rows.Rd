@@ -14,13 +14,18 @@ plot_icr_cpg_diffs_rows(
   spline_window_cpg_size = 5,
   spline_window_bp_size = NULL,
   export_plot = FALSE,
-  output_path = NULL
+  output_path = NULL,
+  methyl_colname = "contrast_fitted_low",
+  methylation_colors = c("#EFEDF5", "#BCBDDC", "#756BB1"),
+  df_cpg_sig_colname = "cpg_glm_adj_pval",
+  cpg_sig_thresh = 0.05
 )
 }
 \arguments{
-\item{df_cpg}{Data frame containing \code{cpg_id} and the selected coefficient
-and standard error columns. Subset to one primary variable and model group
-before calling; duplicate CpG results within the ICR are rejected.}
+\item{df_cpg}{Data frame containing \code{cpg_id} and the selected coefficient,
+standard error, methylation, and significance columns. Subset to one
+primary variable and model group before calling; duplicate CpG results
+within the ICR are rejected.}
 
 \item{icr_id}{Single ICR identifier, such as \code{"ICR_10"}.}
 
@@ -50,17 +55,37 @@ Missing directories are created. The filename is
 \verb{diff_Est_<+ or ->ZF_<High, Medium, or Low>_<icr_id>.jpg}, using the same
 metadata as \code{\link[=plot_icr_dotplot]{plot_icr_dotplot()}}. Unknown confidence is labeled Unknown.
 Images are 4 inches high and 4.5 inches wide. Existing files are overwritten.}
+
+\item{methyl_colname}{Numeric beta-value column for the first heatmap.
+Defaults to \code{"contrast_fitted_low"}. Values are assigned to the nearest
+state among 0, 0.5, and 1, labeled \code{"0\%"}, \code{"50\%"}, and \code{"100\%"}.
+Exact midpoint ties (0.25 and 0.75) use the lower state. Values outside
+the range 0 to 1 use the nearest endpoint. Missing or nonfinite values
+are blank.}
+
+\item{methylation_colors}{Three fill colors for states 0\%, 50\%, and 100\%,
+respectively. Defaults to \code{c("white", "yellow", "purple")}.}
+
+\item{df_cpg_sig_colname}{Numeric p-value or logical significance column
+for the second heatmap. Defaults to \code{"cpg_glm_adj_pval"}. Significant CpGs
+are black; all others, including missing or nonfinite results, are white.
+Logical TRUE is significant without applying a threshold.}
+
+\item{cpg_sig_thresh}{P-value threshold, default 0.05. Numeric p-values must
+be strictly below this threshold. Ignored for logical significance flags.}
 }
 \value{
 A ggplot object. Its \code{data} contains the plotted rows, genomic
-positions, CpG indices, coefficients, standard errors, and interval bounds.
+positions, CpG indices, coefficients, standard errors, interval bounds,
+ordered \code{methylation_state}, and logical \code{significant}.
 Files are written only when \code{export_plot = TRUE}.
 }
 \description{
 Plot one coefficient per CpG in genomic order using full-height
 rows. Grey rectangles span estimate plus or minus one standard error.
-Black vertical lines mark the estimates. This function prepares its data,
-fits its optional local trend, and builds its plot independently.
+Black vertical lines mark the estimates. Two thin heatmaps at the right
+show methylation state and CpG significance. This function prepares its
+data, fits its optional local trend, and builds its plot independently.
 }
 \details{
 CpG membership and positions come from
@@ -93,4 +118,9 @@ number of CpGs and panel height. Line width is fixed; line position marks
 the estimate. The y-axis has no expansion beyond the plotted geometry.
 Light grey SE rectangles and estimate lines are drawn beneath the
 smoothing layers and the zero reference line.
+The heatmaps use the same retained, ordered CpGs and row bounds as the
+coefficient panel. Each strip is 2.5\% of the coefficient panel's width,
+with no gap, border, axis ticks, or legend. Methylation is closest to the
+coefficient panel, followed by significance. Missing annotations do not
+remove CpGs. The coefficient panel retains its symmetric x-axis limits.
 }
