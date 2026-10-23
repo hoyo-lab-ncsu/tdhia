@@ -2,8 +2,9 @@
 #'
 #' @description Plot one coefficient per CpG in genomic order using full-height
 #'   rows. Grey rectangles span estimate plus or minus one standard error.
-#'   Black vertical lines mark the estimates. A thin heatmap at the right
-#'   shows methylation state, with black cell borders for significant CpGs.
+#'   Vertical lines mark the estimates (black by default). A thin heatmap at
+#'   the right shows methylation state, with black rectangles at both edges of
+#'   significant CpG cells.
 #'   This function prepares its data, fits its optional local trend, and builds
 #'   its plot independently.
 #' @param df_cpg Data frame containing `cpg_id` and the selected coefficient,
@@ -16,9 +17,10 @@
 #' @param coeff_se_colname Numeric standard error column on the same scale as
 #'   the coefficient. Standard errors must be nonnegative.
 #' @param title_extra Text appended to the ICR identifier in the plot title.
-#' @param spline_window_cpg_size Approximate number of neighboring CpGs used by
-#'   LOESS, an integer of at least 5. Defaults to 5; NULL disables smoothing.
+#' @param spline_window_cpg_size Full smoothing window width in CpG-index units,
+#'   an integer of at least 5. Defaults to 5; NULL disables CpG-mode smoothing.
 #'   Larger values smooth more. The window is capped at the plotted CpG count.
+#'   Uses normalized tricube-weighted means; the argument name is retained.
 #' @param spline_window_bp_size Full genomic window width in base pairs, a
 #'   positive finite number. Defaults to NULL. When supplied, overrides
 #'   `spline_window_cpg_size`, including its validation. For example, 1000 uses
@@ -39,33 +41,54 @@
 #' @param methylation_colors Three fill colors for states 0%, 50%, and 100%,
 #'   respectively. Defaults to `c("#EFEDF5", "#BCBDDC", "#756BB1")`.
 #' @param df_cpg_sig_colname Numeric p-value or logical significance column
-#'   for methylation-cell borders. Defaults to `"cpg_glm_adj_pval"`. Missing
+#'   for methylation-cell markers. Defaults to `"cpg_glm_adj_pval"`. Missing
 #'   or nonfinite results are treated as nonsignificant.
 #'   Logical TRUE is significant without applying a threshold.
 #' @param cpg_sig_thresh P-value threshold, default 0.05. Numeric p-values must
 #'   be strictly below this threshold. Ignored for logical significance flags.
-#' @param border_color_methyl Border color for nonsignificant methylation cells.
+#' @param border_color_methyl Border color for all methylation cells.
 #'   Defaults to `"white"`; NA disables these borders. Line width is 0.15 mm.
-#' @param border_color_sig Border color for significant methylation cells.
-#'   Defaults to `"black"`; NA disables these borders. Line width is 0.4 mm.
+#' @param border_color_sig Fill color of the rectangles at both edges of
+#'   significant methylation cells. The argument name is retained for compatibility.
+#'   Defaults to `"black"`; NA hides these rectangles.
+#' @param delta_beta_fill_colors Two fill colors for the smoothed methylation
+#'   changes: negative first, positive second. Defaults to `c("blue", "red")`.
+#'   Accepts color names or hexadecimal colors. Fill alpha remains 0.4.
+#'   Has no effect when smoothing is disabled.
+#' @param zero_line_color Color of X = 0 reference lines. Defaults to NA,
+#'   which hides them. Supply a color name or hexadecimal color to show them;
+#'   line width is 1 mm.
+#' @param estimate_line_color Color of the vertical per-CpG estimate markers
+#'   for `coeff_colname` (for example, mean delta-beta). Defaults to `"black"`.
+#'   Accepts a color name or hexadecimal color; NA hides these markers.
 #' @details CpG membership and positions come from
 #'   `tdhia::manifest_v1A2_design_scores`, using `icr_id` and `MAPINFO`.
 #'   Only CpGs present in `df_cpg` are plotted. Rows with missing or nonfinite
 #'   coefficients, standard errors, or positions are omitted with a warning.
 #'   Indices number the remaining CpGs in genomic order from top to bottom;
 #'   for large ICRs only a subset of index ticks is displayed.
-#'   In CpG mode, LOESS fits coefficient against CpG index, using degree 1 and
-#'   span = min(spline_window_cpg_size / n_cpgs, 1). Despite the argument name,
-#'   this is a local regression, not a spline. With fewer than five valid CpGs,
-#'   CpG-mode smoothing is skipped with a warning.
-#'   In bp mode, local linear regression uses tricube distance weights within
-#'   half the specified window width; sites at the boundary have zero weight.
-#'   Predictions requiring fewer than two distinct positively weighted genomic
-#'   positions are left as gaps, without widening the window. Prediction
+#'   Smoothing mirrors values and coordinates about the first and last retained
+#'   CpGs, without duplicating endpoint observations. Reflections repeat as
+#'   needed to cover the smoothing radius. Padded observations are used only
+#'   for smoothing; they do not change plotted CpGs, annotations, or counts.
+#'   Both modes use a normalized kernel-weighted mean: sum(w * coefficient) /
+#'   sum(w), with tricube weights w = (1 - abs(distance / radius)^3)^3 inside
+#'   the window and zero weight at or beyond its boundary. CpG mode uses radius
+#'   min(spline_window_cpg_size, n_cpgs) / 2 in CpG-index units. In bp mode,
+#'   radius is spline_window_bp_size / 2 in genomic coordinates; prediction
 #'   positions are interpolated from MAPINFO along the numbered CpG axis.
+#'   Predictions include every retained CpG and a grid between them. A single
+#'   contributing CpG returns its coefficient. Defined kernel means remain
+#'   within the range of their contributing coefficients, avoiding regression
+#'   overshoot. Locations with no positive kernel weights are connected by
+#'   linear interpolation between neighboring defined means for display;
+#'   these connections do not imply additional CpG support. Small ICRs,
+#'   including a single valid CpG, are supported.
 #'   Both window arguments set to NULL disable smoothing. SEs do not weight
-#'   either smoother. Positive smoothed values have transparent red fill to
-#'   zero, and negative values have transparent blue fill to zero.
+#'   the smoother. Smoothed values are filled to zero using
+#'   `delta_beta_fill_colors`, with alpha 0.4.
+#'   The fill extends to the outer row boundaries, indices 0.5 and n_cpgs + 0.5,
+#'   by holding the first and last smoothed values constant over each half-row.
 #'   The x-axis is symmetric about zero, with a half-range equal to the largest
 #'   absolute coefficient plus the mean standard error across the plotted CpGs,
 #'   without extra axis padding.
@@ -77,13 +100,16 @@
 #'   number of CpGs and panel height. Line width is fixed; line position marks
 #'   the estimate. The y-axis has no expansion beyond the plotted geometry.
 #'   Light grey SE rectangles and estimate lines are drawn beneath the
-#'   smoothing layers and the zero reference line.
+#'   smoothing layers and the optional zero reference line.
 #'   The methylation heatmap uses the same retained, ordered CpGs and row bounds
-#'   as the coefficient panel. Its width is 2.5% of the coefficient panel's
+#'   as the coefficient panel. Its width is 3.25% of the coefficient panel's
 #'   width, with no gap, axis ticks, or legend. Missing annotations do not
 #'   remove CpGs. The coefficient panel retains its symmetric x-axis limits.
-#'   Cell fill denotes methylation state; border color denotes significance.
-#'   Significant cells are drawn last so their outlines remain visible.
+#'   Cell fill denotes methylation state. Significant cells have a filled
+#'   rectangle at each heatmap edge spanning the full row height. Each rectangle
+#'   extends inward by 25% of the heatmap width, leaving the middle 50% visible.
+#'   Rectangles have no outlines; their widths scale with the heatmap width.
+#'   All cells use the same thin border, regardless of significance.
 #' @returns A ggplot object. Its `data` contains the plotted rows, genomic
 #'   positions, CpG indices, coefficients, standard errors, interval bounds,
 #'   ordered `methylation_state`, and logical `significant`.
@@ -97,7 +123,9 @@ plot_icr_cpg_diffs_rows <- function(
     methyl_colname = "contrast_fitted_low",
     methylation_colors = c("#EFEDF5", "#BCBDDC", "#756BB1"),
     df_cpg_sig_colname = "cpg_glm_adj_pval", cpg_sig_thresh = 0.05,
-    border_color_methyl = "white", border_color_sig = "black") {
+    border_color_methyl = "white", border_color_sig = "black",
+    delta_beta_fill_colors = c("blue", "red"), zero_line_color = NA,
+    estimate_line_color = "black") {
   required <- c("cpg_id", coeff_colname, coeff_se_colname, methyl_colname,
                 df_cpg_sig_colname)
   missing_cols <- setdiff(required, names(df_cpg))
@@ -110,8 +138,14 @@ plot_icr_cpg_diffs_rows <- function(
   if (length(methylation_colors) != 3L || anyNA(methylation_colors)) {
     stop("methylation_colors must contain three nonmissing fill colors.")
   }
+  if (!is.character(delta_beta_fill_colors) ||
+      length(delta_beta_fill_colors) != 2L || anyNA(delta_beta_fill_colors)) {
+    stop("delta_beta_fill_colors must contain two nonmissing colors: ",
+         "negative, then positive.")
+  }
   if (length(border_color_methyl) != 1L || length(border_color_sig) != 1L) {
-    stop("Specify one border color per significance state, or NA to disable it.")
+    stop("Specify one color for cell borders and one for significance marks, ",
+         "or NA to disable either.")
   }
   sig_values <- df_cpg[[df_cpg_sig_colname]]
   if (!is.numeric(df_cpg[[methyl_colname]]) ||
@@ -198,7 +232,7 @@ plot_icr_cpg_diffs_rows <- function(
   ticks <- ticks[ticks >= 1 & ticks <= n_sites]
   bound <- max(abs(df_plot$coefficient)) + mean(df_plot$coefficient_se)
   if (bound == 0) bound <- 1
-  strip_width <- 0.05 * bound
+  strip_width <- 0.065 * bound
   panel_levels <- c("Estimate", "Methylation")
   df_plot$plot_panel <- factor("Estimate", levels = panel_levels)
   panel_bounds <- data.frame(
@@ -214,7 +248,8 @@ plot_icr_cpg_diffs_rows <- function(
     ggplot2::geom_segment(
       ggplot2::aes(x = coefficient, xend = coefficient,
                     y = cpg_index - 0.5, yend = cpg_index + 0.5),
-      colour = "black", linewidth = 0.6, lineend = "butt") +
+      colour = estimate_line_color, linewidth = 0.6, lineend = "butt",
+      na.rm = TRUE) +
     # Negative training bounds identify the estimate panel; strips start at 0.
     ggplot2::geom_blank(data = panel_bounds, ggplot2::aes(x = x, y = y),
                          inherit.aes = FALSE) +
@@ -238,91 +273,117 @@ plot_icr_cpg_diffs_rows <- function(
                     strip.background = ggplot2::element_blank(),
                     strip.text.x = ggplot2::element_blank())
 
-  # Fit the local trend directly from this function's ordered CpG data.
+  # Smooth with normalized kernel weights, then connect unsupported intervals.
   if (!is.null(spline_window_bp_size) || !is.null(spline_window_cpg_size)) {
-    if (is.null(spline_window_bp_size) && n_sites < 5L) {
-      warning("Skipping LOESS: fewer than five valid CpGs.")
-    } else {
-      trend <- data.frame(cpg_index = seq(1, n_sites,
-                                          length.out = max(200, n_sites)))
-      if (is.null(spline_window_bp_size)) {
-        fit <- stats::loess(coefficient ~ cpg_index, data = df_plot,
-                            span = min(spline_window_cpg_size / n_sites, 1),
-                            degree = 1, control = stats::loess.control(
-                              surface = "direct"))
-        trend$estimate <- as.numeric(stats::predict(fit, newdata = trend))
-      } else {
-        positions <- if (n_sites == 1L) rep(df_plot$MAPINFO, nrow(trend)) else
-          stats::approx(df_plot$cpg_index, df_plot$MAPINFO,
-                        xout = trend$cpg_index)$y
-        # Center each local fit to avoid large genomic coordinates.
-        trend$estimate <- vapply(positions, function(position) {
-          distance <- (df_plot$MAPINFO - position) /
-            (spline_window_bp_size / 2)
-          inside <- abs(distance) < 1
-          if (length(unique(df_plot$MAPINFO[inside])) < 2L) return(NA_real_)
-          local_x <- distance[inside]
-          weights <- (1 - abs(local_x)^3)^3
-          fit <- stats::lm.wfit(cbind(1, local_x),
-                               df_plot$coefficient[inside], w = weights)
-          if (fit$rank < 2L) NA_real_ else unname(fit$coefficients[1])
-        }, numeric(1))
-      }
-      # Insert zero crossings so positive and negative fills meet at zero.
-      crossing <- which(head(trend$estimate, -1) *
-                          tail(trend$estimate, -1) < 0)
-      if (length(crossing)) {
-        left <- trend[crossing, ]
-        right <- trend[crossing + 1L, ]
-        zeros <- data.frame(cpg_index = left$cpg_index - left$estimate *
-          (right$cpg_index - left$cpg_index) /
-          (right$estimate - left$estimate), estimate = 0)
-        trend <- rbind(trend, zeros)
-        trend <- trend[order(trend$cpg_index), ]
-      }
-      # Leave gaps where a local fit cannot be estimated from nearby CpGs.
-      trend$segment <- cumsum(!is.finite(trend$estimate))
-      trend <- trend[is.finite(trend$estimate), ]
-      trend$plot_panel <- factor(rep("Estimate", nrow(trend)),
-                                 levels = panel_levels)
-      gg <- gg + ggplot2::geom_ribbon(
-        data = trend, ggplot2::aes(y = cpg_index, xmin = 0, group = segment,
-                                    xmax = pmax(estimate, 0)),
-        inherit.aes = FALSE, orientation = "y", fill = "red",
-        alpha = 0.4, colour = NA) +
-        ggplot2::geom_ribbon(
-          data = trend, ggplot2::aes(y = cpg_index, group = segment,
-                                      xmin = pmin(estimate, 0), xmax = 0),
-          inherit.aes = FALSE, orientation = "y", fill = "blue",
-          alpha = 0.4, colour = NA) +
-        ggplot2::geom_path(
-          data = trend, ggplot2::aes(x = estimate, y = cpg_index, group = segment),
-          inherit.aes = FALSE, colour = "transparent", linewidth = 0.7)
+    trend <- data.frame(cpg_index = sort(unique(c(
+      seq(1, n_sites, length.out = max(200, n_sites)), df_plot$cpg_index))))
+    # Reflect both values and positions; retain each source once at joins.
+    smooth_data <- data.frame(
+      position = if (is.null(spline_window_bp_size)) df_plot$cpg_index else
+        df_plot$MAPINFO,
+      coefficient = df_plot$coefficient, source_index = seq_len(n_sites))
+    radius <- if (is.null(spline_window_bp_size)) {
+      min(spline_window_cpg_size, n_sites) / 2
+    } else spline_window_bp_size / 2
+    left_edge <- min(smooth_data$position)
+    extent <- max(smooth_data$position) - left_edge
+    if (extent > 0) {
+      n_mirrors <- ceiling(radius / extent)
+      offset <- smooth_data$position - left_edge
+      copies <- lapply(seq.int(-n_mirrors, n_mirrors), function(tile) {
+        copy <- smooth_data
+        copy$position <- left_edge + tile * extent +
+          if (tile %% 2 == 0) offset else extent - offset
+        copy
+      })
+      smooth_data <- unique(do.call(rbind, copies))
+      smooth_data <- smooth_data[
+        smooth_data$position >= left_edge - radius &
+          smooth_data$position <= left_edge + extent + radius, ]
+      smooth_data <- smooth_data[order(smooth_data$position), ]
     }
+    positions <- if (is.null(spline_window_bp_size)) {
+      trend$cpg_index
+    } else if (n_sites == 1L) {
+      rep(df_plot$MAPINFO, nrow(trend))
+    } else stats::approx(df_plot$cpg_index, df_plot$MAPINFO,
+                          xout = trend$cpg_index)$y
+    # Positive normalized weights keep each mean within its contributors' range.
+    trend$estimate <- vapply(positions, function(position) {
+      distance <- abs(smooth_data$position - position) / radius
+      inside <- distance < 1
+      if (!any(inside)) return(NA_real_)
+      weights <- (1 - distance[inside]^3)^3
+      sum(weights * smooth_data$coefficient[inside]) / sum(weights)
+    }, numeric(1))
+    # Interpolate gaps for display, retaining all defined kernel estimates.
+    supported <- is.finite(trend$estimate)
+    if (any(!supported)) {
+      trend$estimate <- stats::approx(trend$cpg_index[supported],
+        trend$estimate[supported], xout = trend$cpg_index)$y
+    }
+    # Hold endpoint values through the outer half-rows for full-height fill.
+    edges <- data.frame(cpg_index = c(0.5, n_sites + 0.5),
+                        estimate = trend$estimate[c(1, nrow(trend))])
+    trend <- rbind(edges[1, ], trend, edges[2, ])
+    # Insert zero crossings so positive and negative fills meet at zero.
+    crossing <- which(head(trend$estimate, -1) *
+                        tail(trend$estimate, -1) < 0)
+    if (length(crossing)) {
+      left <- trend[crossing, ]
+      right <- trend[crossing + 1L, ]
+      zeros <- data.frame(cpg_index = left$cpg_index - left$estimate *
+        (right$cpg_index - left$cpg_index) /
+        (right$estimate - left$estimate), estimate = 0)
+      trend <- rbind(trend, zeros)
+      trend <- trend[order(trend$cpg_index), ]
+    }
+    # Connected estimates use one continuous fill group.
+    trend$segment <- 1L
+    trend$plot_panel <- factor(rep("Estimate", nrow(trend)),
+                               levels = panel_levels)
+    gg <- gg + ggplot2::geom_ribbon(
+      data = trend, ggplot2::aes(y = cpg_index, xmin = 0, group = segment,
+                                  xmax = pmax(estimate, 0)),
+      inherit.aes = FALSE, orientation = "y", fill = delta_beta_fill_colors[2],
+      alpha = 0.4, colour = NA) +
+      ggplot2::geom_ribbon(
+        data = trend, ggplot2::aes(y = cpg_index, group = segment,
+                                    xmin = pmin(estimate, 0), xmax = 0),
+        inherit.aes = FALSE, orientation = "y", fill = delta_beta_fill_colors[1],
+        alpha = 0.4, colour = NA) +
+      ggplot2::geom_path(
+        data = trend, ggplot2::aes(x = estimate, y = cpg_index, group = segment),
+        inherit.aes = FALSE, colour = "transparent", linewidth = 0.7)
   }
-  # Encode methylation in the fill and significance in the cell border.
+  # Mark both heatmap edges while keeping the center of each cell unobstructed.
   strip_data <- data.frame(
     plot_panel = factor("Methylation", levels = panel_levels),
     cpg_index = df_plot$cpg_index,
-    border_color = ifelse(df_plot$significant,
-                          border_color_sig, border_color_methyl),
-    border_width = ifelse(df_plot$significant, 0.4, 0.15),
     fill_color = methylation_colors[as.integer(df_plot$methylation_state)])
   strip_data$fill_color[is.na(strip_data$fill_color)] <- "white"
-  # Keep significant outlines on top of neighboring nonsignificant borders.
-  strip_data <- strip_data[order(df_plot$significant), , drop = FALSE]
+  sig_data <- strip_data[rep(which(df_plot$significant), each = 2), ,
+                         drop = FALSE]
+  sig_data$xmin <- rep(c(0, 0.75) * strip_width, length.out = nrow(sig_data))
+  sig_data$xmax <- rep(c(0.25, 1) * strip_width, length.out = nrow(sig_data))
   gg <- gg + ggplot2::geom_vline(
     data = data.frame(plot_panel = factor("Estimate", levels = panel_levels),
                       intercept = 0),
-    ggplot2::aes(xintercept = intercept), colour = "black", linewidth = 1) +
+    ggplot2::aes(xintercept = intercept), colour = zero_line_color,
+    linewidth = 1, na.rm = TRUE) +
     ggplot2::geom_rect(
       data = strip_data,
       ggplot2::aes(xmin = 0, xmax = strip_width, ymin = cpg_index - 0.5,
-                    ymax = cpg_index + 0.5, fill = fill_color,
-                    colour = border_color, linewidth = border_width),
-      inherit.aes = FALSE) +
-    ggplot2::scale_fill_identity() + ggplot2::scale_colour_identity() +
-    ggplot2::scale_linewidth_identity()
+                    ymax = cpg_index + 0.5, fill = fill_color),
+      inherit.aes = FALSE, colour = border_color_methyl, linewidth = 0.15) +
+    # Use relative rectangle widths so image dimensions do not change coverage.
+    ggplot2::geom_rect(
+      data = sig_data,
+      ggplot2::aes(xmin = xmin, xmax = xmax,
+                    ymin = cpg_index - 0.5, ymax = cpg_index + 0.5),
+      inherit.aes = FALSE, fill = border_color_sig, colour = NA,
+      na.rm = TRUE) +
+    ggplot2::scale_fill_identity()
   .export_icr_cpg_diffs(gg, icr_id, export_plot, output_path)
   gg
 }

@@ -731,7 +731,7 @@ tdhia_stat_export_dot_plots <- function(df_icr, df_cpg, study_data, df_cpg_beta,
     #   export_plot = TRUE,
     #   output_path = paste0(subout_path, "_plot_point_diff"))
     
-    out <- plot_icr_cpg_diffs_rows(
+    out <- plot_icr_cpg_diffs_rows_split(
       df_cpg = df_sub_cpg,
       coeff_colname = "contrast_fitted_beta_diff",
       coeff_se_colname = "contrast_fitted_beta_diff_se",

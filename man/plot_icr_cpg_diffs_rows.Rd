@@ -20,7 +20,10 @@ plot_icr_cpg_diffs_rows(
   df_cpg_sig_colname = "cpg_glm_adj_pval",
   cpg_sig_thresh = 0.05,
   border_color_methyl = "white",
-  border_color_sig = "black"
+  border_color_sig = "black",
+  delta_beta_fill_colors = c("blue", "red"),
+  zero_line_color = NA,
+  estimate_line_color = "black"
 )
 }
 \arguments{
@@ -40,9 +43,10 @@ the coefficient. Standard errors must be nonnegative.}
 
 \item{title_extra}{Text appended to the ICR identifier in the plot title.}
 
-\item{spline_window_cpg_size}{Approximate number of neighboring CpGs used by
-LOESS, an integer of at least 5. Defaults to 5; NULL disables smoothing.
-Larger values smooth more. The window is capped at the plotted CpG count.}
+\item{spline_window_cpg_size}{Full smoothing window width in CpG-index units,
+an integer of at least 5. Defaults to 5; NULL disables CpG-mode smoothing.
+Larger values smooth more. The window is capped at the plotted CpG count.
+Uses normalized tricube-weighted means; the argument name is retained.}
 
 \item{spline_window_bp_size}{Full genomic window width in base pairs, a
 positive finite number. Defaults to NULL. When supplied, overrides
@@ -69,18 +73,32 @@ are blank.}
 respectively. Defaults to \code{c("#EFEDF5", "#BCBDDC", "#756BB1")}.}
 
 \item{df_cpg_sig_colname}{Numeric p-value or logical significance column
-for methylation-cell borders. Defaults to \code{"cpg_glm_adj_pval"}. Missing
+for methylation-cell markers. Defaults to \code{"cpg_glm_adj_pval"}. Missing
 or nonfinite results are treated as nonsignificant.
 Logical TRUE is significant without applying a threshold.}
 
 \item{cpg_sig_thresh}{P-value threshold, default 0.05. Numeric p-values must
 be strictly below this threshold. Ignored for logical significance flags.}
 
-\item{border_color_methyl}{Border color for nonsignificant methylation cells.
+\item{border_color_methyl}{Border color for all methylation cells.
 Defaults to \code{"white"}; NA disables these borders. Line width is 0.15 mm.}
 
-\item{border_color_sig}{Border color for significant methylation cells.
-Defaults to \code{"black"}; NA disables these borders. Line width is 0.4 mm.}
+\item{border_color_sig}{Fill color of the rectangles at both edges of
+significant methylation cells. The argument name is retained for compatibility.
+Defaults to \code{"black"}; NA hides these rectangles.}
+
+\item{delta_beta_fill_colors}{Two fill colors for the smoothed methylation
+changes: negative first, positive second. Defaults to \code{c("blue", "red")}.
+Accepts color names or hexadecimal colors. Fill alpha remains 0.4.
+Has no effect when smoothing is disabled.}
+
+\item{zero_line_color}{Color of X = 0 reference lines. Defaults to NA,
+which hides them. Supply a color name or hexadecimal color to show them;
+line width is 1 mm.}
+
+\item{estimate_line_color}{Color of the vertical per-CpG estimate markers
+for \code{coeff_colname} (for example, mean delta-beta). Defaults to \code{"black"}.
+Accepts a color name or hexadecimal color; NA hides these markers.}
 }
 \value{
 A ggplot object. Its \code{data} contains the plotted rows, genomic
@@ -91,8 +109,9 @@ Files are written only when \code{export_plot = TRUE}.
 \description{
 Plot one coefficient per CpG in genomic order using full-height
 rows. Grey rectangles span estimate plus or minus one standard error.
-Black vertical lines mark the estimates. A thin heatmap at the right
-shows methylation state, with black cell borders for significant CpGs.
+Vertical lines mark the estimates (black by default). A thin heatmap at
+the right shows methylation state, with black rectangles at both edges of
+significant CpG cells.
 This function prepares its data, fits its optional local trend, and builds
 its plot independently.
 }
@@ -103,18 +122,28 @@ Only CpGs present in \code{df_cpg} are plotted. Rows with missing or nonfinite
 coefficients, standard errors, or positions are omitted with a warning.
 Indices number the remaining CpGs in genomic order from top to bottom;
 for large ICRs only a subset of index ticks is displayed.
-In CpG mode, LOESS fits coefficient against CpG index, using degree 1 and
-span = min(spline_window_cpg_size / n_cpgs, 1). Despite the argument name,
-this is a local regression, not a spline. With fewer than five valid CpGs,
-CpG-mode smoothing is skipped with a warning.
-In bp mode, local linear regression uses tricube distance weights within
-half the specified window width; sites at the boundary have zero weight.
-Predictions requiring fewer than two distinct positively weighted genomic
-positions are left as gaps, without widening the window. Prediction
+Smoothing mirrors values and coordinates about the first and last retained
+CpGs, without duplicating endpoint observations. Reflections repeat as
+needed to cover the smoothing radius. Padded observations are used only
+for smoothing; they do not change plotted CpGs, annotations, or counts.
+Both modes use a normalized kernel-weighted mean: sum(w * coefficient) /
+sum(w), with tricube weights w = (1 - abs(distance / radius)^3)^3 inside
+the window and zero weight at or beyond its boundary. CpG mode uses radius
+min(spline_window_cpg_size, n_cpgs) / 2 in CpG-index units. In bp mode,
+radius is spline_window_bp_size / 2 in genomic coordinates; prediction
 positions are interpolated from MAPINFO along the numbered CpG axis.
+Predictions include every retained CpG and a grid between them. A single
+contributing CpG returns its coefficient. Defined kernel means remain
+within the range of their contributing coefficients, avoiding regression
+overshoot. Locations with no positive kernel weights are connected by
+linear interpolation between neighboring defined means for display;
+these connections do not imply additional CpG support. Small ICRs,
+including a single valid CpG, are supported.
 Both window arguments set to NULL disable smoothing. SEs do not weight
-either smoother. Positive smoothed values have transparent red fill to
-zero, and negative values have transparent blue fill to zero.
+the smoother. Smoothed values are filled to zero using
+\code{delta_beta_fill_colors}, with alpha 0.4.
+The fill extends to the outer row boundaries, indices 0.5 and n_cpgs + 0.5,
+by holding the first and last smoothed values constant over each half-row.
 The x-axis is symmetric about zero, with a half-range equal to the largest
 absolute coefficient plus the mean standard error across the plotted CpGs,
 without extra axis padding.
@@ -126,11 +155,14 @@ use the same bounds as the SE rectangles, so their heights adapt to the
 number of CpGs and panel height. Line width is fixed; line position marks
 the estimate. The y-axis has no expansion beyond the plotted geometry.
 Light grey SE rectangles and estimate lines are drawn beneath the
-smoothing layers and the zero reference line.
+smoothing layers and the optional zero reference line.
 The methylation heatmap uses the same retained, ordered CpGs and row bounds
-as the coefficient panel. Its width is 2.5\% of the coefficient panel's
+as the coefficient panel. Its width is 3.25\% of the coefficient panel's
 width, with no gap, axis ticks, or legend. Missing annotations do not
 remove CpGs. The coefficient panel retains its symmetric x-axis limits.
-Cell fill denotes methylation state; border color denotes significance.
-Significant cells are drawn last so their outlines remain visible.
+Cell fill denotes methylation state. Significant cells have a filled
+rectangle at each heatmap edge spanning the full row height. Each rectangle
+extends inward by 25\% of the heatmap width, leaving the middle 50\% visible.
+Rectangles have no outlines; their widths scale with the heatmap width.
+All cells use the same thin border, regardless of significance.
 }
