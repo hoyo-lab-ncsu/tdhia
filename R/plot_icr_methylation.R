@@ -36,13 +36,17 @@
 #'   the range 0 to 1 use the nearest endpoint. Missing or nonfinite values
 #'   are blank.
 #' @param methylation_colors Three fill colors for states 0%, 50%, and 100%,
-#'   respectively. Defaults to `c("white", "yellow", "purple")`.
+#'   respectively. Defaults to `c("#EFEDF5", "#BCBDDC", "#756BB1")`.
 #' @param df_cpg_sig_colname Numeric p-value or logical significance column
 #'   for the second heatmap. Defaults to `"cpg_glm_adj_pval"`. Significant CpGs
 #'   are black; all others, including missing or nonfinite results, are white.
 #'   Logical TRUE is significant without applying a threshold.
 #' @param cpg_sig_thresh P-value threshold, default 0.05. Numeric p-values must
 #'   be strictly below this threshold. Ignored for logical significance flags.
+#' @param border_color_methyl Border color for each methylation heatmap cell.
+#'   Defaults to `"white"`; NA disables these borders. Line width is 0.15 mm.
+#' @param border_color_sig Border color for each significance heatmap cell.
+#'   Defaults to `"white"`; NA disables these borders. Line width is 0.15 mm.
 #' @details CpG membership and positions come from
 #'   `tdhia::manifest_v1A2_design_scores`, using `icr_id` and `MAPINFO`.
 #'   Only CpGs present in `df_cpg` are plotted. Rows with missing or nonfinite
@@ -75,9 +79,10 @@
 #'   smoothing layers and the zero reference line.
 #'   The heatmaps use the same retained, ordered CpGs and row bounds as the
 #'   coefficient panel. Each strip is 2.5% of the coefficient panel's width,
-#'   with no gap, border, axis ticks, or legend. Methylation is closest to the
+#'   with no gap, axis ticks, or legend. Methylation is closest to the
 #'   coefficient panel, followed by significance. Missing annotations do not
 #'   remove CpGs. The coefficient panel retains its symmetric x-axis limits.
+#'   Thin cell borders delineate individual CpG rows in each heatmap.
 #' @returns A ggplot object. Its `data` contains the plotted rows, genomic
 #'   positions, CpG indices, coefficients, standard errors, interval bounds,
 #'   ordered `methylation_state`, and logical `significant`.
@@ -90,7 +95,8 @@ plot_icr_cpg_diffs_rows <- function(
     spline_window_bp_size = NULL, export_plot = FALSE, output_path = NULL,
     methyl_colname = "contrast_fitted_low",
     methylation_colors = c("#EFEDF5", "#BCBDDC", "#756BB1"),
-    df_cpg_sig_colname = "cpg_glm_adj_pval", cpg_sig_thresh = 0.05) {
+    df_cpg_sig_colname = "cpg_glm_adj_pval", cpg_sig_thresh = 0.05,
+    border_color_methyl = "white", border_color_sig = "white") {
   required <- c("cpg_id", coeff_colname, coeff_se_colname, methyl_colname,
                 df_cpg_sig_colname)
   missing_cols <- setdiff(required, names(df_cpg))
@@ -102,6 +108,9 @@ plot_icr_cpg_diffs_rows <- function(
   }
   if (length(methylation_colors) != 3L || anyNA(methylation_colors)) {
     stop("methylation_colors must contain three nonmissing fill colors.")
+  }
+  if (length(border_color_methyl) != 1L || length(border_color_sig) != 1L) {
+    stop("Specify one border color per heatmap, or NA to disable its borders.")
   }
   sig_values <- df_cpg[[df_cpg_sig_colname]]
   if (!is.numeric(df_cpg[[methyl_colname]]) ||
@@ -290,11 +299,12 @@ plot_icr_cpg_diffs_rows <- function(
           inherit.aes = FALSE, colour = "transparent", linewidth = 0.7)
     }
   }
-  # Fill adjoining strips with full-height row rectangles and no outlines.
+  # Fill adjoining strips and outline each CpG cell with its strip's color.
   strip_data <- data.frame(
     plot_panel = factor(rep(panel_levels[-1], each = n_sites),
                         levels = panel_levels),
     cpg_index = rep(df_plot$cpg_index, 2),
+    border_color = rep(c(border_color_methyl, border_color_sig), each = n_sites),
     fill_color = c(methylation_colors[as.integer(df_plot$methylation_state)],
                    ifelse(df_plot$significant, "black", "white")))
   strip_data$fill_color[is.na(strip_data$fill_color)] <- "white"
@@ -305,9 +315,10 @@ plot_icr_cpg_diffs_rows <- function(
     ggplot2::geom_rect(
       data = strip_data,
       ggplot2::aes(xmin = 0, xmax = strip_width, ymin = cpg_index - 0.5,
-                    ymax = cpg_index + 0.5, fill = fill_color),
-      inherit.aes = FALSE, colour = NA) +
-    ggplot2::scale_fill_identity()
+                    ymax = cpg_index + 0.5, fill = fill_color,
+                    colour = border_color),
+      inherit.aes = FALSE, linewidth = 0.15) +
+    ggplot2::scale_fill_identity() + ggplot2::scale_colour_identity()
   .export_icr_cpg_diffs(gg, icr_id, export_plot, output_path)
   gg
 }

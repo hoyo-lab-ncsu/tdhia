@@ -18,7 +18,9 @@ plot_icr_cpg_diffs_rows(
   methyl_colname = "contrast_fitted_low",
   methylation_colors = c("#EFEDF5", "#BCBDDC", "#756BB1"),
   df_cpg_sig_colname = "cpg_glm_adj_pval",
-  cpg_sig_thresh = 0.05
+  cpg_sig_thresh = 0.05,
+  border_color_methyl = "white",
+  border_color_sig = "white"
 )
 }
 \arguments{
@@ -64,7 +66,7 @@ the range 0 to 1 use the nearest endpoint. Missing or nonfinite values
 are blank.}
 
 \item{methylation_colors}{Three fill colors for states 0\%, 50\%, and 100\%,
-respectively. Defaults to \code{c("white", "yellow", "purple")}.}
+respectively. Defaults to \code{c("#EFEDF5", "#BCBDDC", "#756BB1")}.}
 
 \item{df_cpg_sig_colname}{Numeric p-value or logical significance column
 for the second heatmap. Defaults to \code{"cpg_glm_adj_pval"}. Significant CpGs
@@ -73,6 +75,12 @@ Logical TRUE is significant without applying a threshold.}
 
 \item{cpg_sig_thresh}{P-value threshold, default 0.05. Numeric p-values must
 be strictly below this threshold. Ignored for logical significance flags.}
+
+\item{border_color_methyl}{Border color for each methylation heatmap cell.
+Defaults to \code{"white"}; NA disables these borders. Line width is 0.15 mm.}
+
+\item{border_color_sig}{Border color for each significance heatmap cell.
+Defaults to \code{"white"}; NA disables these borders. Line width is 0.15 mm.}
 }
 \value{
 A ggplot object. Its \code{data} contains the plotted rows, genomic
@@ -120,7 +128,8 @@ Light grey SE rectangles and estimate lines are drawn beneath the
 smoothing layers and the zero reference line.
 The heatmaps use the same retained, ordered CpGs and row bounds as the
 coefficient panel. Each strip is 2.5\% of the coefficient panel's width,
-with no gap, border, axis ticks, or legend. Methylation is closest to the
+with no gap, axis ticks, or legend. Methylation is closest to the
 coefficient panel, followed by significance. Missing annotations do not
 remove CpGs. The coefficient panel retains its symmetric x-axis limits.
+Thin cell borders delineate individual CpG rows in each heatmap.
 }
