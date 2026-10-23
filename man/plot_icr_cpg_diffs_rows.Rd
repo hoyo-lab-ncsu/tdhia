@@ -20,7 +20,7 @@ plot_icr_cpg_diffs_rows(
   df_cpg_sig_colname = "cpg_glm_adj_pval",
   cpg_sig_thresh = 0.05,
   border_color_methyl = "white",
-  border_color_sig = "white"
+  border_color_sig = "black"
 )
 }
 \arguments{
@@ -58,7 +58,7 @@ Missing directories are created. The filename is
 metadata as \code{\link[=plot_icr_dotplot]{plot_icr_dotplot()}}. Unknown confidence is labeled Unknown.
 Images are 4 inches high and 4.5 inches wide. Existing files are overwritten.}
 
-\item{methyl_colname}{Numeric beta-value column for the first heatmap.
+\item{methyl_colname}{Numeric beta-value column for the methylation heatmap.
 Defaults to \code{"contrast_fitted_low"}. Values are assigned to the nearest
 state among 0, 0.5, and 1, labeled \code{"0\%"}, \code{"50\%"}, and \code{"100\%"}.
 Exact midpoint ties (0.25 and 0.75) use the lower state. Values outside
@@ -69,18 +69,18 @@ are blank.}
 respectively. Defaults to \code{c("#EFEDF5", "#BCBDDC", "#756BB1")}.}
 
 \item{df_cpg_sig_colname}{Numeric p-value or logical significance column
-for the second heatmap. Defaults to \code{"cpg_glm_adj_pval"}. Significant CpGs
-are black; all others, including missing or nonfinite results, are white.
+for methylation-cell borders. Defaults to \code{"cpg_glm_adj_pval"}. Missing
+or nonfinite results are treated as nonsignificant.
 Logical TRUE is significant without applying a threshold.}
 
 \item{cpg_sig_thresh}{P-value threshold, default 0.05. Numeric p-values must
 be strictly below this threshold. Ignored for logical significance flags.}
 
-\item{border_color_methyl}{Border color for each methylation heatmap cell.
+\item{border_color_methyl}{Border color for nonsignificant methylation cells.
 Defaults to \code{"white"}; NA disables these borders. Line width is 0.15 mm.}
 
-\item{border_color_sig}{Border color for each significance heatmap cell.
-Defaults to \code{"white"}; NA disables these borders. Line width is 0.15 mm.}
+\item{border_color_sig}{Border color for significant methylation cells.
+Defaults to \code{"black"}; NA disables these borders. Line width is 0.4 mm.}
 }
 \value{
 A ggplot object. Its \code{data} contains the plotted rows, genomic
@@ -91,9 +91,10 @@ Files are written only when \code{export_plot = TRUE}.
 \description{
 Plot one coefficient per CpG in genomic order using full-height
 rows. Grey rectangles span estimate plus or minus one standard error.
-Black vertical lines mark the estimates. Two thin heatmaps at the right
-show methylation state and CpG significance. This function prepares its
-data, fits its optional local trend, and builds its plot independently.
+Black vertical lines mark the estimates. A thin heatmap at the right
+shows methylation state, with black cell borders for significant CpGs.
+This function prepares its data, fits its optional local trend, and builds
+its plot independently.
 }
 \details{
 CpG membership and positions come from
@@ -126,10 +127,10 @@ number of CpGs and panel height. Line width is fixed; line position marks
 the estimate. The y-axis has no expansion beyond the plotted geometry.
 Light grey SE rectangles and estimate lines are drawn beneath the
 smoothing layers and the zero reference line.
-The heatmaps use the same retained, ordered CpGs and row bounds as the
-coefficient panel. Each strip is 2.5\% of the coefficient panel's width,
-with no gap, axis ticks, or legend. Methylation is closest to the
-coefficient panel, followed by significance. Missing annotations do not
+The methylation heatmap uses the same retained, ordered CpGs and row bounds
+as the coefficient panel. Its width is 2.5\% of the coefficient panel's
+width, with no gap, axis ticks, or legend. Missing annotations do not
 remove CpGs. The coefficient panel retains its symmetric x-axis limits.
-Thin cell borders delineate individual CpG rows in each heatmap.
+Cell fill denotes methylation state; border color denotes significance.
+Significant cells are drawn last so their outlines remain visible.
 }
